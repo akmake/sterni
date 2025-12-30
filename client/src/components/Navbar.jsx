@@ -1,29 +1,19 @@
 import { useState, Fragment } from "react";
 import { Link, NavLink } from "react-router-dom";
-import {
-  Menu, X, LogOut, Home, User, UserCircle, Briefcase, ChevronDown, Settings
-} from "lucide-react";
+import { Menu, X, LogOut, Home, Briefcase, ChevronDown, Settings, UserCircle, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
-// --- Imports from your project structure ---
 import { useAuthStore } from "@/stores/authStore";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-// --- Navigation Structure ---
-// נשארנו רק עם בית ופרויקטים
+// --- נתונים ---
 const navItems = [
     { to: '/', label: 'בית', icon: Home, type: 'link' },
     { to: '/projects', label: 'פרויקטים', icon: Briefcase, type: 'link', auth: true },
 ];
 
-// --- Helper to filter links based on auth and role ---
 const getVisibleItems = (isAuthenticated, user) => {
     return navItems.filter(item => {
         if (item.auth && !isAuthenticated) return false;
@@ -32,49 +22,54 @@ const getVisibleItems = (isAuthenticated, user) => {
     });
 };
 
-// --- Main Component ---
-export default function Navbar() {
+export default function Navbar({ mobileOnly = false }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const { isAuthenticated, user, logout } = useAuthStore();
     const visibleItems = getVisibleItems(isAuthenticated, user);
 
     return (
         <>
-            {/* --- Sidebar for Desktop --- */}
-            <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0">
-                <SidebarContent items={visibleItems} user={user} isAuthenticated={isAuthenticated} logout={logout} />
-            </div>
-
-            {/* --- Mobile Top Bar --- */}
-            <div className="md:hidden flex items-center justify-between bg-white dark:bg-slate-900 border-b h-16 px-4">
-                 <Link to="/" className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-amber-600 bg-clip-text text-transparent">
-                    yosefdahan
-                </Link>
-                <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
-                    <Menu className="h-6 w-6" />
+            {/* === כפתור צף למובייל === 
+                זה הדבר היחיד שיוצג בטלפון כשהתפריט סגור.
+            */}
+            <div className="md:hidden">
+                <Button 
+                    variant="outline" 
+                    size="icon" 
+                    onClick={() => setSidebarOpen(true)}
+                    className="bg-white/90 backdrop-blur shadow-lg border-slate-200 rounded-full h-12 w-12"
+                >
+                    <Menu className="h-6 w-6 text-slate-700" />
                 </Button>
             </div>
 
-            {/* --- Mobile Drawer --- */}
+            {/* === תפריט צד לדסקטופ (מוצג רק אם אנחנו לא במצב מובייל-בלבד) === */}
+            {!mobileOnly && (
+                <div className="hidden md:flex md:flex-col h-full w-full">
+                    <SidebarContent items={visibleItems} user={user} isAuthenticated={isAuthenticated} logout={logout} />
+                </div>
+            )}
+
+            {/* === המגירה הנפתחת (Mobile Drawer) === */}
             <AnimatePresence>
                 {sidebarOpen && (
                     <Fragment>
-                        {/* Overlay */}
+                        {/* רקע כהה (Overlay) */}
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            transition={{ duration: 0.3 }}
-                            className="fixed inset-0 z-40 bg-black/50 md:hidden"
+                            className="fixed inset-0 z-[60] bg-black/40 md:hidden backdrop-blur-sm"
                             onClick={() => setSidebarOpen(false)}
                         />
-                        {/* Drawer Content */}
+                        
+                        {/* התפריט עצמו */}
                         <motion.div
-                             initial={{ x: '100%' }}
-                             animate={{ x: 0 }}
-                             exit={{ x: '100%' }}
-                             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                             className="fixed inset-y-0 right-0 z-50 w-64 md:hidden"
+                            initial={{ x: '100%' }}
+                            animate={{ x: 0 }}
+                            exit={{ x: '100%' }}
+                            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                            className="fixed inset-y-0 right-0 z-[70] w-72 bg-white shadow-2xl md:hidden border-l border-slate-100"
                         >
                             <SidebarContent
                                 items={visibleItems}
@@ -91,7 +86,7 @@ export default function Navbar() {
     );
 }
 
-// --- Reusable Sidebar Content ---
+// --- תוכן התפריט (משותף) ---
 function SidebarContent({ items, user, isAuthenticated, logout, onClose }) {
     const handleLogout = () => {
         logout();
@@ -99,61 +94,65 @@ function SidebarContent({ items, user, isAuthenticated, logout, onClose }) {
     };
 
     return (
-        <div className="flex flex-col flex-grow border-l border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto h-full">
-            <div className="flex items-center justify-between h-16 flex-shrink-0 px-4">
-                <Link to="/" onClick={onClose} className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-amber-600 bg-clip-text text-transparent">
+        <div className="flex flex-col h-full bg-white text-slate-800">
+            {/* כותרת התפריט */}
+            <div className="flex items-center justify-between p-6 border-b border-slate-100">
+                <Link to="/" onClick={onClose} className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                     yosefdahan
                 </Link>
                 {onClose && (
-                     <Button variant="ghost" size="icon" onClick={onClose}>
-                        <X className="h-6 w-6" />
+                    <Button variant="ghost" size="icon" onClick={onClose} className="-ml-2">
+                        <X className="h-5 w-5 text-slate-400" />
                     </Button>
                 )}
             </div>
-            <div className="flex-1 flex flex-col">
-                <nav className="flex-1 px-2 py-4 space-y-1">
-                    {items.map((item) => (
-                        <NavItem key={item.label} item={item} onClick={onClose} />
-                    ))}
-                </nav>
-                <div className="px-2 py-4 border-t dark:border-slate-800">
-                    {isAuthenticated ? (
-                        <UserNav user={user} logout={handleLogout} />
-                    ) : (
-                        <div className="space-y-2">
-                             <Button variant="ghost" asChild className="w-full justify-start">
-                                <Link to="/login" onClick={onClose}><User className="ml-2 h-4 w-4" />התחברות</Link>
-                            </Button>
-                            <Button asChild className="w-full">
-                                <Link to="/register" onClick={onClose}>הרשמה</Link>
-                            </Button>
-                        </div>
-                    )}
-                </div>
+
+            {/* רשימת הלינקים */}
+            <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
+                {items.map((item) => (
+                    <NavItem key={item.label} item={item} onClick={onClose} />
+                ))}
+            </div>
+
+            {/* חלק תחתון - משתמש */}
+            <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+                {isAuthenticated ? (
+                    <UserNav user={user} logout={handleLogout} />
+                ) : (
+                    <div className="grid gap-3">
+                        <Button variant="outline" asChild className="w-full justify-start border-slate-200">
+                            <Link to="/login" onClick={onClose}><User className="ml-2 h-4 w-4" />התחברות</Link>
+                        </Button>
+                        <Button asChild className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200">
+                            <Link to="/register" onClick={onClose}>הרשמה</Link>
+                        </Button>
+                    </div>
+                )}
             </div>
         </div>
     );
 }
 
-// --- Sidebar Navigation Item ---
+// --- פריט ניווט ---
 function NavItem({ item, onClick }) {
-    const navLinkClass = "group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors";
-    const activeClass = "bg-slate-100 dark:bg-slate-800 text-primary dark:text-white";
-    const inactiveClass = "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-primary dark:hover:text-white";
-
     return (
         <NavLink
             to={item.to}
             onClick={onClick}
-            className={({ isActive }) => `${navLinkClass} ${isActive ? activeClass : inactiveClass}`}
+            className={({ isActive }) => `
+                flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200
+                ${isActive 
+                    ? "bg-blue-50 text-blue-700 shadow-sm" 
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}
+            `}
         >
-            <item.icon className="ml-3 flex-shrink-0 h-5 w-5" />
+            <item.icon className={`ml-3 h-5 w-5 ${({ isActive }) => isActive ? "text-blue-600" : "text-slate-400"}`} />
             {item.label}
         </NavLink>
     );
 }
 
-// --- User Navigation (for Sidebar) ---
+// --- תפריט משתמש תחתון ---
 function UserNav({ user, logout }) {
      const getInitials = (name) => {
         if (!name) return 'U';
@@ -163,29 +162,29 @@ function UserNav({ user, logout }) {
 
     return (
         <DropdownMenu>
-            <DropdownMenuTrigger className="w-full">
-                 <div className="flex items-center gap-3 text-sm font-medium p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                     <div className="h-9 w-9 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
+            <DropdownMenuTrigger className="w-full outline-none">
+                 <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-white hover:shadow-sm transition-all cursor-pointer border border-transparent hover:border-slate-200">
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold shadow-md shadow-blue-200">
                         {getInitials(user?.name)}
                     </div>
-                    <div className="text-start flex-1 truncate">
-                        <p className="font-semibold text-slate-800 dark:text-slate-100">{user?.name || 'משתמש'}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user?.email}</p>
+                    <div className="text-start flex-1 min-w-0">
+                        <p className="font-semibold text-sm text-slate-800 truncate">{user?.name || 'משתמש'}</p>
+                        <p className="text-xs text-slate-500 truncate">{user?.email}</p>
                     </div>
-                    <ChevronDown size={16} className="text-slate-500" />
+                    <ChevronDown size={16} className="text-slate-400" />
                  </div>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end" forceMount>
+            <DropdownMenuContent className="w-60 mb-2" align="end" side="top">
                 <DropdownMenuItem asChild>
-                    <Link to="/profile"><UserCircle className="mr-2 h-4 w-4" /><span>פרופיל</span></Link>
+                    <Link to="/profile"><UserCircle className="mr-2 h-4 w-4" /><span>פרופיל אישי</span></Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                    <Link to="/settings"><Settings className="mr-2 h-4 w-4" /><span>הגדרות</span></Link>
+                    <Link to="/settings"><Settings className="mr-2 h-4 w-4" /><span>הגדרות מערכת</span></Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={logout} className="text-red-500 focus:text-red-600 focus:bg-red-50 cursor-pointer">
+                <DropdownMenuItem onClick={logout} className="text-red-600 focus:text-red-700 focus:bg-red-50">
                     <LogOut className="mr-2 h-4 w-4" />
-                    <span>התנתק</span>
+                    <span>יציאה מהמערכת</span>
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

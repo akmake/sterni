@@ -17,8 +17,9 @@ import {
 } from 'lucide-react';
 
 // כתובת השרת לתמונות - ודא שזה תואם לשרת שלך
-const SERVER_URL = 'http://localhost:4000';
-
+const SERVER_URL = import.meta.env.DEV 
+  ? 'http://localhost:5000' 
+  : '';
 export default function ProjectPage() {
   const { id } = useParams();
   const { 

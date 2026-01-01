@@ -82,12 +82,66 @@ export const addEventToGroup = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+export const updateGroupEvent = async (req, res, next) => {
+  try {
+    const { groupId, eventId } = req.params;
+    const { title, date, startTime, endTime, hall, requirements, pax } = req.body;
+
+    // 1. בדיקת חפיפות (Conflict Check)
+    // אנחנו בודקים האם יש אירוע *אחר* (בקבוצה אחרת או בזו) שחוסם אותנו
+    const conflict = await Group.findOne({
+      schedule: {
+        $elemMatch: {
+          _id: { $ne: eventId }, // מתעלמים מהאירוע הנוכחי שאנחנו עורכים
+          hall: hall,
+          date: new Date(date),
+          $or: [{
+             $and: [
+               { startTime: { $lt: endTime } }, 
+               { endTime: { $gt: startTime } }
+             ]
+          }]
+        }
+      }
+    });
+
+    if (conflict) {
+       // אם מצאנו קונפליקט, נבדוק אם זה לא הקבוצה עצמה (למרות ה-$ne לפעמים צריך לוודא)
+       return next(new AppError(`האולם תפוס בשעות אלו ע"י: ${conflict.name}`, 409));
+    }
+
+    // 2. ביצוע העדכון
+    const group = await Group.findOneAndUpdate(
+      { "_id": groupId, "schedule._id": eventId },
+      { 
+        $set: {
+          "schedule.$.title": title,
+          "schedule.$.date": date,
+          "schedule.$.startTime": startTime,
+          "schedule.$.endTime": endTime,
+          "schedule.$.hall": hall,
+          "schedule.$.requirements": requirements,
+          "schedule.$.pax": pax
+        }
+      },
+      { new: true, runValidators: true }
+    ).populate('schedule.hall');
+
+    if (!group) return next(new AppError('Group or Event not found', 404));
+
+    res.json(group);
+  } catch (err) { next(err); }
+};
+
+// ... (removeEventFromGroup נשאר אותו דבר)
 export const removeEventFromGroup = async (req, res, next) => {
   try {
     const { groupId, eventId } = req.params;
     const group = await Group.findById(groupId);
     group.schedule.pull({ _id: eventId });
     await group.save();
-    res.json(group);
+    // מחזירים את הקבוצה המעודכנת
+    const updated = await Group.findById(groupId).populate('schedule.hall'); 
+    res.json(updated);
   } catch (err) { next(err); }
 };

@@ -3,19 +3,22 @@ import { useParams } from 'react-router-dom';
 import useGroupsStore from '@/stores/groupsStore';
 import DayScheduler from '@/components/DayScheduler';
 import { Button } from '@/components/ui/Button';
-import { Plus, Calendar as CalIcon, Users, Edit2, Check, X, MapPin, Eye } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Plus, Calendar as CalIcon, Users, Edit2, Check, X, MapPin, Eye, Trash2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from 'react-hot-toast';
 
 export default function GroupDetailsPage() {
   const { id } = useParams();
-  const { groups, fetchGroups, updateGroup, halls, fetchHalls, addEvent } = useGroupsStore();
+  const { groups, fetchGroups, updateGroup, halls, fetchHalls, addEvent, updateEvent, deleteEvent } = useGroupsStore();
   
   const [selectedDate, setSelectedDate] = useState(null);
   const [isEventDialogOpen, setIsEventDialogOpen] = useState(false);
   const [isEditingDetails, setIsEditingDetails] = useState(false);
-  const [isSchedulerOpen, setIsSchedulerOpen] = useState(false); // סטייט לפתיחת הלוח הגדול
+  const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
   
+  // סטייט לזיהוי האם אנו עורכים אירוע קיים (אם null -> יצירה חדשה)
+  const [editingEventId, setEditingEventId] = useState(null);
+
   const [editFormData, setEditFormData] = useState({});
   const [newEvent, setNewEvent] = useState({
       title: '', startTime: '', endTime: '', hallId: '', pax: '', requirements: ''
@@ -57,20 +60,59 @@ export default function GroupDetailsPage() {
       if (!selectedDate && days.length > 0) setSelectedDate(days[0]);
   }, [group, days.length]);
 
-  const handleAddEvent = async () => {
+  // פתיחת דיאלוג ליצירה חדשה
+  const openNewEventDialog = () => {
+      setEditingEventId(null); // מצב יצירה
+      setNewEvent({ title: '', startTime: '', endTime: '', hallId: '', pax: group.pax, requirements: '' });
+      setIsEventDialogOpen(true);
+  };
+
+  // פתיחת דיאלוג לעריכה (טעינת נתונים)
+  const openEditEventDialog = (event) => {
+      setEditingEventId(event._id); // מצב עריכה
+      setNewEvent({
+          title: event.title,
+          startTime: event.startTime,
+          endTime: event.endTime,
+          hallId: event.hall._id || event.hall, // טיפול במקרה של populate או ID
+          pax: event.pax,
+          requirements: event.requirements || ''
+      });
+      setIsEventDialogOpen(true);
+  };
+
+  const handleSaveEvent = async () => {
       if(!newEvent.title || !newEvent.hallId) {
           toast.error("יש למלא שם אירוע ולבחור אולם");
           return;
       }
-      
-      await addEvent(group._id, {
+
+      const eventPayload = {
           ...newEvent,
           pax: parseInt(newEvent.pax) || 0,
           date: selectedDate,
           hall: newEvent.hallId
-      });
-      setIsEventDialogOpen(false);
-      setNewEvent({ title: '', startTime: '', endTime: '', hallId: '', pax: '', requirements: '' });
+      };
+      
+      try {
+          if (editingEventId) {
+              // עדכון קיים
+              await updateEvent(group._id, editingEventId, eventPayload);
+          } else {
+              // יצירה חדשה
+              await addEvent(group._id, eventPayload);
+          }
+          setIsEventDialogOpen(false);
+      } catch (e) {
+          // השגיאה מטופלת ב-Store (טוסט)
+      }
+  };
+
+  const handleDeleteEvent = async () => {
+      if (window.confirm('האם אתה בטוח שברצונך למחוק את האירוע?')) {
+          await deleteEvent(group._id, editingEventId);
+          setIsEventDialogOpen(false);
+      }
   };
 
   const handleSaveDetails = async () => {
@@ -88,7 +130,6 @@ export default function GroupDetailsPage() {
 
   if (!group) return <div className="p-10 text-center text-slate-500">טוען נתונים...</div>;
 
-  // סינון אירועים ליום הנבחר (עבור הרשימה הרגילה)
   const eventsForDay = group.schedule?.filter(e => 
       selectedDate && new Date(e.date).toDateString() === selectedDate.toDateString()
   ).sort((a,b) => a.startTime.localeCompare(b.startTime));
@@ -97,18 +138,15 @@ export default function GroupDetailsPage() {
     <div className="min-h-screen bg-[#F5F5F7] p-6 font-sans">
       <div className="max-w-6xl mx-auto space-y-6">
         
-        {/* כותרת ופרטים (Edit Header) */}
+        {/* כותרת עריכה (נשאר אותו דבר) */}
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-slate-700 to-slate-900"></div>
             <div className="flex justify-between items-start">
                 <div className="flex-1 space-y-2">
                     <div className="flex items-center gap-4">
                         {isEditingDetails ? (
-                            <input 
-                                className="text-3xl font-bold text-slate-900 border-b-2 border-blue-500 outline-none w-1/2"
-                                value={editFormData.name}
-                                onChange={e => setEditFormData({...editFormData, name: e.target.value})}
-                            />
+                            <input className="text-3xl font-bold text-slate-900 border-b-2 border-blue-500 outline-none w-1/2"
+                                value={editFormData.name} onChange={e => setEditFormData({...editFormData, name: e.target.value})} />
                         ) : (
                             <h1 className="text-4xl font-bold text-slate-900">{group.name}</h1>
                         )}
@@ -124,12 +162,8 @@ export default function GroupDetailsPage() {
                             <Users size={20} className="text-slate-400" />
                             <span className="font-bold text-slate-700">כמות אורחים:</span>
                             {isEditingDetails ? (
-                                <input 
-                                    type="number" 
-                                    className="w-20 font-bold border rounded px-1"
-                                    value={editFormData.pax}
-                                    onChange={e => setEditFormData({...editFormData, pax: e.target.value})}
-                                />
+                                <input type="number" className="w-20 font-bold border rounded px-1"
+                                    value={editFormData.pax} onChange={e => setEditFormData({...editFormData, pax: e.target.value})} />
                             ) : (
                                 <span className="font-bold text-slate-900">{group.pax}</span>
                             )}
@@ -166,14 +200,9 @@ export default function GroupDetailsPage() {
             {days.map((date, i) => {
                 const isSelected = selectedDate?.toDateString() === date.toDateString();
                 return (
-                    <button
-                        key={i}
-                        onClick={() => setSelectedDate(date)}
-                        className={`
-                            min-w-[90px] p-3 rounded-2xl border transition-all duration-300 flex-shrink-0 text-center
-                            ${isSelected ? 'bg-slate-900 text-white border-slate-900 shadow-lg scale-105' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}
-                        `}
-                    >
+                    <button key={i} onClick={() => setSelectedDate(date)}
+                        className={`min-w-[90px] p-3 rounded-2xl border transition-all duration-300 flex-shrink-0 text-center
+                            ${isSelected ? 'bg-slate-900 text-white border-slate-900 shadow-lg scale-105' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
                         <p className="text-xs opacity-70 mb-1">{date.toLocaleDateString('he-IL', { weekday: 'short' })}</p>
                         <p className="text-lg font-bold">{date.getDate()}.{date.getMonth()+1}</p>
                     </button>
@@ -181,29 +210,17 @@ export default function GroupDetailsPage() {
             })}
         </div>
 
-        {/* --- רשימת האירועים (כמו בהתחלה) --- */}
+        {/* רשימת האירועים */}
         <div className="space-y-4">
             <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-slate-800">
                      לו"ז ליום {selectedDate?.toLocaleDateString('he-IL', { weekday: 'long' })}
                 </h2>
-                
                 <div className="flex gap-2">
-                    {/* כפתור בדיקת זמינות - פותח את הלוח הויזואלי */}
-                    <Button 
-                        onClick={() => setIsSchedulerOpen(true)}
-                        className="bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 rounded-xl px-4 h-12 shadow-sm"
-                    >
+                    <Button onClick={() => setIsSchedulerOpen(true)} className="bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 rounded-xl px-4 h-12 shadow-sm">
                         <Eye size={18} className="ml-2" /> בדיקת זמינות אולמות
                     </Button>
-
-                    <Button 
-                        onClick={() => {
-                            setNewEvent({ title: '', startTime: '', endTime: '', hallId: '', pax: group.pax, requirements: '' });
-                            setIsEventDialogOpen(true);
-                        }} 
-                        className="bg-slate-900 text-white rounded-xl px-6 h-12 shadow-lg"
-                    >
+                    <Button onClick={openNewEventDialog} className="bg-slate-900 text-white rounded-xl px-6 h-12 shadow-lg">
                         <Plus size={18} className="ml-2" /> אירוע חדש
                     </Button>
                 </div>
@@ -218,13 +235,20 @@ export default function GroupDetailsPage() {
                 )}
                 
                 {eventsForDay?.map(event => (
-                    <div key={event._id} className="flex gap-6 p-5 rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-all items-center">
-                        <div className="w-24 text-center border-l pl-6 border-slate-100">
+                    <div 
+                        key={event._id} 
+                        onClick={() => openEditEventDialog(event)} // לחיצה לפתיחת עריכה
+                        className="flex gap-6 p-5 rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all items-center cursor-pointer group"
+                    >
+                        <div className="w-24 text-center border-l pl-6 border-slate-100 group-hover:border-blue-100 transition-colors">
                             <p className="text-2xl font-bold text-slate-900">{event.startTime}</p>
                             <p className="text-sm text-slate-400 mt-1">{event.endTime}</p>
                         </div>
                         <div className="flex-1">
-                            <h3 className="text-xl font-bold text-slate-800">{event.title}</h3>
+                            <div className="flex justify-between items-start">
+                                <h3 className="text-xl font-bold text-slate-800 group-hover:text-blue-700 transition-colors">{event.title}</h3>
+                                <Edit2 size={16} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
                             <div className="flex flex-wrap gap-3 mt-2">
                                 <span className="flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
                                     <MapPin size={14} /> {event.hall?.name || 'אולם לא ידוע'}
@@ -235,7 +259,7 @@ export default function GroupDetailsPage() {
                                     </span>
                                 )}
                                 {event.requirements && (
-                                    <span className="bg-slate-50 text-slate-500 px-3 py-1 rounded-full text-sm">{event.requirements}</span>
+                                    <span className="bg-slate-50 text-slate-500 px-3 py-1 rounded-full text-sm truncate max-w-md">{event.requirements}</span>
                                 )}
                             </div>
                         </div>
@@ -244,7 +268,7 @@ export default function GroupDetailsPage() {
             </div>
         </div>
 
-        {/* --- Dialog: לוח שנה ויזואלי (בדיקת זמינות) --- */}
+        {/* Dialog: לוח שנה ויזואלי */}
         <Dialog open={isSchedulerOpen} onOpenChange={setIsSchedulerOpen}>
             <DialogContent className="max-w-6xl w-full h-[80vh] flex flex-col p-0 bg-slate-50 overflow-hidden">
                 <DialogHeader className="p-6 bg-white border-b border-slate-200">
@@ -266,11 +290,13 @@ export default function GroupDetailsPage() {
             </DialogContent>
         </Dialog>
 
-        {/* --- Dialog: הוספת אירוע --- */}
+        {/* Dialog: יצירה/עריכה */}
         <Dialog open={isEventDialogOpen} onOpenChange={setIsEventDialogOpen}>
             <DialogContent className="sm:max-w-[500px] dir-rtl text-right">
                 <DialogHeader>
-                    <DialogTitle className="text-right mr-4 text-xl">אירוע חדש</DialogTitle>
+                    <DialogTitle className="text-right mr-4 text-xl">
+                        {editingEventId ? 'עריכת אירוע' : 'אירוע חדש'}
+                    </DialogTitle>
                 </DialogHeader>
                 <div className="grid gap-5 py-4">
                     <div className="grid grid-cols-4 gap-4">
@@ -309,7 +335,17 @@ export default function GroupDetailsPage() {
                             value={newEvent.requirements} onChange={e => setNewEvent({...newEvent, requirements: e.target.value})} />
                     </div>
                 </div>
-                <Button onClick={handleAddEvent} className="w-full h-12 rounded-xl text-lg bg-slate-900 hover:bg-slate-800 shadow-xl">שמור ושריין</Button>
+                
+                <div className="flex gap-3 mt-2">
+                    {editingEventId && (
+                        <Button onClick={handleDeleteEvent} variant="ghost" className="text-red-500 hover:bg-red-50 hover:text-red-600">
+                            <Trash2 size={20} />
+                        </Button>
+                    )}
+                    <Button onClick={handleSaveEvent} className="flex-1 h-12 rounded-xl text-lg bg-slate-900 hover:bg-slate-800 shadow-xl">
+                        {editingEventId ? 'עדכן אירוע' : 'שמור ושריין'}
+                    </Button>
+                </div>
             </DialogContent>
         </Dialog>
       </div>

@@ -69,6 +69,8 @@ const useGroupsStore = create((set, get) => ({
       }
   },
 
+  
+
   addEvent: async (groupId, eventData) => {
     try {
       const { data: updatedGroup } = await api.post(`/groups/${groupId}/events`, eventData);
@@ -80,7 +82,38 @@ const useGroupsStore = create((set, get) => ({
       const msg = error.response?.data?.message || 'שגיאה בשיבוץ';
       toast.error(msg);
     }
+  },
+  updateEvent: async (groupId, eventId, eventData) => {
+    try {
+        const { data: updatedGroup } = await api.patch(`/groups/${groupId}/events/${eventId}`, eventData);
+        
+        set(state => ({
+            activeGroup: updatedGroup,
+            groups: state.groups.map(g => g._id === groupId ? updatedGroup : g)
+        }));
+        toast.success('האירוע עודכן בהצלחה');
+    } catch (error) {
+        const msg = error.response?.data?.message || 'שגיאה בעדכון האירוע';
+        toast.error(msg);
+        throw error; // זורקים שגיאה כדי שהקומפוננטה תדע לא לסגור את הדיאלוג
+    }
+  },
+
+  deleteEvent: async (groupId, eventId) => {
+      try {
+          const { data: updatedGroup } = await api.delete(`/groups/${groupId}/events/${eventId}`);
+           set(state => ({
+            activeGroup: updatedGroup,
+            groups: state.groups.map(g => g._id === groupId ? updatedGroup : g)
+        }));
+        toast.success('האירוע נמחק');
+      } catch (error) {
+          toast.error('שגיאה במחיקת האירוע');
+      }
   }
+
+
+
 }));
 
 export default useGroupsStore;

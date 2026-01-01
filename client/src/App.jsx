@@ -16,7 +16,10 @@ import RegisterPage    from "@/pages/RegisterPage";
 import ProjectsPage       from "@/pages/ProjectsPage";
 import ProjectPage        from "@/pages/ProjectPage";
 import NewProjectPage     from "@/pages/NewProjectPage";
-
+import HallsPage          from "@/pages/HallsPage";
+import GroupsPage         from "@/pages/GroupsPage";
+import NewGroupPage       from "@/pages/NewGroupPage";     // דף יצירה + יומן
+import GroupDetailsPage   from "@/pages/GroupDetailsPage"; // דף ניהול לו"ז
 /* Fallback */
 import NotFoundPage from "@/pages/NotFoundPage";
 
@@ -39,6 +42,11 @@ export default function App() {
           <Route path="projects"       element={<ProjectsPage />}   />
           <Route path="projects/new"   element={<NewProjectPage />} />
           <Route path="projects/:id"   element={<ProjectPage />}    />
+          <Route path="groups" element={<GroupsPage />} />{/* תצטרך ליצור דף רשימה פשוט או להשתמש בקיים */}
+          <Route path="groups/new" element={<NewGroupPage />} />
+          <Route path="groups/:id" element={<GroupDetailsPage />} />
+          <Route path="halls" element={<HallsPage />} />
+
         </Route>
 
      

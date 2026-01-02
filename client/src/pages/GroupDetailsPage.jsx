@@ -1,352 +1,885 @@
+// client/src/pages/GroupDetailsPage.jsx
+
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import useGroupsStore from '@/stores/groupsStore';
 import DayScheduler from '@/components/DayScheduler';
 import { Button } from '@/components/ui/Button';
-import { Plus, Calendar as CalIcon, Users, Edit2, Check, X, MapPin, Eye, Trash2 } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Plus,
+  Calendar as CalIcon,
+  Users,
+  Edit2,
+  Check,
+  X,
+  MapPin,
+  Eye,
+  Trash2,
+  Utensils,
+  Truck,
+  Briefcase,
+  Home,
+  Mail,   // הוספתי לאייקונים הקיימים (אם חסר לך, תוסיף לייבוא למעלה)
+  Phone   // הוספתי לאייקונים הקיימים
+} from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'react-hot-toast';
+
+const MEAL_TYPES = [
+  { id: 'breakfast', label: 'ארוחת בוקר' },
+  { id: 'lunch', label: 'ארוחת צהריים' },
+  { id: 'dinner', label: 'ארוחת ערב' },
+  { id: 'light', label: 'ארוחה קלה' },
+  { id: 'night_treats', label: 'פינוקי לילה' },
+];
 
 export default function GroupDetailsPage() {
   const { id } = useParams();
-  const { groups, fetchGroups, updateGroup, halls, fetchHalls, addEvent, updateEvent, deleteEvent } = useGroupsStore();
+  const { groups, fetchGroups, updateGroup, halls, fetchHalls, addEvent, updateEvent, deleteEvent } =
+    useGroupsStore();
   
   const [selectedDate, setSelectedDate] = useState(null);
-  const [isEventDialogOpen, setIsEventDialogOpen] = useState(false);
+
+  // דיאלוגים
+  const [isEditEventDialogOpen, setIsEditEventDialogOpen] = useState(false);
   const [isEditingDetails, setIsEditingDetails] = useState(false);
   const [isSchedulerOpen, setIsSchedulerOpen] = useState(false);
-  
-  // סטייט לזיהוי האם אנו עורכים אירוע קיים (אם null -> יצירה חדשה)
-  const [editingEventId, setEditingEventId] = useState(null);
 
+  // נתונים לעריכה
   const [editFormData, setEditFormData] = useState({});
-  const [newEvent, setNewEvent] = useState({
-      title: '', startTime: '', endTime: '', hallId: '', pax: '', requirements: ''
+  const [editingEventId, setEditingEventId] = useState(null);
+  const [editEventData, setEditEventData] = useState({});
+
+  // נתונים ליצירה מהירה (Inline)
+  const [quickEvent, setQuickEvent] = useState({
+    eventType: 'meal',
+    title: '',
+    startTime: '',
+    endTime: '',
+    hallId: '',
+    locationText: '',
+    pax: '',
+    requirements: '',
+    mealType: 'breakfast',
+    kosherType: 'parve',
   });
 
-  useEffect(() => { 
-      if (groups.length === 0) fetchGroups();
-      fetchHalls();
+  useEffect(() => {
+    if (groups.length === 0) fetchGroups();
+    fetchHalls();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const group = groups.find(g => g._id === id);
+  const group = groups.find((g) => g._id === id);
 
   useEffect(() => {
-      if (group) {
-          setEditFormData({
-              name: group.name,
-              pax: group.pax,
-              contactName: group.contactPerson?.name || '',
-              contactPhone: group.contactPerson?.phone || ''
-          });
-      }
+    if (group) {
+      setEditFormData({
+        name: group.name,
+        pax: group.pax,
+        minPax: group.minPax || 0,
+        contactName: group.contactPerson?.name || '',
+        contactPhone: group.contactPerson?.phone || '',
+        contactEmail: group.contactPerson?.email || '', // הוספתי את האימייל לטופס העריכה
+      });
+      setQuickEvent((prev) => ({ ...prev, pax: group.pax }));
+    }
   }, [group]);
 
   const getDaysArray = () => {
-      if (!group) return [];
-      const arr = [];
-      const dt = new Date(group.startDate);
-      const end = new Date(group.endDate);
-      while (dt <= end) {
-          arr.push(new Date(dt));
-          dt.setDate(dt.getDate() + 1);
-      }
-      return arr;
+    if (!group) return [];
+    const arr = [];
+    const dt = new Date(group.startDate);
+    const end = new Date(group.endDate);
+    while (dt <= end) {
+      arr.push(new Date(dt));
+      dt.setDate(dt.getDate() + 1);
+    }
+    return arr;
   };
-  
+
   const days = getDaysArray();
 
   useEffect(() => {
-      if (!selectedDate && days.length > 0) setSelectedDate(days[0]);
+    if (!selectedDate && days.length > 0) setSelectedDate(days[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [group, days.length]);
 
-  // פתיחת דיאלוג ליצירה חדשה
-  const openNewEventDialog = () => {
-      setEditingEventId(null); // מצב יצירה
-      setNewEvent({ title: '', startTime: '', endTime: '', hallId: '', pax: group.pax, requirements: '' });
-      setIsEventDialogOpen(true);
+
+  // --- פונקציות עזר ולוגיקה ---
+
+  const validatePayload = (data, date) => {
+    if (!data.startTime || !data.endTime) {
+      toast.error('נא להזין שעות התחלה וסיום');
+      return null;
+    }
+
+    let finalTitle = data.title;
+    let finalHall = data.hallId;
+    let finalLocation = data.locationText;
+
+    if (data.eventType === 'meal') {
+      const mealLabel = MEAL_TYPES.find((m) => m.id === data.mealType)?.label || 'ארוחה';
+      // כאן הסרתי את השרשור האוטומטי לכותרת כדי לא ליצור כפילויות, 
+      // המידע יוצג ויזואלית באמצעות התגיות החדשות שיצרנו
+      finalTitle = mealLabel; 
+
+      if (!finalHall) {
+        toast.error('יש לבחור אולם לארוחה');
+        return null;
+      }
+      finalLocation = '';
+    } else {
+      if (!finalTitle) {
+        toast.error('יש להזין כותרת לאירוע');
+        return null;
+      }
+      finalHall = null;
+    }
+
+    return {
+      ...data,
+      title: finalTitle,
+      hall: finalHall,
+      locationText: finalLocation,
+      pax: parseInt(data.pax, 10) || 0,
+      date: date,
+    };
   };
 
-  // פתיחת דיאלוג לעריכה (טעינת נתונים)
-  const openEditEventDialog = (event) => {
-      setEditingEventId(event._id); // מצב עריכה
-      setNewEvent({
-          title: event.title,
-          startTime: event.startTime,
-          endTime: event.endTime,
-          hallId: event.hall._id || event.hall, // טיפול במקרה של populate או ID
-          pax: event.pax,
-          requirements: event.requirements || ''
+  const handleCreateQuickEvent = async () => {
+    const payload = validatePayload(quickEvent, selectedDate);
+    if (!payload) return;
+
+    try {
+      await addEvent(group._id, payload);
+      toast.success('נוסף בהצלחה');
+
+      setQuickEvent({
+        eventType: 'meal',
+        title: '',
+        startTime: '',
+        endTime: '',
+        hallId: '',
+        locationText: '',
+        pax: group.pax,
+        requirements: '',
+        mealType: 'breakfast',
+        kosherType: 'parve',
       });
-      setIsEventDialogOpen(true);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const handleSaveEvent = async () => {
-      if(!newEvent.title || !newEvent.hallId) {
-          toast.error("יש למלא שם אירוע ולבחור אולם");
-          return;
-      }
+  const openEditDialog = (event) => {
+    setEditingEventId(event._id);
+    let type = event.eventType || 'meal';
+    if (type === 'regular') type = 'meal';
+    setEditEventData({
+      eventType: type,
+      title: event.title,
+      startTime: event.startTime,
+      endTime: event.endTime,
+      hallId: event.hall?._id || event.hall || '',
+      locationText: event.locationText || '',
+      pax: event.pax,
+      requirements: event.requirements || '',
+      mealType: event.mealType || 'breakfast',
+      kosherType: event.kosherType || 'parve',
+    });
+    setIsEditEventDialogOpen(true);
+  };
 
-      const eventPayload = {
-          ...newEvent,
-          pax: parseInt(newEvent.pax) || 0,
-          date: selectedDate,
-          hall: newEvent.hallId
-      };
-      
-      try {
-          if (editingEventId) {
-              // עדכון קיים
-              await updateEvent(group._id, editingEventId, eventPayload);
-          } else {
-              // יצירה חדשה
-              await addEvent(group._id, eventPayload);
-          }
-          setIsEventDialogOpen(false);
-      } catch (e) {
-          // השגיאה מטופלת ב-Store (טוסט)
-      }
+  const handleUpdateEvent = async () => {
+    const payload = validatePayload(editEventData, selectedDate);
+    if (!payload) return;
+    await updateEvent(group._id, editingEventId, payload);
+    setIsEditEventDialogOpen(false);
   };
 
   const handleDeleteEvent = async () => {
-      if (window.confirm('האם אתה בטוח שברצונך למחוק את האירוע?')) {
-          await deleteEvent(group._id, editingEventId);
-          setIsEventDialogOpen(false);
-      }
+    if (window.confirm('האם למחוק את האירוע?')) {
+      await deleteEvent(group._id, editingEventId);
+      setIsEditEventDialogOpen(false);
+    }
   };
 
   const handleSaveDetails = async () => {
-      await updateGroup(group._id, {
-          name: editFormData.name,
-          pax: parseInt(editFormData.pax),
-          contactPerson: {
-              ...group.contactPerson,
-              name: editFormData.contactName,
-              phone: editFormData.contactPhone
-          }
-      });
-      setIsEditingDetails(false);
+    await updateGroup(group._id, {
+      name: editFormData.name,
+      pax: parseInt(editFormData.pax, 10),
+      minPax: parseInt(editFormData.minPax, 10),
+      contactPerson: {
+        ...group.contactPerson,
+        name: editFormData.contactName,
+        phone: editFormData.contactPhone,
+        email: editFormData.contactEmail // הוספתי שמירה של האימייל
+      },
+    });
+    setIsEditingDetails(false);
   };
 
   if (!group) return <div className="p-10 text-center text-slate-500">טוען נתונים...</div>;
 
-  const eventsForDay = group.schedule?.filter(e => 
-      selectedDate && new Date(e.date).toDateString() === selectedDate.toDateString()
-  ).sort((a,b) => a.startTime.localeCompare(b.startTime));
+  const eventsForDay = group.schedule
+    ?.filter(
+      (e) => selectedDate && new Date(e.date).toDateString() === selectedDate.toDateString(),
+    )
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+
+  // --- רכיבי UI קטנים ---
+  const SegmentedControl = ({ options, value, onChange }) => (
+    <div className="bg-slate-100 p-1 rounded-xl flex w-full relative">
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          onClick={() => onChange(opt.value)}
+          className={`flex-1 py-1.5 text-sm font-semibold rounded-lg transition-all duration-200 z-10
+          ${value === opt.value ? 'bg-white text-black shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          type="button"
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  const AppleInput = (props) => (
+    <input
+      {...props}
+      className={`w-full bg-slate-50 border-none rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 outline-none transition-all placeholder:text-slate-400 ${
+        props.className || ''
+      }`}
+    />
+  );
+
+  const AppleSelect = (props) => (
+    <select
+      {...props}
+      className={`w-full bg-slate-50 border-none rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 outline-none transition-all ${
+        props.className || ''
+      }`}
+    />
+  );
 
   return (
-    <div className="min-h-screen bg-[#F5F5F7] p-6 font-sans">
+    <div className="min-h-screen bg-[#F5F5F7] p-6 font-sans dir-rtl">
       <div className="max-w-6xl mx-auto space-y-6">
         
-        {/* כותרת עריכה (נשאר אותו דבר) */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-slate-700 to-slate-900"></div>
-            <div className="flex justify-between items-start">
-                <div className="flex-1 space-y-2">
-                    <div className="flex items-center gap-4">
-                        {isEditingDetails ? (
-                            <input className="text-3xl font-bold text-slate-900 border-b-2 border-blue-500 outline-none w-1/2"
-                                value={editFormData.name} onChange={e => setEditFormData({...editFormData, name: e.target.value})} />
-                        ) : (
-                            <h1 className="text-4xl font-bold text-slate-900">{group.name}</h1>
-                        )}
-                        {!isEditingDetails && (
-                            <div className="flex items-center gap-2 text-slate-500 bg-slate-50 px-3 py-1 rounded-full text-sm">
-                                <CalIcon size={14} />
-                                {new Date(group.startDate).toLocaleDateString('he-IL')} - {new Date(group.endDate).toLocaleDateString('he-IL')}
-                            </div>
-                        )}
+        {/* --- Header: פרטי הקבוצה --- */}
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-slate-700 to-slate-900"></div>
+          <div className="flex justify-between items-start">
+            <div className="flex-1 space-y-3">
+              
+              {/* כותרת ושם קבוצה */}
+              <div className="flex items-center gap-4">
+                {isEditingDetails ? (
+                  <input
+                    className="text-3xl font-bold text-slate-900 border-b-2 border-blue-500 outline-none w-1/2"
+                    value={editFormData.name || ''}
+                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                  />
+                ) : (
+                  <h1 className="text-4xl font-bold text-slate-900">{group.name}</h1>
+                )}
+                {!isEditingDetails && (
+                  <>
+                    <div className="flex items-center gap-2 text-slate-500 bg-slate-50 px-3 py-1 rounded-full text-sm border border-slate-100">
+                      <CalIcon size={14} />
+                      {new Date(group.startDate).toLocaleDateString('he-IL')} -{' '}
+                      {new Date(group.endDate).toLocaleDateString('he-IL')}
                     </div>
-                    <div className="flex items-center gap-8 mt-2">
-                        <div className="flex items-center gap-2 text-lg">
-                            <Users size={20} className="text-slate-400" />
-                            <span className="font-bold text-slate-700">כמות אורחים:</span>
-                            {isEditingDetails ? (
-                                <input type="number" className="w-20 font-bold border rounded px-1"
-                                    value={editFormData.pax} onChange={e => setEditFormData({...editFormData, pax: e.target.value})} />
-                            ) : (
-                                <span className="font-bold text-slate-900">{group.pax}</span>
-                            )}
-                        </div>
-                        <div className="h-6 w-px bg-slate-200"></div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-slate-500">איש קשר:</span>
-                            {isEditingDetails ? (
-                                <div className="flex gap-2">
-                                    <input className="border rounded px-1 w-32" placeholder="שם" value={editFormData.contactName} onChange={e => setEditFormData({...editFormData, contactName: e.target.value})} />
-                                    <input className="border rounded px-1 w-32" placeholder="טלפון" value={editFormData.contactPhone} onChange={e => setEditFormData({...editFormData, contactPhone: e.target.value})} />
-                                </div>
-                            ) : (
-                                <span className="font-medium text-slate-800">{group.contactPerson?.name} ({group.contactPerson?.phone})</span>
-                            )}
+                    <div
+                      className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold border ${
+                        group.hostingType === 'overnight'
+                          ? 'bg-purple-50 text-purple-700 border-purple-100'
+                          : 'bg-blue-50 text-blue-700 border-blue-100'
+                      }`}
+                    >
+                      {group.hostingType === 'overnight' ? (
+                        <Home size={14} />
+                      ) : (
+                        <Briefcase size={14} />
+                      )}
+                      {group.hostingType === 'overnight' ? 'אירוח ולינה' : 'יום עיון'}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* נתונים נוספים (כמות, איש קשר) */}
+              <div className="flex items-center gap-8 mt-2">
+                <div className="flex items-center gap-2 text-lg">
+                  <Users size={20} className="text-slate-400" />
+                  <div className="flex flex-col leading-tight">
+                    <div className="flex gap-2">
+                      <span className="text-slate-500 text-sm">צפי:</span>
+                      {isEditingDetails ? (
+                        <input
+                          type="number"
+                          className="w-16 font-bold border rounded px-1"
+                          value={editFormData.pax ?? ''}
+                          onChange={(e) =>
+                            setEditFormData({ ...editFormData, pax: e.target.value })
+                          }
+                        />
+                      ) : (
+                        <span className="font-bold text-slate-900">{group.pax}</span>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <span className="text-red-500 text-sm font-medium">מינימום:</span>
+                      {isEditingDetails ? (
+                        <input
+                          type="number"
+                          className="w-16 font-bold border rounded px-1 text-red-600"
+                          value={editFormData.minPax ?? ''}
+                          onChange={(e) =>
+                            setEditFormData({ ...editFormData, minPax: e.target.value })
+                          }
+                        />
+                      ) : (
+                        <span className="font-bold text-red-600">{group.minPax}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="h-8 w-px bg-slate-200"></div>
+
+                {/* ========================================================================
+                   📌  שינוי 1: תצוגת איש קשר מכובדת (עם טלפון ואימייל בצורה נקייה)
+                   ========================================================================
+                */}
+                <div className="flex items-center gap-3">
+                  <span className="text-slate-500 self-start mt-1">איש קשר:</span>
+                  
+                  {isEditingDetails ? (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex gap-2">
+                         <input
+                           className="border rounded px-1 w-32"
+                           placeholder="שם"
+                           value={editFormData.contactName || ''}
+                           onChange={(e) => setEditFormData({ ...editFormData, contactName: e.target.value })}
+                         />
+                         <input
+                           className="border rounded px-1 w-32"
+                           placeholder="טלפון"
+                           value={editFormData.contactPhone || ''}
+                           onChange={(e) => setEditFormData({ ...editFormData, contactPhone: e.target.value })}
+                         />
+                      </div>
+                      <input
+                          className="border rounded px-1 w-full"
+                          placeholder="אימייל"
+                          value={editFormData.contactEmail || ''}
+                          onChange={(e) => setEditFormData({ ...editFormData, contactEmail: e.target.value })}
+                       />
+                    </div>
+                  ) : (
+                    <div className="flex flex-col">
+                        <span className="font-bold text-slate-800 leading-tight">
+                            {group.contactPerson?.name || 'לא הוזן שם'}
+                        </span>
+                        <div className="flex items-center gap-2 text-xs text-slate-500 font-medium mt-0.5">
+                             {group.contactPerson?.phone && <span>{group.contactPerson.phone}</span>}
+                             
+                             {/* קו מפריד ואימייל רק אם יש אימייל */}
+                             {group.contactPerson?.email && group.contactPerson?.phone && (
+                                <span className="text-slate-300">|</span>
+                             )}
+                             
+                             {group.contactPerson?.email && <span>{group.contactPerson.email}</span>}
                         </div>
                     </div>
+                  )}
                 </div>
-                <div>
-                    {isEditingDetails ? (
-                        <div className="flex gap-2">
-                             <Button onClick={() => setIsEditingDetails(false)} variant="ghost" className="text-red-500"><X size={20}/></Button>
-                             <Button onClick={handleSaveDetails} className="bg-green-600 hover:bg-green-700 text-white"><Check size={20}/></Button>
-                        </div>
-                    ) : (
-                        <Button onClick={() => setIsEditingDetails(true)} variant="ghost" className="text-slate-400 hover:text-blue-600"><Edit2 size={18} /></Button>
-                    )}
-                </div>
+                {/* ======================================================================== */}
+
+              </div>
             </div>
+
+            <div>
+              {isEditingDetails ? (
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => setIsEditingDetails(false)}
+                    variant="ghost"
+                    className="text-red-500"
+                  >
+                    <X size={20} />
+                  </Button>
+                  <Button
+                    onClick={handleSaveDetails}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <Check size={20} />
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  onClick={() => setIsEditingDetails(true)}
+                  variant="ghost"
+                  className="text-slate-400 hover:text-blue-600"
+                >
+                  <Edit2 size={18} />
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* בחירת ימים */}
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-            {days.map((date, i) => {
-                const isSelected = selectedDate?.toDateString() === date.toDateString();
-                return (
-                    <button key={i} onClick={() => setSelectedDate(date)}
-                        className={`min-w-[90px] p-3 rounded-2xl border transition-all duration-300 flex-shrink-0 text-center
-                            ${isSelected ? 'bg-slate-900 text-white border-slate-900 shadow-lg scale-105' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}>
-                        <p className="text-xs opacity-70 mb-1">{date.toLocaleDateString('he-IL', { weekday: 'short' })}</p>
-                        <p className="text-lg font-bold">{date.getDate()}.{date.getMonth()+1}</p>
-                    </button>
-                )
-            })}
+          {days.map((date, i) => {
+            const isSelected = selectedDate?.toDateString() === date.toDateString();
+            return (
+              <button
+                key={i}
+                onClick={() => setSelectedDate(date)}
+                className={`min-w-[90px] p-3 rounded-2xl border transition-all duration-300 flex-shrink-0 text-center
+                ${
+                  isSelected
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-lg scale-105'
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <p className="text-xs opacity-70 mb-1">
+                  {date.toLocaleDateString('he-IL', { weekday: 'short' })}
+                </p>
+                <p className="text-lg font-bold">
+                  {date.getDate()}.{date.getMonth() + 1}
+                </p>
+              </button>
+            );
+          })}
         </div>
 
-        {/* רשימת האירועים */}
-        <div className="space-y-4">
-            <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-slate-800">
-                     לו"ז ליום {selectedDate?.toLocaleDateString('he-IL', { weekday: 'long' })}
-                </h2>
-                <div className="flex gap-2">
-                    <Button onClick={() => setIsSchedulerOpen(true)} className="bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 rounded-xl px-4 h-12 shadow-sm">
-                        <Eye size={18} className="ml-2" /> בדיקת זמינות אולמות
-                    </Button>
-                    <Button onClick={openNewEventDialog} className="bg-slate-900 text-white rounded-xl px-6 h-12 shadow-lg">
-                        <Plus size={18} className="ml-2" /> אירוע חדש
-                    </Button>
+        <div className="space-y-4 pb-20">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-slate-800">
+              לו"ז ליום {selectedDate?.toLocaleDateString('he-IL', { weekday: 'long' })}
+            </h2>
+            <Button
+              onClick={() => setIsSchedulerOpen(true)}
+              className="bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 rounded-xl px-4 h-12 shadow-sm"
+            >
+              <Eye size={18} className="ml-2" /> בדיקת זמינות אולמות
+            </Button>
+          </div>
+
+          {/* רשימת האירועים */}
+          <div className="space-y-3">
+            {/* מצב ריק */}
+            {(!eventsForDay || eventsForDay.length === 0) && (
+              <div className="flex flex-col items-center justify-center py-20 text-slate-400 border-2 border-dashed border-slate-200 rounded-3xl bg-white/50">
+                <CalIcon size={48} className="mb-4 opacity-20" />
+                <p>אין אירועים ליום זה.</p>
+              </div>
+            )}
+
+            {/* אירועים קיימים */}
+            {eventsForDay?.map((event) => (
+              <div
+                key={event._id}
+                onClick={() => openEditDialog(event)}
+                className="flex gap-6 p-5 rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all items-center cursor-pointer group"
+              >
+                <div className="w-24 text-center border-l pl-6 border-slate-100 group-hover:border-blue-100 transition-colors">
+                  <p className="text-2xl font-bold text-slate-900">{event.startTime}</p>
+                  <p className="text-sm text-slate-400 mt-1">{event.endTime}</p>
                 </div>
-            </div>
 
-            <div className="space-y-3">
-                {(!eventsForDay || eventsForDay.length === 0) && (
-                    <div className="flex flex-col items-center justify-center py-20 text-slate-400 border-2 border-dashed border-slate-200 rounded-3xl bg-white/50">
-                        <CalIcon size={48} className="mb-4 opacity-20" />
-                        <p>אין אירועים ליום זה.</p>
-                    </div>
-                )}
-                
-                {eventsForDay?.map(event => (
-                    <div 
-                        key={event._id} 
-                        onClick={() => openEditEventDialog(event)} // לחיצה לפתיחת עריכה
-                        className="flex gap-6 p-5 rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all items-center cursor-pointer group"
-                    >
-                        <div className="w-24 text-center border-l pl-6 border-slate-100 group-hover:border-blue-100 transition-colors">
-                            <p className="text-2xl font-bold text-slate-900">{event.startTime}</p>
-                            <p className="text-sm text-slate-400 mt-1">{event.endTime}</p>
-                        </div>
-                        <div className="flex-1">
-                            <div className="flex justify-between items-start">
-                                <h3 className="text-xl font-bold text-slate-800 group-hover:text-blue-700 transition-colors">{event.title}</h3>
-                                <Edit2 size={16} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </div>
-                            <div className="flex flex-wrap gap-3 mt-2">
-                                <span className="flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
-                                    <MapPin size={14} /> {event.hall?.name || 'אולם לא ידוע'}
-                                </span>
-                                {event.pax > 0 && (
-                                    <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1">
-                                        <Users size={12}/> {event.pax}
-                                    </span>
-                                )}
-                                {event.requirements && (
-                                    <span className="bg-slate-50 text-slate-500 px-3 py-1 rounded-full text-sm truncate max-w-md">{event.requirements}</span>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
+                <div className="flex-1">
+                  <div className="flex justify-between items-start">
+                    
+                    {/* ========================================================================
+                        📌 שינוי 2: הצגת בשרי/פרווה ליד הכותרת
+                        ======================================================================== 
+                    */}
+                    <div className="flex items-center gap-3">
+                        <h3 className="text-xl font-bold text-slate-800 group-hover:text-blue-700 transition-colors">
+                          {event.title}
+                        </h3>
 
-        {/* Dialog: לוח שנה ויזואלי */}
-        <Dialog open={isSchedulerOpen} onOpenChange={setIsSchedulerOpen}>
-            <DialogContent className="max-w-6xl w-full h-[80vh] flex flex-col p-0 bg-slate-50 overflow-hidden">
-                <DialogHeader className="p-6 bg-white border-b border-slate-200">
-                    <DialogTitle>מצב אולמות - {selectedDate?.toLocaleDateString('he-IL')}</DialogTitle>
-                </DialogHeader>
-                <div className="flex-1 p-6 overflow-auto">
-                    {selectedDate && (
-                        <DayScheduler 
-                            date={selectedDate}
-                            halls={halls}
-                            groups={groups}
-                            currentGroupId={group._id}
-                        />
+                        {/* תגית כשרות דינמית */}
+                        {['lunch', 'dinner', 'light'].includes(event.mealType) && event.kosherType && (
+                           <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border 
+                             ${event.kosherType === 'meat' 
+                               ? 'bg-rose-50 text-rose-600 border-rose-100' // בשרי = אדום
+                               : 'bg-emerald-50 text-emerald-600 border-emerald-100' // פרווה = ירוק
+                             }
+                           `}>
+                              {event.kosherType === 'meat' ? 'בשרי' : 'פרווה'}
+                           </span>
+                        )}
+                    </div>
+                    {/* ======================================================================== */}
+
+                    <Edit2
+                      size={16}
+                      className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap gap-3 mt-2">
+                    <span className="flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
+                      <MapPin size={14} /> {event.hall?.name || event.locationText || 'אולם לא ידוע'}
+                    </span>
+
+                    {event.pax > 0 && (
+                      <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1">
+                        <Users size={12} /> {event.pax}
+                      </span>
                     )}
+
+                    {event.requirements && (
+                      <span className="bg-slate-50 text-slate-500 px-3 py-1 rounded-full text-sm truncate max-w-md">
+                        {event.requirements}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="p-4 bg-white border-t border-slate-200 text-left">
-                     <Button onClick={() => setIsSchedulerOpen(false)}>סגור</Button>
+              </div>
+            ))}
+
+            {/* איזור הוספה מהירה (לא שונה למעט התיקון הקטן ב-AppleInput אם היה) - נשאר זהה לקוד המקורי שלך */}
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mt-8 relative overflow-hidden">
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold">הוספה מהירה</h3>
+                  <div className="w-48">
+                    <SegmentedControl
+                      options={[
+                        { label: 'ארוחה', value: 'meal' },
+                        { label: 'כללי', value: 'general' },
+                      ]}
+                      value={quickEvent.eventType}
+                      onChange={(val) => setQuickEvent({ ...quickEvent, eventType: val })}
+                    />
+                  </div>
                 </div>
-            </DialogContent>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                  <div className="md:col-span-5 space-y-2">
+                    <label className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">
+                      מהות האירוע
+                    </label>
+
+                    {quickEvent.eventType === 'meal' ? (
+                      <div className="flex gap-2">
+                        <AppleSelect
+                          value={quickEvent.mealType}
+                          onChange={(e) => setQuickEvent({ ...quickEvent, mealType: e.target.value })}
+                        >
+                          {MEAL_TYPES.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.label}
+                            </option>
+                          ))}
+                        </AppleSelect>
+
+                        {['lunch', 'dinner', 'light'].includes(quickEvent.mealType) && (
+                          <div className="bg-slate-50 rounded-xl p-1 flex items-center">
+                            <button
+                              onClick={() => setQuickEvent({ ...quickEvent, kosherType: 'meat' })}
+                              className={`h-full px-3 rounded-lg text-xs font-bold transition-all ${
+                                quickEvent.kosherType === 'meat'
+                                  ? 'bg-white shadow-sm text-red-600'
+                                  : 'text-slate-400'
+                              }`}
+                              type="button"
+                            >
+                              בשרי
+                            </button>
+                            <button
+                              onClick={() => setQuickEvent({ ...quickEvent, kosherType: 'parve' })}
+                              className={`h-full px-3 rounded-lg text-xs font-bold transition-all ${
+                                quickEvent.kosherType === 'parve'
+                                  ? 'bg-white shadow-sm text-green-600'
+                                  : 'text-slate-400'
+                              }`}
+                              type="button"
+                            >
+                              פרווה
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <AppleInput
+                        placeholder="כותרת (הגעה, קבלת פנים...)"
+                        value={quickEvent.title}
+                        onChange={(e) => setQuickEvent({ ...quickEvent, title: e.target.value })}
+                      />
+                    )}
+                  </div>
+
+                  <div className="md:col-span-3 space-y-2">
+                    <label className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">
+                      מיקום
+                    </label>
+
+                    {quickEvent.eventType === 'meal' ? (
+                      <AppleSelect
+                        value={quickEvent.hallId}
+                        onChange={(e) => setQuickEvent({ ...quickEvent, hallId: e.target.value })}
+                      >
+                        <option value="">בחר אולם...</option>
+                        {halls.map((hall) => (
+                          <option key={hall._id} value={hall._id}>
+                            {hall.name}
+                          </option>
+                        ))}
+                      </AppleSelect>
+                    ) : (
+                      <AppleInput
+                        placeholder="טקסט חופשי..."
+                        value={quickEvent.locationText}
+                        onChange={(e) =>
+                          setQuickEvent({ ...quickEvent, locationText: e.target.value })
+                        }
+                      />
+                    )}
+                  </div>
+
+                  <div className="md:col-span-4 flex gap-2">
+                    <div className="space-y-2 flex-1">
+                      <label className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">
+                        שעות
+                      </label>
+                      <div className="flex gap-1">
+                        <AppleInput
+                          type="time"
+                          className="text-center px-1"
+                          value={quickEvent.startTime}
+                          onChange={(e) =>
+                            setQuickEvent({ ...quickEvent, startTime: e.target.value })
+                          }
+                        />
+                        <AppleInput
+                          type="time"
+                          className="text-center px-1"
+                          value={quickEvent.endTime}
+                          onChange={(e) =>
+                            setQuickEvent({ ...quickEvent, endTime: e.target.value })
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 w-20">
+                      <label className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">
+                        כמות
+                      </label>
+                      <AppleInput
+                        type="number"
+                        className="text-center px-1 font-bold"
+                        value={quickEvent.pax}
+                        onChange={(e) => setQuickEvent({ ...quickEvent, pax: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex gap-3">
+                  <AppleInput
+                    placeholder="הערות מיוחדות לאירוע זה..."
+                    value={quickEvent.requirements}
+                    onChange={(e) =>
+                      setQuickEvent({ ...quickEvent, requirements: e.target.value })
+                    }
+                    className="bg-slate-50/50"
+                  />
+                  <Button
+                    onClick={handleCreateQuickEvent}
+                    className="h-[42px] px-8 rounded-xl bg-black hover:bg-slate-800 text-white shadow-lg shadow-slate-200"
+                  >
+                    הוסף
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* --- דיאלוגים --- */}
+        <Dialog open={isSchedulerOpen} onOpenChange={setIsSchedulerOpen}>
+          <DialogContent className="max-w-6xl w-full h-[80vh] flex flex-col p-0 bg-slate-50 overflow-hidden">
+            <DialogHeader className="p-6 bg-white border-b border-slate-200">
+              <DialogTitle>מצב אולמות</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 p-6 overflow-auto">
+              {selectedDate && (
+                <DayScheduler
+                  date={selectedDate}
+                  halls={halls}
+                  groups={groups}
+                  currentGroupId={group._id}
+                />
+              )}
+            </div>
+            <div className="p-4 bg-white border-t border-slate-200 text-left">
+              <Button onClick={() => setIsSchedulerOpen(false)}>סגור</Button>
+            </div>
+          </DialogContent>
         </Dialog>
 
-        {/* Dialog: יצירה/עריכה */}
-        <Dialog open={isEventDialogOpen} onOpenChange={setIsEventDialogOpen}>
-            <DialogContent className="sm:max-w-[500px] dir-rtl text-right">
-                <DialogHeader>
-                    <DialogTitle className="text-right mr-4 text-xl">
-                        {editingEventId ? 'עריכת אירוע' : 'אירוע חדש'}
-                    </DialogTitle>
-                </DialogHeader>
-                <div className="grid gap-5 py-4">
-                    <div className="grid grid-cols-4 gap-4">
-                        <div className="col-span-3 space-y-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase">שם האירוע</label>
-                            <input className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-100 bg-slate-50 focus:bg-white" 
-                                placeholder="לדוגמה: ארוחת ערב" autoFocus value={newEvent.title} onChange={e => setNewEvent({...newEvent, title: e.target.value})} />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase">כמות</label>
-                            <input type="number" className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-100 text-center font-bold" 
-                                value={newEvent.pax} onChange={e => setNewEvent({...newEvent, pax: e.target.value})} />
-                        </div>
+        {/* עריכת אירוע */}
+        <Dialog open={isEditEventDialogOpen} onOpenChange={setIsEditEventDialogOpen}>
+          <DialogContent className="sm:max-w-[550px] dir-rtl text-right p-0 overflow-hidden rounded-2xl">
+            <div className="bg-slate-900 p-6 text-white">
+              <DialogTitle className="text-xl">עריכת אירוע</DialogTitle>
+            </div>
+
+            <div className="p-6 grid gap-6">
+              <div className="flex bg-slate-100 p-1 rounded-xl">
+                <button
+                  onClick={() => setEditEventData({ ...editEventData, eventType: 'meal' })}
+                  className={`flex-1 py-2 rounded-lg font-bold text-sm ${
+                    editEventData.eventType === 'meal' ? 'bg-white shadow-sm' : 'text-slate-400'
+                  }`}
+                  type="button"
+                >
+                  ארוחה
+                </button>
+                <button
+                  onClick={() => setEditEventData({ ...editEventData, eventType: 'general' })}
+                  className={`flex-1 py-2 rounded-lg font-bold text-sm ${
+                    editEventData.eventType === 'general' ? 'bg-white shadow-sm' : 'text-slate-400'
+                  }`}
+                  type="button"
+                >
+                  כללי
+                </button>
+              </div>
+
+              {editEventData.eventType === 'meal' ? (
+                <div className="space-y-4">
+                  <select
+                    className="w-full p-3 border rounded-xl"
+                    value={editEventData.mealType}
+                    onChange={(e) => setEditEventData({ ...editEventData, mealType: e.target.value })}
+                  >
+                    {MEAL_TYPES.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+
+                  {['lunch', 'dinner', 'light'].includes(editEventData.mealType) && (
+                    <div className="flex gap-4">
+                      <label className="flex gap-2">
+                        <input
+                          type="radio"
+                          checked={editEventData.kosherType === 'meat'}
+                          onChange={() => setEditEventData({ ...editEventData, kosherType: 'meat' })}
+                        />{' '}
+                        בשרי
+                      </label>
+                      <label className="flex gap-2">
+                        <input
+                          type="radio"
+                          checked={editEventData.kosherType === 'parve'}
+                          onChange={() => setEditEventData({ ...editEventData, kosherType: 'parve' })}
+                        />{' '}
+                        פרווה
+                      </label>
                     </div>
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500 uppercase">אולם</label>
-                        <select className="w-full p-3 border border-slate-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-blue-100"
-                            value={newEvent.hallId} onChange={e => setNewEvent({...newEvent, hallId: e.target.value})}>
-                            <option value="">בחר אולם...</option>
-                            {halls.map(hall => (<option key={hall._id} value={hall._id}>{hall.name}</option>))}
-                        </select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase">התחלה</label>
-                            <input type="time" className="w-full p-3 border border-slate-200 rounded-xl text-center font-mono bg-slate-50" value={newEvent.startTime} onChange={e => setNewEvent({...newEvent, startTime: e.target.value})} />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase">סיום</label>
-                            <input type="time" className="w-full p-3 border border-slate-200 rounded-xl text-center font-mono bg-slate-50" value={newEvent.endTime} onChange={e => setNewEvent({...newEvent, endTime: e.target.value})} />
-                        </div>
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500 uppercase">הערות</label>
-                        <textarea className="w-full p-3 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-100" rows={2}
-                            value={newEvent.requirements} onChange={e => setNewEvent({...newEvent, requirements: e.target.value})} />
-                    </div>
+                  )}
+
+                  <select
+                    className="w-full p-3 border rounded-xl"
+                    value={editEventData.hallId}
+                    onChange={(e) => setEditEventData({ ...editEventData, hallId: e.target.value })}
+                  >
+                    <option value="">בחר אולם...</option>
+                    {halls.map((h) => (
+                      <option key={h._id} value={h._id}>
+                        {h.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                
-                <div className="flex gap-3 mt-2">
-                    {editingEventId && (
-                        <Button onClick={handleDeleteEvent} variant="ghost" className="text-red-500 hover:bg-red-50 hover:text-red-600">
-                            <Trash2 size={20} />
-                        </Button>
-                    )}
-                    <Button onClick={handleSaveEvent} className="flex-1 h-12 rounded-xl text-lg bg-slate-900 hover:bg-slate-800 shadow-xl">
-                        {editingEventId ? 'עדכן אירוע' : 'שמור ושריין'}
-                    </Button>
+              ) : (
+                <div className="space-y-4">
+                  <input
+                    className="w-full p-3 border rounded-xl"
+                    value={editEventData.title || ''}
+                    onChange={(e) => setEditEventData({ ...editEventData, title: e.target.value })}
+                    placeholder="כותרת"
+                  />
+                  <input
+                    className="w-full p-3 border rounded-xl"
+                    value={editEventData.locationText || ''}
+                    onChange={(e) =>
+                      setEditEventData({ ...editEventData, locationText: e.target.value })
+                    }
+                    placeholder="מיקום"
+                  />
                 </div>
-            </DialogContent>
+              )}
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-500">התחלה</label>
+                  <input
+                    type="time"
+                    className="w-full p-3 border rounded-xl text-center"
+                    value={editEventData.startTime || ''}
+                    onChange={(e) =>
+                      setEditEventData({ ...editEventData, startTime: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500">סיום</label>
+                  <input
+                    type="time"
+                    className="w-full p-3 border rounded-xl text-center"
+                    value={editEventData.endTime || ''}
+                    onChange={(e) =>
+                      setEditEventData({ ...editEventData, endTime: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500">כמות</label>
+                  <input
+                    type="number"
+                    className="w-full p-3 border rounded-xl text-center font-bold"
+                    value={editEventData.pax ?? ''}
+                    onChange={(e) => setEditEventData({ ...editEventData, pax: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-500">הערות</label>
+                <input
+                  className="w-full p-3 border rounded-xl"
+                  value={editEventData.requirements || ''}
+                  onChange={(e) =>
+                    setEditEventData({ ...editEventData, requirements: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="flex gap-3 mt-4">
+                <Button onClick={handleDeleteEvent} variant="ghost" className="text-red-500">
+                  <Trash2 />
+                </Button>
+                <Button onClick={handleUpdateEvent} className="flex-1 bg-slate-900 text-white">
+                  שמור שינויים
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
         </Dialog>
       </div>
     </div>

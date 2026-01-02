@@ -33,6 +33,10 @@ const eventSchema = new mongoose.Schema({
   locationText: { type: String, required: false }, // מיקום טקסט חופשי
 
   pax: { type: Number, default: 0 },
+  
+  // --- שדה חדש: מחיר ---
+  price: { type: Number, default: 0 },
+  
   requirements: { type: String }
 });
 

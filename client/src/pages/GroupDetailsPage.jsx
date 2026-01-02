@@ -19,8 +19,9 @@ import {
   Truck,
   Briefcase,
   Home,
-  Mail,   // הוספתי לאייקונים הקיימים (אם חסר לך, תוסיף לייבוא למעלה)
-  Phone   // הוספתי לאייקונים הקיימים
+  Mail,
+  Phone,
+   // הוספתי את האייקון של השקל
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'react-hot-toast';
@@ -32,6 +33,44 @@ const MEAL_TYPES = [
   { id: 'light', label: 'ארוחה קלה' },
   { id: 'night_treats', label: 'פינוקי לילה' },
 ];
+
+// --- רכיבים חיצוניים (תיקון לבעיית הפוקוס בהקלדה) ---
+
+const SegmentedControl = ({ options, value, onChange }) => (
+  <div className="bg-slate-100 p-1 rounded-xl flex w-full relative">
+    {options.map((opt) => (
+      <button
+        key={opt.value}
+        onClick={() => onChange(opt.value)}
+        className={`flex-1 py-1.5 text-sm font-semibold rounded-lg transition-all duration-200 z-10
+        ${value === opt.value ? 'bg-white text-black shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+        type="button"
+      >
+        {opt.label}
+      </button>
+    ))}
+  </div>
+);
+
+const AppleInput = (props) => (
+  <input
+    {...props}
+    className={`w-full bg-slate-50 border-none rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 outline-none transition-all placeholder:text-slate-400 ${
+      props.className || ''
+    }`}
+  />
+);
+
+const AppleSelect = (props) => (
+  <select
+    {...props}
+    className={`w-full bg-slate-50 border-none rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 outline-none transition-all ${
+      props.className || ''
+    }`}
+  />
+);
+
+// --- סוף רכיבים חיצוניים ---
 
 export default function GroupDetailsPage() {
   const { id } = useParams();
@@ -59,6 +98,7 @@ export default function GroupDetailsPage() {
     hallId: '',
     locationText: '',
     pax: '',
+    price: '', // הוספתי שדה מחיר
     requirements: '',
     mealType: 'breakfast',
     kosherType: 'parve',
@@ -80,7 +120,7 @@ export default function GroupDetailsPage() {
         minPax: group.minPax || 0,
         contactName: group.contactPerson?.name || '',
         contactPhone: group.contactPerson?.phone || '',
-        contactEmail: group.contactPerson?.email || '', // הוספתי את האימייל לטופס העריכה
+        contactEmail: group.contactPerson?.email || '',
       });
       setQuickEvent((prev) => ({ ...prev, pax: group.pax }));
     }
@@ -118,10 +158,9 @@ export default function GroupDetailsPage() {
     let finalHall = data.hallId;
     let finalLocation = data.locationText;
 
+    // טיפול בכותרת ואולם לפי סוג אירוע
     if (data.eventType === 'meal') {
       const mealLabel = MEAL_TYPES.find((m) => m.id === data.mealType)?.label || 'ארוחה';
-      // כאן הסרתי את השרשור האוטומטי לכותרת כדי לא ליצור כפילויות, 
-      // המידע יוצג ויזואלית באמצעות התגיות החדשות שיצרנו
       finalTitle = mealLabel; 
 
       if (!finalHall) {
@@ -137,13 +176,23 @@ export default function GroupDetailsPage() {
       finalHall = null;
     }
 
+    // --- תיקון לוגיקת לילה (Night Shift Logic) ---
+    // אם השעה היא בין 00:00 ל-05:59, המערכת תבין שזה שייך ללילה של היום הזה,
+    // ולכן תשמור את זה פיזית בתאריך של מחר, כדי שזה יופיע נכון במיון ובפילטור.
+    let finalDate = new Date(date);
+    const [h] = data.startTime.split(':').map(Number);
+    if (h < 6) {
+        finalDate.setDate(finalDate.getDate() + 1);
+    }
+
     return {
       ...data,
       title: finalTitle,
       hall: finalHall,
       locationText: finalLocation,
       pax: parseInt(data.pax, 10) || 0,
-      date: date,
+      price: parseInt(data.price, 10) || 0, // הוספתי המרה של המחיר
+      date: finalDate, // שליחת התאריך המתוקן
     };
   };
 
@@ -163,6 +212,7 @@ export default function GroupDetailsPage() {
         hallId: '',
         locationText: '',
         pax: group.pax,
+        price: '', // איפוס שדה המחיר
         requirements: '',
         mealType: 'breakfast',
         kosherType: 'parve',
@@ -184,6 +234,7 @@ export default function GroupDetailsPage() {
       hallId: event.hall?._id || event.hall || '',
       locationText: event.locationText || '',
       pax: event.pax,
+      price: event.price || '', // טעינת המחיר לעריכה
       requirements: event.requirements || '',
       mealType: event.mealType || 'breakfast',
       kosherType: event.kosherType || 'parve',
@@ -214,7 +265,7 @@ export default function GroupDetailsPage() {
         ...group.contactPerson,
         name: editFormData.contactName,
         phone: editFormData.contactPhone,
-        email: editFormData.contactEmail // הוספתי שמירה של האימייל
+        email: editFormData.contactEmail 
       },
     });
     setIsEditingDetails(false);
@@ -222,47 +273,33 @@ export default function GroupDetailsPage() {
 
   if (!group) return <div className="p-10 text-center text-slate-500">טוען נתונים...</div>;
 
+  // --- לוגיקת תצוגה חכמה (יום לוגי: 06:00 עד 06:00 למחרת) ---
   const eventsForDay = group.schedule
-    ?.filter(
-      (e) => selectedDate && new Date(e.date).toDateString() === selectedDate.toDateString(),
-    )
-    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+    ?.filter((e) => {
+      if (!selectedDate) return false;
+      
+      const eventDate = new Date(e.date);
+      const [h] = e.startTime.split(':').map(Number);
+      
+      // אירועים של היום (מ-06:00 עד חצות)
+      const isTodayRegular = eventDate.toDateString() === selectedDate.toDateString() && h >= 6;
 
+      // אירועים של הלילה (מחר לפנות בוקר עד 06:00)
+      const nextDay = new Date(selectedDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      const isTomorrowEarly = eventDate.toDateString() === nextDay.toDateString() && h < 6;
 
-  // --- רכיבי UI קטנים ---
-  const SegmentedControl = ({ options, value, onChange }) => (
-    <div className="bg-slate-100 p-1 rounded-xl flex w-full relative">
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          onClick={() => onChange(opt.value)}
-          className={`flex-1 py-1.5 text-sm font-semibold rounded-lg transition-all duration-200 z-10
-          ${value === opt.value ? 'bg-white text-black shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-          type="button"
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
-  );
-
-  const AppleInput = (props) => (
-    <input
-      {...props}
-      className={`w-full bg-slate-50 border-none rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 outline-none transition-all placeholder:text-slate-400 ${
-        props.className || ''
-      }`}
-    />
-  );
-
-  const AppleSelect = (props) => (
-    <select
-      {...props}
-      className={`w-full bg-slate-50 border-none rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 outline-none transition-all ${
-        props.className || ''
-      }`}
-    />
-  );
+      return isTodayRegular || isTomorrowEarly;
+    })
+    .sort((a, b) => {
+      // מיון: שעות הלילה (00-05) נחשבות "גדולות יותר" מ-23 כדי שיופיעו בסוף הרשימה
+      const getMinutes = (timeStr) => {
+        const [h, m] = timeStr.split(':').map(Number);
+        const adjustedH = h < 6 ? h + 24 : h; 
+        return adjustedH * 60 + m;
+      };
+      return getMinutes(a.startTime) - getMinutes(b.startTime);
+    });
 
   return (
     <div className="min-h-screen bg-[#F5F5F7] p-6 font-sans dir-rtl">
@@ -310,7 +347,7 @@ export default function GroupDetailsPage() {
                 )}
               </div>
 
-              {/* נתונים נוספים (כמות, איש קשר) */}
+              {/* נתונים נוספים */}
               <div className="flex items-center gap-8 mt-2">
                 <div className="flex items-center gap-2 text-lg">
                   <Users size={20} className="text-slate-400" />
@@ -350,10 +387,7 @@ export default function GroupDetailsPage() {
 
                 <div className="h-8 w-px bg-slate-200"></div>
 
-                {/* ========================================================================
-                   📌  שינוי 1: תצוגת איש קשר מכובדת (עם טלפון ואימייל בצורה נקייה)
-                   ========================================================================
-                */}
+                {/* איש קשר */}
                 <div className="flex items-center gap-3">
                   <span className="text-slate-500 self-start mt-1">איש קשר:</span>
                   
@@ -388,7 +422,6 @@ export default function GroupDetailsPage() {
                         <div className="flex items-center gap-2 text-xs text-slate-500 font-medium mt-0.5">
                              {group.contactPerson?.phone && <span>{group.contactPerson.phone}</span>}
                              
-                             {/* קו מפריד ואימייל רק אם יש אימייל */}
                              {group.contactPerson?.email && group.contactPerson?.phone && (
                                 <span className="text-slate-300">|</span>
                              )}
@@ -398,8 +431,6 @@ export default function GroupDetailsPage() {
                     </div>
                   )}
                 </div>
-                {/* ======================================================================== */}
-
               </div>
             </div>
 
@@ -497,28 +528,22 @@ export default function GroupDetailsPage() {
                 <div className="flex-1">
                   <div className="flex justify-between items-start">
                     
-                    {/* ========================================================================
-                        📌 שינוי 2: הצגת בשרי/פרווה ליד הכותרת
-                        ======================================================================== 
-                    */}
                     <div className="flex items-center gap-3">
                         <h3 className="text-xl font-bold text-slate-800 group-hover:text-blue-700 transition-colors">
                           {event.title}
                         </h3>
 
-                        {/* תגית כשרות דינמית */}
                         {['lunch', 'dinner', 'light'].includes(event.mealType) && event.kosherType && (
                            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border 
                              ${event.kosherType === 'meat' 
-                               ? 'bg-rose-50 text-rose-600 border-rose-100' // בשרי = אדום
-                               : 'bg-emerald-50 text-emerald-600 border-emerald-100' // פרווה = ירוק
+                               ? 'bg-rose-50 text-rose-600 border-rose-100'
+                               : 'bg-emerald-50 text-emerald-600 border-emerald-100'
                              }
                            `}>
                               {event.kosherType === 'meat' ? 'בשרי' : 'פרווה'}
                            </span>
                         )}
                     </div>
-                    {/* ======================================================================== */}
 
                     <Edit2
                       size={16}
@@ -547,7 +572,7 @@ export default function GroupDetailsPage() {
               </div>
             ))}
 
-            {/* איזור הוספה מהירה (לא שונה למעט התיקון הקטן ב-AppleInput אם היה) - נשאר זהה לקוד המקורי שלך */}
+            {/* איזור הוספה מהירה */}
             <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mt-8 relative overflow-hidden">
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-4">
@@ -647,6 +672,7 @@ export default function GroupDetailsPage() {
                     )}
                   </div>
 
+                  {/* שורת קלטים: שעות, עלות, כמות */}
                   <div className="md:col-span-4 flex gap-2">
                     <div className="space-y-2 flex-1">
                       <label className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">
@@ -669,6 +695,22 @@ export default function GroupDetailsPage() {
                             setQuickEvent({ ...quickEvent, endTime: e.target.value })
                           }
                         />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 w-20">
+                      <label className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">
+                        עלות
+                      </label>
+                      <div className="relative">
+                         <AppleInput
+                           type="number"
+                           className="text-center px-1 font-bold pl-4"
+                           placeholder="0"
+                           value={quickEvent.price}
+                           onChange={(e) => setQuickEvent({ ...quickEvent, price: e.target.value })}
+                         />
+
                       </div>
                     </div>
 
@@ -825,7 +867,8 @@ export default function GroupDetailsPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-3 gap-4">
+              {/* גריד לעריכת זמנים, כמות ומחיר */}
+              <div className="grid grid-cols-4 gap-3">
                 <div>
                   <label className="text-xs font-bold text-slate-500">התחלה</label>
                   <input
@@ -846,6 +889,16 @@ export default function GroupDetailsPage() {
                     onChange={(e) =>
                       setEditEventData({ ...editEventData, endTime: e.target.value })
                     }
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500">עלות</label>
+                  <input
+                    type="number"
+                    className="w-full p-3 border rounded-xl text-center"
+                    placeholder="₪"
+                    value={editEventData.price ?? ''}
+                    onChange={(e) => setEditEventData({ ...editEventData, price: e.target.value })}
                   />
                 </div>
                 <div>

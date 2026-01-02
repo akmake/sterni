@@ -154,3 +154,110 @@ export const removeEventFromGroup = async (req, res, next) => {
     res.json(updated);
   } catch (err) { next(err); }
 };
+
+export const getKitchenReport = async (req, res, next) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    // מאריכים את טווח החיפוש ביום אחד קדימה כדי לתפוס אירועים של הלילה (למשל 02:00 של מחר ששייך להיום)
+    const searchEnd = new Date(end);
+    searchEnd.setDate(searchEnd.getDate() + 1);
+    searchEnd.setHours(23, 59, 59, 999);
+
+    const report = await Group.aggregate([
+      // 1. סינון ראשוני רחב
+      { $match: { "schedule.date": { $gte: start, $lte: searchEnd } } },
+      { $unwind: "$schedule" },
+      { $match: { "schedule.eventType": "meal" } }, // סינון לארוחות בלבד (אפשר לשנות אם רוצים הכל)
+
+      // 2. חישוב "יום עסקים" (Business Date)
+      // אם השעה קטנה מ-06:00, נחשיב את זה כיום אחד אחורה
+      { $addFields: {
+          "schedule.businessDate": {
+            $cond: {
+              if: { $lt: [ { $toInt: { $substrCP: ["$schedule.startTime", 0, 2] } }, 6 ] },
+              then: { $subtract: ["$schedule.date", 24 * 60 * 60 * 1000] }, // החסרת יום (במילישניות)
+              else: "$schedule.date"
+            }
+          }
+      }},
+
+      // 3. סינון סופי לפי התאריך העסקי המבוקש
+      { $match: { "schedule.businessDate": { $gte: start, $lte: end } } },
+
+      // 4. הבאת פרטי אולם
+      { $lookup: { from: "halls", localField: "schedule.hall", foreignField: "_id", as: "hallDetails" } },
+
+      // 5. עיצוב התוצאה
+      { $project: {
+          groupName: "$name",
+          contactPerson: "$contactPerson",
+          title: "$schedule.title",
+          originalDate: "$schedule.date",
+          date: "$schedule.businessDate", // זה התאריך שיקבע באיזה יום זה יוצג
+          startTime: "$schedule.startTime",
+          endTime: "$schedule.endTime",
+          pax: "$schedule.pax",
+          price: "$schedule.price", // הוספת מחיר
+          mealType: "$schedule.mealType",
+          kosherType: "$schedule.kosherType",
+          requirements: "$schedule.requirements",
+          hall: { $arrayElemAt: ["$hallDetails", 0] },
+          locationText: "$schedule.locationText"
+      }},
+
+      // 6. מיון לפי תאריך ושעה
+      { $sort: { "date": 1, "startTime": 1 } }
+    ]);
+
+    res.json(report);
+  } catch (err) { next(err); }
+};
+
+// --- פונקציה חדשה: דוח סיכום לפי קבוצות ---
+export const getGroupSummaryReport = async (req, res, next) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    // גם כאן נשתמש בלוגיקה של הרחבת הטווח
+    const searchEnd = new Date(end);
+    searchEnd.setDate(searchEnd.getDate() + 1);
+
+    const report = await Group.aggregate([
+      { $match: { "schedule.date": { $gte: start, $lte: searchEnd } } },
+      { $unwind: "$schedule" },
+      // חישוב יום עסקים
+      { $addFields: {
+          businessDate: {
+            $cond: {
+              if: { $lt: [ { $toInt: { $substrCP: ["$schedule.startTime", 0, 2] } }, 6 ] },
+              then: { $subtract: ["$schedule.date", 24 * 60 * 60 * 1000] },
+              else: "$schedule.date"
+            }
+          }
+      }},
+      // סינון לפי הטווח המבוקש
+      { $match: { businessDate: { $gte: start, $lte: end } } },
+      
+      // קיבוץ לפי שם הקבוצה
+      { $group: {
+          _id: "$name", // שם הקבוצה
+          totalEvents: { $sum: 1 },
+          totalPax: { $sum: "$schedule.pax" },
+          totalPrice: { $sum: "$schedule.price" }, // סיכום כספי אם רלוונטי
+          events: { $push: { 
+            title: "$schedule.title", 
+            date: "$businessDate",
+            pax: "$schedule.pax" 
+          }}
+      }},
+      { $sort: { totalPax: -1 } } // מיון לפי כמות אנשים יורדת
+    ]);
+
+    res.json(report);
+  } catch (err) { next(err); }
+};

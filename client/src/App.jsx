@@ -20,6 +20,7 @@ import HallsPage          from "@/pages/HallsPage";
 import GroupsPage         from "@/pages/GroupsPage";
 import NewGroupPage       from "@/pages/NewGroupPage";     // דף יצירה + יומן
 import GroupDetailsPage   from "@/pages/GroupDetailsPage"; // דף ניהול לו"ז
+import KitchenReportPage from "@/pages/KitchenReportPage"
 /* Fallback */
 import NotFoundPage from "@/pages/NotFoundPage";
 
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="groups/new" element={<NewGroupPage />} />
           <Route path="groups/:id" element={<GroupDetailsPage />} />
           <Route path="halls" element={<HallsPage />} />
+          <Route path="reports/kitchen" element={<KitchenReportPage />} />
 
         </Route>
 

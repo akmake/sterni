@@ -11,7 +11,7 @@ export default function DayScheduler({
   
   // הגדרות זמן - ציר אנכי
   const START_HOUR = 6; 
-  const END_HOUR = 24; // חצות
+  const END_HOUR = 30; // חצות
   const TOTAL_HOURS = END_HOUR - START_HOUR;
   const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => i + START_HOUR);
 
@@ -70,7 +70,16 @@ export default function DayScheduler({
     groups.forEach(group => {
       group.schedule.forEach(event => {
         const eventDate = new Date(event.date);
-        if (event.hall?._id === hallId && eventDate.toDateString() === date.toDateString()) {
+        const [h] = event.startTime.split(':').map(Number);
+        
+        // לוגיקה זהה: האם האירוע שייך ליום הזה (06:00 עד סוף היום) או ללילה של מחר (עד 06:00)
+        const isTodayRegular = eventDate.toDateString() === date.toDateString() && h >= 6;
+        
+        const nextDay = new Date(date);
+        nextDay.setDate(nextDay.getDate() + 1);
+        const isTomorrowEarly = eventDate.toDateString() === nextDay.toDateString() && h < 6;
+
+        if (event.hall?._id === hallId && (isTodayRegular || isTomorrowEarly)) {
           relevantEvents.push({
             ...event,
             groupName: group.name,

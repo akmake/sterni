@@ -3,74 +3,20 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import useGroupsStore from '@/stores/groupsStore';
-import DayScheduler from '@/components/DayScheduler';
 import { Button } from '@/components/ui/Button';
 import {
-  Plus,
   Calendar as CalIcon,
   Users,
   Edit2,
-  Check,
-  X,
   MapPin,
   Eye,
-  Trash2,
-  Utensils,
-  Truck,
-  Briefcase,
-  Home,
-  Mail,
-  Phone,
-   // הוספתי את האייקון של השקל
 } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'react-hot-toast';
 
-const MEAL_TYPES = [
-  { id: 'breakfast', label: 'ארוחת בוקר' },
-  { id: 'lunch', label: 'ארוחת צהריים' },
-  { id: 'dinner', label: 'ארוחת ערב' },
-  { id: 'light', label: 'ארוחה קלה' },
-  { id: 'night_treats', label: 'פינוקי לילה' },
-];
-
-// --- רכיבים חיצוניים (תיקון לבעיית הפוקוס בהקלדה) ---
-
-const SegmentedControl = ({ options, value, onChange }) => (
-  <div className="bg-slate-100 p-1 rounded-xl flex w-full relative">
-    {options.map((opt) => (
-      <button
-        key={opt.value}
-        onClick={() => onChange(opt.value)}
-        className={`flex-1 py-1.5 text-sm font-semibold rounded-lg transition-all duration-200 z-10
-        ${value === opt.value ? 'bg-white text-black shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-        type="button"
-      >
-        {opt.label}
-      </button>
-    ))}
-  </div>
-);
-
-const AppleInput = (props) => (
-  <input
-    {...props}
-    className={`w-full bg-slate-50 border-none rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 outline-none transition-all placeholder:text-slate-400 ${
-      props.className || ''
-    }`}
-  />
-);
-
-const AppleSelect = (props) => (
-  <select
-    {...props}
-    className={`w-full bg-slate-50 border-none rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 outline-none transition-all ${
-      props.className || ''
-    }`}
-  />
-);
-
-// --- סוף רכיבים חיצוניים ---
+// Imports from split files
+import { MEAL_TYPES, SegmentedControl, AppleInput, AppleSelect } from './GroupPageComponents';
+import GroupPageHeader from './GroupPageHeader';
+import GroupPageModals from './GroupPageModals';
 
 export default function GroupDetailsPage() {
   const { id } = useParams();
@@ -306,163 +252,14 @@ export default function GroupDetailsPage() {
       <div className="max-w-6xl mx-auto space-y-6">
         
         {/* --- Header: פרטי הקבוצה --- */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-slate-700 to-slate-900"></div>
-          <div className="flex justify-between items-start">
-            <div className="flex-1 space-y-3">
-              
-              {/* כותרת ושם קבוצה */}
-              <div className="flex items-center gap-4">
-                {isEditingDetails ? (
-                  <input
-                    className="text-3xl font-bold text-slate-900 border-b-2 border-blue-500 outline-none w-1/2"
-                    value={editFormData.name || ''}
-                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                  />
-                ) : (
-                  <h1 className="text-4xl font-bold text-slate-900">{group.name}</h1>
-                )}
-                {!isEditingDetails && (
-                  <>
-                    <div className="flex items-center gap-2 text-slate-500 bg-slate-50 px-3 py-1 rounded-full text-sm border border-slate-100">
-                      <CalIcon size={14} />
-                      {new Date(group.startDate).toLocaleDateString('he-IL')} -{' '}
-                      {new Date(group.endDate).toLocaleDateString('he-IL')}
-                    </div>
-                    <div
-                      className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold border ${
-                        group.hostingType === 'overnight'
-                          ? 'bg-purple-50 text-purple-700 border-purple-100'
-                          : 'bg-blue-50 text-blue-700 border-blue-100'
-                      }`}
-                    >
-                      {group.hostingType === 'overnight' ? (
-                        <Home size={14} />
-                      ) : (
-                        <Briefcase size={14} />
-                      )}
-                      {group.hostingType === 'overnight' ? 'אירוח ולינה' : 'יום עיון'}
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* נתונים נוספים */}
-              <div className="flex items-center gap-8 mt-2">
-                <div className="flex items-center gap-2 text-lg">
-                  <Users size={20} className="text-slate-400" />
-                  <div className="flex flex-col leading-tight">
-                    <div className="flex gap-2">
-                      <span className="text-slate-500 text-sm">צפי:</span>
-                      {isEditingDetails ? (
-                        <input
-                          type="number"
-                          className="w-16 font-bold border rounded px-1"
-                          value={editFormData.pax ?? ''}
-                          onChange={(e) =>
-                            setEditFormData({ ...editFormData, pax: e.target.value })
-                          }
-                        />
-                      ) : (
-                        <span className="font-bold text-slate-900">{group.pax}</span>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <span className="text-red-500 text-sm font-medium">מינימום:</span>
-                      {isEditingDetails ? (
-                        <input
-                          type="number"
-                          className="w-16 font-bold border rounded px-1 text-red-600"
-                          value={editFormData.minPax ?? ''}
-                          onChange={(e) =>
-                            setEditFormData({ ...editFormData, minPax: e.target.value })
-                          }
-                        />
-                      ) : (
-                        <span className="font-bold text-red-600">{group.minPax}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="h-8 w-px bg-slate-200"></div>
-
-                {/* איש קשר */}
-                <div className="flex items-center gap-3">
-                  <span className="text-slate-500 self-start mt-1">איש קשר:</span>
-                  
-                  {isEditingDetails ? (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex gap-2">
-                         <input
-                           className="border rounded px-1 w-32"
-                           placeholder="שם"
-                           value={editFormData.contactName || ''}
-                           onChange={(e) => setEditFormData({ ...editFormData, contactName: e.target.value })}
-                         />
-                         <input
-                           className="border rounded px-1 w-32"
-                           placeholder="טלפון"
-                           value={editFormData.contactPhone || ''}
-                           onChange={(e) => setEditFormData({ ...editFormData, contactPhone: e.target.value })}
-                         />
-                      </div>
-                      <input
-                          className="border rounded px-1 w-full"
-                          placeholder="אימייל"
-                          value={editFormData.contactEmail || ''}
-                          onChange={(e) => setEditFormData({ ...editFormData, contactEmail: e.target.value })}
-                       />
-                    </div>
-                  ) : (
-                    <div className="flex flex-col">
-                        <span className="font-bold text-slate-800 leading-tight">
-                            {group.contactPerson?.name || 'לא הוזן שם'}
-                        </span>
-                        <div className="flex items-center gap-2 text-xs text-slate-500 font-medium mt-0.5">
-                             {group.contactPerson?.phone && <span>{group.contactPerson.phone}</span>}
-                             
-                             {group.contactPerson?.email && group.contactPerson?.phone && (
-                                <span className="text-slate-300">|</span>
-                             )}
-                             
-                             {group.contactPerson?.email && <span>{group.contactPerson.email}</span>}
-                        </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div>
-              {isEditingDetails ? (
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => setIsEditingDetails(false)}
-                    variant="ghost"
-                    className="text-red-500"
-                  >
-                    <X size={20} />
-                  </Button>
-                  <Button
-                    onClick={handleSaveDetails}
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    <Check size={20} />
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  onClick={() => setIsEditingDetails(true)}
-                  variant="ghost"
-                  className="text-slate-400 hover:text-blue-600"
-                >
-                  <Edit2 size={18} />
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
+        <GroupPageHeader 
+          group={group}
+          isEditingDetails={isEditingDetails}
+          setIsEditingDetails={setIsEditingDetails}
+          editFormData={editFormData}
+          setEditFormData={setEditFormData}
+          handleSaveDetails={handleSaveDetails}
+        />
 
         {/* בחירת ימים */}
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
@@ -703,13 +500,13 @@ export default function GroupDetailsPage() {
                         עלות
                       </label>
                       <div className="relative">
-                         <AppleInput
-                           type="number"
-                           className="text-center px-1 font-bold pl-4"
-                           placeholder="0"
-                           value={quickEvent.price}
-                           onChange={(e) => setQuickEvent({ ...quickEvent, price: e.target.value })}
-                         />
+                          <AppleInput
+                            type="number"
+                            className="text-center px-1 font-bold pl-4"
+                            placeholder="0"
+                            value={quickEvent.price}
+                            onChange={(e) => setQuickEvent({ ...quickEvent, price: e.target.value })}
+                          />
 
                       </div>
                     </div>
@@ -749,191 +546,21 @@ export default function GroupDetailsPage() {
           </div>
         </div>
 
-        {/* --- דיאלוגים --- */}
-        <Dialog open={isSchedulerOpen} onOpenChange={setIsSchedulerOpen}>
-          <DialogContent className="max-w-6xl w-full h-[80vh] flex flex-col p-0 bg-slate-50 overflow-hidden">
-            <DialogHeader className="p-6 bg-white border-b border-slate-200">
-              <DialogTitle>מצב אולמות</DialogTitle>
-            </DialogHeader>
-            <div className="flex-1 p-6 overflow-auto">
-              {selectedDate && (
-                <DayScheduler
-                  date={selectedDate}
-                  halls={halls}
-                  groups={groups}
-                  currentGroupId={group._id}
-                />
-              )}
-            </div>
-            <div className="p-4 bg-white border-t border-slate-200 text-left">
-              <Button onClick={() => setIsSchedulerOpen(false)}>סגור</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* עריכת אירוע */}
-        <Dialog open={isEditEventDialogOpen} onOpenChange={setIsEditEventDialogOpen}>
-          <DialogContent className="sm:max-w-[550px] dir-rtl text-right p-0 overflow-hidden rounded-2xl">
-            <div className="bg-slate-900 p-6 text-white">
-              <DialogTitle className="text-xl">עריכת אירוע</DialogTitle>
-            </div>
-
-            <div className="p-6 grid gap-6">
-              <div className="flex bg-slate-100 p-1 rounded-xl">
-                <button
-                  onClick={() => setEditEventData({ ...editEventData, eventType: 'meal' })}
-                  className={`flex-1 py-2 rounded-lg font-bold text-sm ${
-                    editEventData.eventType === 'meal' ? 'bg-white shadow-sm' : 'text-slate-400'
-                  }`}
-                  type="button"
-                >
-                  ארוחה
-                </button>
-                <button
-                  onClick={() => setEditEventData({ ...editEventData, eventType: 'general' })}
-                  className={`flex-1 py-2 rounded-lg font-bold text-sm ${
-                    editEventData.eventType === 'general' ? 'bg-white shadow-sm' : 'text-slate-400'
-                  }`}
-                  type="button"
-                >
-                  כללי
-                </button>
-              </div>
-
-              {editEventData.eventType === 'meal' ? (
-                <div className="space-y-4">
-                  <select
-                    className="w-full p-3 border rounded-xl"
-                    value={editEventData.mealType}
-                    onChange={(e) => setEditEventData({ ...editEventData, mealType: e.target.value })}
-                  >
-                    {MEAL_TYPES.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
-
-                  {['lunch', 'dinner', 'light'].includes(editEventData.mealType) && (
-                    <div className="flex gap-4">
-                      <label className="flex gap-2">
-                        <input
-                          type="radio"
-                          checked={editEventData.kosherType === 'meat'}
-                          onChange={() => setEditEventData({ ...editEventData, kosherType: 'meat' })}
-                        />{' '}
-                        בשרי
-                      </label>
-                      <label className="flex gap-2">
-                        <input
-                          type="radio"
-                          checked={editEventData.kosherType === 'parve'}
-                          onChange={() => setEditEventData({ ...editEventData, kosherType: 'parve' })}
-                        />{' '}
-                        פרווה
-                      </label>
-                    </div>
-                  )}
-
-                  <select
-                    className="w-full p-3 border rounded-xl"
-                    value={editEventData.hallId}
-                    onChange={(e) => setEditEventData({ ...editEventData, hallId: e.target.value })}
-                  >
-                    <option value="">בחר אולם...</option>
-                    {halls.map((h) => (
-                      <option key={h._id} value={h._id}>
-                        {h.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <input
-                    className="w-full p-3 border rounded-xl"
-                    value={editEventData.title || ''}
-                    onChange={(e) => setEditEventData({ ...editEventData, title: e.target.value })}
-                    placeholder="כותרת"
-                  />
-                  <input
-                    className="w-full p-3 border rounded-xl"
-                    value={editEventData.locationText || ''}
-                    onChange={(e) =>
-                      setEditEventData({ ...editEventData, locationText: e.target.value })
-                    }
-                    placeholder="מיקום"
-                  />
-                </div>
-              )}
-
-              {/* גריד לעריכת זמנים, כמות ומחיר */}
-              <div className="grid grid-cols-4 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-slate-500">התחלה</label>
-                  <input
-                    type="time"
-                    className="w-full p-3 border rounded-xl text-center"
-                    value={editEventData.startTime || ''}
-                    onChange={(e) =>
-                      setEditEventData({ ...editEventData, startTime: e.target.value })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500">סיום</label>
-                  <input
-                    type="time"
-                    className="w-full p-3 border rounded-xl text-center"
-                    value={editEventData.endTime || ''}
-                    onChange={(e) =>
-                      setEditEventData({ ...editEventData, endTime: e.target.value })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500">עלות</label>
-                  <input
-                    type="number"
-                    className="w-full p-3 border rounded-xl text-center"
-                    placeholder="₪"
-                    value={editEventData.price ?? ''}
-                    onChange={(e) => setEditEventData({ ...editEventData, price: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500">כמות</label>
-                  <input
-                    type="number"
-                    className="w-full p-3 border rounded-xl text-center font-bold"
-                    value={editEventData.pax ?? ''}
-                    onChange={(e) => setEditEventData({ ...editEventData, pax: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-500">הערות</label>
-                <input
-                  className="w-full p-3 border rounded-xl"
-                  value={editEventData.requirements || ''}
-                  onChange={(e) =>
-                    setEditEventData({ ...editEventData, requirements: e.target.value })
-                  }
-                />
-              </div>
-
-              <div className="flex gap-3 mt-4">
-                <Button onClick={handleDeleteEvent} variant="ghost" className="text-red-500">
-                  <Trash2 />
-                </Button>
-                <Button onClick={handleUpdateEvent} className="flex-1 bg-slate-900 text-white">
-                  שמור שינויים
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <GroupPageModals
+          isSchedulerOpen={isSchedulerOpen}
+          setIsSchedulerOpen={setIsSchedulerOpen}
+          selectedDate={selectedDate}
+          halls={halls}
+          groups={groups}
+          currentGroupId={group._id}
+          isEditEventDialogOpen={isEditEventDialogOpen}
+          setIsEditEventDialogOpen={setIsEditEventDialogOpen}
+          editEventData={editEventData}
+          setEditEventData={setEditEventData}
+          handleUpdateEvent={handleUpdateEvent}
+          handleDeleteEvent={handleDeleteEvent}
+        />
+        
       </div>
     </div>
   );

@@ -8,8 +8,8 @@ import csurf from 'csurf';
 import mongoose from 'mongoose';
 import path from 'path';
 import { fileURLToPath } from 'url';
-
-// --- Imports ---
+import emailRoutes from './routes/emailRoutes.js';
+import { startEmailListener } from './services/emailListener.js';// --- Imports ---
 import authRoutes from './routes/auth.js';
 import hallRoutes from './routes/hallRoutes.js';   // <-- הוסף
 import groupRoutes from './routes/groupRoutes.js'; // <-- הוסף
@@ -77,6 +77,8 @@ app.use(csrfProtection); // מכאן והלאה הכל מוגן
 app.use('/api/projects', requireAuth, projectRoutes);
 app.use('/api/halls', requireAuth, hallRoutes);   // <-- הוסף
 app.use('/api/groups', requireAuth, groupRoutes); // <-- הוסף
+app.use('/api/emails', emailRoutes);
+
 
 // Error Handling
 app.use('*', (req, res) => {
@@ -90,7 +92,7 @@ app.use((err, req, res, next) => {
   console.error(err);
   res.status(err.statusCode || 500).json({ message: err.message || 'Internal Server Error' });
 });
-
+startEmailListener();
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 

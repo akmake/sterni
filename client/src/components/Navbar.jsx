@@ -1,12 +1,13 @@
 import { useState, Fragment } from "react";
-import { Link, NavLink } from "react-router-dom";
-import { Menu, X, LogOut, Home, Briefcase,Utensils, ChevronDown, Settings,MapPin, UserCircle, User, Users } from "lucide-react";
+import { Link, NavLink  } from "react-router-dom";
+import { Menu, X, LogOut, Home, Briefcase,Utensils, ChevronDown, Settings,MapPin, UserCircle, User, Users,Mail } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/stores/authStore";
 import { Button } from "@/components/ui/Button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
 
 // --- נתונים ---
 const navItems = [
@@ -15,6 +16,7 @@ const navItems = [
     { to: '/groups', label: 'ניהול קבוצות', icon: Users, type: 'link', auth: true },
     { to: '/reports/kitchen', label: 'דוח מטבח', icon: Utensils, type: 'link', auth: true },
     { to: '/halls', label: 'ניהול אולמות', icon: MapPin, type: 'link', auth: true },
+    { to: '/emails', label: 'ניהול פניות', icon: Mail, type: 'link', auth: true },
 ];
 
 const getVisibleItems = (isAuthenticated, user) => {

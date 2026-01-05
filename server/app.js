@@ -14,6 +14,7 @@ import authRoutes from './routes/auth.js';
 import hallRoutes from './routes/hallRoutes.js';   // <-- הוסף
 import groupRoutes from './routes/groupRoutes.js'; // <-- הוסף
 import projectRoutes from './routes/projectRoutes.js';
+import taskRoutes from './routes/taskRoutes.js';
 // ודא שהנתיבים האלו קיימים אצלך, אם לא - מחק אותם
 
 import rateLimiter from './middlewares/rateLimiter.js';
@@ -78,7 +79,7 @@ app.use('/api/projects', requireAuth, projectRoutes);
 app.use('/api/halls', requireAuth, hallRoutes);   // <-- הוסף
 app.use('/api/groups', requireAuth, groupRoutes); // <-- הוסף
 app.use('/api/emails', emailRoutes);
-
+app.use('/api/tasks', taskRoutes);
 
 // Error Handling
 app.use('*', (req, res) => {

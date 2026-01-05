@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Mail, Clock, CheckCircle, AlertCircle, RefreshCw, Search, ChevronDown } from 'lucide-react';
+// 👇 התיקון: שימוש ב-api המרכזי של הפרויקט
+import api from '../utils/api'; 
+import { Mail, Clock, CheckCircle, RefreshCw, Search } from 'lucide-react';
 
 const EmailsPage = () => {
   const [emails, setEmails] = useState([]);
@@ -10,7 +11,8 @@ const EmailsPage = () => {
   const fetchEmails = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('http://localhost:5000/api/emails');
+      // ✅ קריאה נקייה דרך api.js (כולל קוקיז אוטומטי)
+      const res = await api.get('/emails');
       setEmails(res.data);
     } catch (err) {
       console.error("Error fetching emails:", err);
@@ -21,39 +23,25 @@ const EmailsPage = () => {
 
   useEffect(() => {
     fetchEmails();
-    const interval = setInterval(fetchEmails, 15000); // רענון שקט כל 15 שניות
+    const interval = setInterval(fetchEmails, 15000); 
     return () => clearInterval(interval);
   }, []);
 
   const updateStatus = async (id, newStatus) => {
     try {
-      // 1. נסה לשלוף את הטוקן מהאחסון המקומי
-      // (שים לב: אולי אצלך זה נקרא 'jwt' או משהו אחר, בדוק ב-Application -> Local Storage בדפדפן)
-      const token = localStorage.getItem('token'); 
-
-      // 2. הגדרת הכותרות (Headers) עם הטוקן
-      const config = {
-        headers: {
-          Authorization: `Bearer ${token}` // שליחת הטוקן לשרת
-        }
-      };
-
-      // עדכון אופטימיסטי בסטייט (כדי שהמשתמש יראה מיד שינוי)
+      // עדכון אופטימיסטי בסטייט
       setEmails(prev => prev.map(email => 
         email._id === id ? { ...email, status: newStatus } : email
       ));
 
-      // 3. שליחת הבקשה לשרת עם הקונפיגורציה שכוללת את הטוקן
-    await axios.patch(
-        `http://localhost:5000/api/emails/${id}/status`, 
-        { status: newStatus }, 
-        { withCredentials: true } // זה אומר ל-Axios לשלוח את הקוקיז
-    );
+      // ✅ שליחה דרך api.js (בלי headers ידניים)
+      await api.patch(`/emails/${id}/status`, { status: newStatus });
+    
     } catch (err) {
       console.error("Error updating status:", err);
-      // אם נכשל, נחזיר הודעת שגיאה ונרענן את הנתונים כדי לבטל את השינוי האופטימיסטי
-      alert("שגיאה: אין לך הרשאה לעדכן סטטוס (403)");
+      // במקרה שגיאה נרענן את הנתונים
       fetchEmails();
+      // ה-api.js שלך כבר יקפיץ את המשתמש ללוגין אם ה-Token פג תוקף (401)
     }
   };
 

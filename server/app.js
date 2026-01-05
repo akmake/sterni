@@ -15,8 +15,6 @@ import hallRoutes from './routes/hallRoutes.js';   // <-- הוסף
 import groupRoutes from './routes/groupRoutes.js'; // <-- הוסף
 import projectRoutes from './routes/projectRoutes.js';
 import taskRoutes from './routes/taskRoutes.js';
-// ודא שהנתיבים האלו קיימים אצלך, אם לא - מחק אותם
-
 import rateLimiter from './middlewares/rateLimiter.js';
 import { requireAuth } from './middlewares/authMiddleware.js';
 

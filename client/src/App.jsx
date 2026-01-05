@@ -34,7 +34,7 @@ export default function App() {
         {/* -------- Public Routes -------- */}
         
         {/* 2. שינוי: במקום להציג את דף הבית, בצע הפניה אוטומטית לפרויקטים [cite: 9] */}
-        <Route index element={<Navigate to="/projects" replace />} />
+        <Route index element={<Navigate to="/tasks" replace />} />
      
         <Route path="login"    element={<LoginPage />}    />
         <Route path="register" element={<RegisterPage />} />

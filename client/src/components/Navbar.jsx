@@ -102,7 +102,7 @@ function SidebarContent({ items, user, isAuthenticated, logout, onClose }) {
         <div className="flex flex-col h-full bg-white text-slate-800">
             {/* כותרת התפריט */}
             <div className="flex items-center justify-between p-6 border-b border-slate-100">
-                <Link to="/" onClick={onClose} className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                <Link to="/tasks" onClick={onClose} className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                     yosefdahan
                 </Link>
                 {onClose && (

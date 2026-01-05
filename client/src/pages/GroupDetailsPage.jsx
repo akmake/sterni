@@ -14,9 +14,50 @@ import {
 import { toast } from 'react-hot-toast';
 
 // Imports from split files
-import { MEAL_TYPES, SegmentedControl, AppleInput, AppleSelect } from './GroupPageComponents';
+import { SegmentedControl, AppleInput, AppleSelect } from './GroupPageComponents';
 import GroupPageHeader from './GroupPageHeader';
 import GroupPageModals from './GroupPageModals';
+
+// --- הגדרות ארוחות ---
+const MEAL_DEFINITIONS = {
+  breakfast: {
+    label: 'ארוחת בוקר',
+    kosherOptions: ['חלבי'],
+    menuOptions: ['תפריט נוער', 'תפריט ימי עיון', 'פרטיים']
+  },
+  light_meal: {
+    label: 'ארוחה קלה',
+    kosherOptions: ['פרווה', 'בשרי', 'חלבי'],
+    menuOptions: [
+      'כיבוד קל', 'כיבוד קל משודרג', 'פיתה פלאפל', 
+      'מזנון קליל', 'בורקס פיצה ופסטה', 
+      'לחמניות סלטים ומעדן', 'וופל בלגי'
+    ]
+  },
+  lunch: {
+    label: 'ארוחת צהריים',
+    kosherOptions: ['פרווה', 'בשרי', 'חלבי'],
+    menuOptions: ['תפריט נוער', 'תפריט ימי עיון', 'פרטיים']
+  },
+  light_evening: {
+    label: 'ארוחה קלה ערב',
+    kosherOptions: ['פרווה', 'בשרי', 'חלבי'],
+    menuOptions: [
+      'כיבוד קל', 'כיבוד קל משודרג', 'פיתה פלאפל', 
+      'מזנון קליל', 'בורקס פיצה ופסטה', 
+      'לחמניות סלטים ומעדן', 'וופל בלגי'
+    ]
+  },
+  dinner: {
+    label: 'ארוחת ערב',
+    kosherOptions: ['פרווה', 'בשרי', 'חלבי'],
+    menuOptions: ['תפריט נוער', 'תפריט ימי עיון', 'פרטיים']
+  },
+  night_treats: {
+    label: 'פינוקי לילה',
+    isManual: true // אין כאן kosherOptions, ולכן זה קרס
+  }
+};
 
 export default function GroupDetailsPage() {
   const { id } = useParams();
@@ -44,10 +85,11 @@ export default function GroupDetailsPage() {
     hallId: '',
     locationText: '',
     pax: '',
-    price: '', // הוספתי שדה מחיר
+    price: '',
     requirements: '',
-    mealType: 'breakfast',
+    mealType: 'breakfast', 
     kosherType: 'parve',
+    menuItem: '' 
   });
 
   useEffect(() => {
@@ -105,9 +147,23 @@ export default function GroupDetailsPage() {
     let finalLocation = data.locationText;
 
     // טיפול בכותרת ואולם לפי סוג אירוע
-    if (data.eventType === 'meal') {
-      const mealLabel = MEAL_TYPES.find((m) => m.id === data.mealType)?.label || 'ארוחה';
-      finalTitle = mealLabel; 
+    const isMeal = data.eventType === 'meal';
+    
+    if (isMeal) {
+      const def = MEAL_DEFINITIONS[data.mealType];
+      if (!def) {
+         toast.error('סוג ארוחה לא תקין');
+         return null;
+      }
+
+      // בניית כותרת יפה לתצוגה
+      if (def.isManual) {
+          finalTitle = def.label; 
+      } else {
+          finalTitle = `${def.label}`;
+          if (data.kosherType) finalTitle += ` (${data.kosherType})`; 
+          if (data.menuItem) finalTitle += ` - ${data.menuItem}`;
+      }
 
       if (!finalHall) {
         toast.error('יש לבחור אולם לארוחה');
@@ -122,9 +178,7 @@ export default function GroupDetailsPage() {
       finalHall = null;
     }
 
-    // --- תיקון לוגיקת לילה (Night Shift Logic) ---
-    // אם השעה היא בין 00:00 ל-05:59, המערכת תבין שזה שייך ללילה של היום הזה,
-    // ולכן תשמור את זה פיזית בתאריך של מחר, כדי שזה יופיע נכון במיון ובפילטור.
+    // --- תיקון לוגיקת לילה ---
     let finalDate = new Date(date);
     const [h] = data.startTime.split(':').map(Number);
     if (h < 6) {
@@ -137,8 +191,15 @@ export default function GroupDetailsPage() {
       hall: finalHall,
       locationText: finalLocation,
       pax: parseInt(data.pax, 10) || 0,
-      price: parseInt(data.price, 10) || 0, // הוספתי המרה של המחיר
-      date: finalDate, // שליחת התאריך המתוקן
+      price: parseInt(data.price, 10) || 0,
+      date: finalDate,
+      
+      // שדות המודל החדש
+      isMeal: isMeal, 
+      mealType: isMeal ? data.mealType : '',
+      kosherType: isMeal ? data.kosherType : '',
+      menuItem: isMeal ? data.menuItem : '', 
+      eventType: isMeal ? 'meal' : 'activity'
     };
   };
 
@@ -158,20 +219,33 @@ export default function GroupDetailsPage() {
         hallId: '',
         locationText: '',
         pax: group.pax,
-        price: '', // איפוס שדה המחיר
+        price: '',
         requirements: '',
         mealType: 'breakfast',
         kosherType: 'parve',
+        menuItem: '' 
       });
     } catch (e) {
       console.error(e);
     }
   };
 
+  // --- שמירה מה-Scheduler ---
+  const handleSaveFromScheduler = async (eventData) => {
+    try {
+      await addEvent(group._id, eventData);
+      toast.success('האירוע שובץ בלוח');
+    } catch (error) {
+      console.error(error);
+      toast.error('שגיאה בשמירה מהלוח');
+    }
+  };
+
   const openEditDialog = (event) => {
     setEditingEventId(event._id);
     let type = event.eventType || 'meal';
-    if (type === 'regular') type = 'meal';
+    if (type === 'regular') type = 'meal'; 
+    
     setEditEventData({
       eventType: type,
       title: event.title,
@@ -180,10 +254,11 @@ export default function GroupDetailsPage() {
       hallId: event.hall?._id || event.hall || '',
       locationText: event.locationText || '',
       pax: event.pax,
-      price: event.price || '', // טעינת המחיר לעריכה
+      price: event.price || '',
       requirements: event.requirements || '',
       mealType: event.mealType || 'breakfast',
       kosherType: event.kosherType || 'parve',
+      menuItem: event.menuItem || '' 
     });
     setIsEditEventDialogOpen(true);
   };
@@ -219,26 +294,19 @@ export default function GroupDetailsPage() {
 
   if (!group) return <div className="p-10 text-center text-slate-500">טוען נתונים...</div>;
 
-  // --- לוגיקת תצוגה חכמה (יום לוגי: 06:00 עד 06:00 למחרת) ---
+  // --- לוגיקת תצוגה חכמה ---
   const eventsForDay = group.schedule
     ?.filter((e) => {
       if (!selectedDate) return false;
-      
       const eventDate = new Date(e.date);
       const [h] = e.startTime.split(':').map(Number);
-      
-      // אירועים של היום (מ-06:00 עד חצות)
       const isTodayRegular = eventDate.toDateString() === selectedDate.toDateString() && h >= 6;
-
-      // אירועים של הלילה (מחר לפנות בוקר עד 06:00)
       const nextDay = new Date(selectedDate);
       nextDay.setDate(nextDay.getDate() + 1);
       const isTomorrowEarly = eventDate.toDateString() === nextDay.toDateString() && h < 6;
-
       return isTodayRegular || isTomorrowEarly;
     })
     .sort((a, b) => {
-      // מיון: שעות הלילה (00-05) נחשבות "גדולות יותר" מ-23 כדי שיופיעו בסוף הרשימה
       const getMinutes = (timeStr) => {
         const [h, m] = timeStr.split(':').map(Number);
         const adjustedH = h < 6 ? h + 24 : h; 
@@ -251,7 +319,6 @@ export default function GroupDetailsPage() {
     <div className="min-h-screen bg-[#F5F5F7] p-6 font-sans dir-rtl">
       <div className="max-w-6xl mx-auto space-y-6">
         
-        {/* --- Header: פרטי הקבוצה --- */}
         <GroupPageHeader 
           group={group}
           isEditingDetails={isEditingDetails}
@@ -300,9 +367,7 @@ export default function GroupDetailsPage() {
             </Button>
           </div>
 
-          {/* רשימת האירועים */}
           <div className="space-y-3">
-            {/* מצב ריק */}
             {(!eventsForDay || eventsForDay.length === 0) && (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400 border-2 border-dashed border-slate-200 rounded-3xl bg-white/50">
                 <CalIcon size={48} className="mb-4 opacity-20" />
@@ -310,7 +375,6 @@ export default function GroupDetailsPage() {
               </div>
             )}
 
-            {/* אירועים קיימים */}
             {eventsForDay?.map((event) => (
               <div
                 key={event._id}
@@ -324,41 +388,38 @@ export default function GroupDetailsPage() {
 
                 <div className="flex-1">
                   <div className="flex justify-between items-start">
-                    
                     <div className="flex items-center gap-3">
                         <h3 className="text-xl font-bold text-slate-800 group-hover:text-blue-700 transition-colors">
                           {event.title}
                         </h3>
-
-                        {['lunch', 'dinner', 'light'].includes(event.mealType) && event.kosherType && (
+                        {/* תגית כשרות - הגנה מפני קריסה ידנית */}
+                        {MEAL_DEFINITIONS[event.mealType] && 
+                         !MEAL_DEFINITIONS[event.mealType].isManual && 
+                         event.kosherType && (
                            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border 
                              ${event.kosherType === 'meat' 
                                ? 'bg-rose-50 text-rose-600 border-rose-100'
-                               : 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                               : event.kosherType === 'parve' 
+                                 ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                 : 'bg-blue-50 text-blue-600 border-blue-100'
                              }
                            `}>
-                              {event.kosherType === 'meat' ? 'בשרי' : 'פרווה'}
+                              {event.kosherType === 'meat' ? 'בשרי' : event.kosherType === 'parve' ? 'פרווה' : 'חלבי'}
                            </span>
                         )}
                     </div>
-
-                    <Edit2
-                      size={16}
-                      className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity"
-                    />
+                    <Edit2 size={16} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
 
                   <div className="flex flex-wrap gap-3 mt-2">
                     <span className="flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
                       <MapPin size={14} /> {event.hall?.name || event.locationText || 'אולם לא ידוע'}
                     </span>
-
                     {event.pax > 0 && (
                       <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1">
                         <Users size={12} /> {event.pax}
                       </span>
                     )}
-
                     {event.requirements && (
                       <span className="bg-slate-50 text-slate-500 px-3 py-1 rounded-full text-sm truncate max-w-md">
                         {event.requirements}
@@ -369,7 +430,7 @@ export default function GroupDetailsPage() {
               </div>
             ))}
 
-            {/* איזור הוספה מהירה */}
+            {/* --- הוספה מהירה (Inline Quick Add) --- */}
             <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 mt-8 relative overflow-hidden">
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-4">
@@ -393,43 +454,78 @@ export default function GroupDetailsPage() {
                     </label>
 
                     {quickEvent.eventType === 'meal' ? (
-                      <div className="flex gap-2">
-                        <AppleSelect
-                          value={quickEvent.mealType}
-                          onChange={(e) => setQuickEvent({ ...quickEvent, mealType: e.target.value })}
-                        >
-                          {MEAL_TYPES.map((t) => (
-                            <option key={t.id} value={t.id}>
-                              {t.label}
-                            </option>
-                          ))}
-                        </AppleSelect>
+                      <div className="flex flex-col gap-2">
+                        {/* בחירת סוג ארוחה */}
+                        <div className="flex gap-2">
+                          <AppleSelect
+                            value={quickEvent.mealType}
+                            onChange={(e) => {
+                                const newType = e.target.value;
+                                const def = MEAL_DEFINITIONS[newType];
+                                
+                                // --- תיקון השגיאה כאן: בדיקה אם קיים kosherOptions ---
+                                let defaultKosher = 'parve';
+                                if (def.kosherOptions && def.kosherOptions.length === 1) {
+                                  defaultKosher = def.kosherOptions[0];
+                                }
 
-                        {['lunch', 'dinner', 'light'].includes(quickEvent.mealType) && (
-                          <div className="bg-slate-50 rounded-xl p-1 flex items-center">
-                            <button
-                              onClick={() => setQuickEvent({ ...quickEvent, kosherType: 'meat' })}
-                              className={`h-full px-3 rounded-lg text-xs font-bold transition-all ${
-                                quickEvent.kosherType === 'meat'
-                                  ? 'bg-white shadow-sm text-red-600'
-                                  : 'text-slate-400'
-                              }`}
-                              type="button"
-                            >
-                              בשרי
-                            </button>
-                            <button
-                              onClick={() => setQuickEvent({ ...quickEvent, kosherType: 'parve' })}
-                              className={`h-full px-3 rounded-lg text-xs font-bold transition-all ${
-                                quickEvent.kosherType === 'parve'
-                                  ? 'bg-white shadow-sm text-green-600'
-                                  : 'text-slate-400'
-                              }`}
-                              type="button"
-                            >
-                              פרווה
-                            </button>
-                          </div>
+                                setQuickEvent({ 
+                                    ...quickEvent, 
+                                    mealType: newType,
+                                    kosherType: defaultKosher,
+                                    menuItem: ''
+                                });
+                            }}
+                          >
+                            {Object.entries(MEAL_DEFINITIONS).map(([key, def]) => (
+                              <option key={key} value={key}>{def.label}</option>
+                            ))}
+                          </AppleSelect>
+
+                          {/* בחירת כשרות */}
+                          {MEAL_DEFINITIONS[quickEvent.mealType] && 
+                           !MEAL_DEFINITIONS[quickEvent.mealType].isManual && 
+                           MEAL_DEFINITIONS[quickEvent.mealType].kosherOptions.length > 1 && (
+                            <div className="bg-slate-50 rounded-xl p-1 flex items-center shrink-0">
+                              {MEAL_DEFINITIONS[quickEvent.mealType].kosherOptions.includes('meat') && (
+                                <button
+                                  onClick={() => setQuickEvent({ ...quickEvent, kosherType: 'meat' })}
+                                  className={`h-full px-3 rounded-lg text-xs font-bold transition-all ${
+                                    quickEvent.kosherType === 'meat' ? 'bg-white shadow-sm text-red-600' : 'text-slate-400'
+                                  }`}
+                                >בשרי</button>
+                              )}
+                              {MEAL_DEFINITIONS[quickEvent.mealType].kosherOptions.includes('parve') && (
+                                <button
+                                  onClick={() => setQuickEvent({ ...quickEvent, kosherType: 'parve' })}
+                                  className={`h-full px-3 rounded-lg text-xs font-bold transition-all ${
+                                    quickEvent.kosherType === 'parve' ? 'bg-white shadow-sm text-green-600' : 'text-slate-400'
+                                  }`}
+                                >פרווה</button>
+                              )}
+                               {MEAL_DEFINITIONS[quickEvent.mealType].kosherOptions.includes('halavi') && (
+                                <button
+                                  onClick={() => setQuickEvent({ ...quickEvent, kosherType: 'halavi' })}
+                                  className={`h-full px-3 rounded-lg text-xs font-bold transition-all ${
+                                    quickEvent.kosherType === 'halavi' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'
+                                  }`}
+                                >חלבי</button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* בחירת תפריט */}
+                        {MEAL_DEFINITIONS[quickEvent.mealType] && !MEAL_DEFINITIONS[quickEvent.mealType].isManual && (
+                           <AppleSelect
+                             value={quickEvent.menuItem}
+                             onChange={(e) => setQuickEvent({ ...quickEvent, menuItem: e.target.value })}
+                           >
+                             <option value="">בחר תפריט...</option>
+                             {MEAL_DEFINITIONS[quickEvent.mealType].menuOptions.map(opt => (
+                                <option key={opt} value={opt}>{opt}</option>
+                             ))}
+                           </AppleSelect>
                         )}
                       </div>
                     ) : (
@@ -469,7 +565,6 @@ export default function GroupDetailsPage() {
                     )}
                   </div>
 
-                  {/* שורת קלטים: שעות, עלות, כמות */}
                   <div className="md:col-span-4 flex gap-2">
                     <div className="space-y-2 flex-1">
                       <label className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">
@@ -499,16 +594,13 @@ export default function GroupDetailsPage() {
                       <label className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">
                         עלות
                       </label>
-                      <div className="relative">
-                          <AppleInput
-                            type="number"
-                            className="text-center px-1 font-bold pl-4"
-                            placeholder="0"
-                            value={quickEvent.price}
-                            onChange={(e) => setQuickEvent({ ...quickEvent, price: e.target.value })}
-                          />
-
-                      </div>
+                      <AppleInput
+                          type="number"
+                          className="text-center px-1 font-bold pl-4"
+                          placeholder="0"
+                          value={quickEvent.price}
+                          onChange={(e) => setQuickEvent({ ...quickEvent, price: e.target.value })}
+                        />
                     </div>
 
                     <div className="space-y-2 w-20">
@@ -559,6 +651,7 @@ export default function GroupDetailsPage() {
           setEditEventData={setEditEventData}
           handleUpdateEvent={handleUpdateEvent}
           handleDeleteEvent={handleDeleteEvent}
+          onSaveEvent={handleSaveFromScheduler} 
         />
         
       </div>

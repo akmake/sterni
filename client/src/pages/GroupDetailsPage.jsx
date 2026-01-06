@@ -161,7 +161,6 @@ export default function GroupDetailsPage() {
           finalTitle = def.label; 
       } else {
           finalTitle = `${def.label}`;
-          if (data.kosherType) finalTitle += ` (${data.kosherType})`; 
           if (data.menuItem) finalTitle += ` - ${data.menuItem}`;
       }
 

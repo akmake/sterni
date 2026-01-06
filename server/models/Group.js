@@ -7,8 +7,12 @@ const eventSchema = new mongoose.Schema({
   startTime: { type: String, required: true },
   endTime: { type: String, required: true },
   
+  // קישור לאולם (לא חובה - אם רוצים מיקום חופשי)
   hall: { type: mongoose.Schema.Types.ObjectId, ref: 'Hall', required: false },
   
+  // שדה למיקום חופשי (טקסט) - בשימוש כאשר לא בוחרים אולם מסודר
+  locationText: { type: String, required: false, default: '' },
+
   eventType: { 
     type: String, 
     enum: ['meal', 'activity', 'general', 'regular'], 
@@ -20,17 +24,15 @@ const eventSchema = new mongoose.Schema({
 
   mealType: { 
     type: String, 
-    // תיקון: הוספתי את 'light' לרשימה כדי לא לשבור אירועים ישנים
-    enum: ['breakfast', 'lunch', 'dinner', 'light_meal', 'light_evening', 'night_treats', 'light'],
+    // התיקון הקריטי: הוספנו "" (מחרוזת ריקה) לסוף הרשימה כדי למנוע קריסה באירועים רגילים
+    enum: ['breakfast', 'lunch', 'dinner', 'light_meal', 'light_evening', 'night_treats', 'light', ''],
+    default: '', 
     required: false
   },
   
   kosherType: { type: String, required: false },
   menuItem: { type: String, required: false },
   notes: { type: String },
-
-  // --- לוגיקה לאירוע כללי ---
-  locationText: { type: String, required: false },
 
   pax: { type: Number, default: 0 },
   price: { type: Number, default: 0 },
@@ -44,6 +46,7 @@ const groupSchema = new mongoose.Schema({
   pax: { type: Number, required: true, default: 0 },
 
   minPax: { type: Number, required: true, default: 0 },
+  
   hostingType: { 
     type: String, 
     enum: ['seminar', 'overnight'], 

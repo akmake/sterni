@@ -1,6 +1,7 @@
 import Group from '../models/Group.js';
 import AppError from '../utils/AppError.js';
 
+// --- קבלת כל הקבוצות ---
 export const getGroups = async (req, res, next) => {
   try {
     const groups = await Group.find({})
@@ -10,9 +11,18 @@ export const getGroups = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// --- קבלת קבוצה בודדת (חדש - למקרה שתצטרך) ---
+export const getGroup = async (req, res, next) => {
+  try {
+    const group = await Group.findById(req.params.id || req.params.groupId).populate('schedule.hall');
+    if (!group) return next(new AppError('Group not found', 404));
+    res.json(group);
+  } catch (err) { next(err); }
+};
+
+// --- יצירת קבוצה ---
 export const createGroup = async (req, res, next) => {
   try {
-    // מקבלים את השדות החדשים
     const { name, contactPerson, startDate, endDate, pax, minPax, hostingType } = req.body;
     
     const group = await Group.create({
@@ -21,21 +31,24 @@ export const createGroup = async (req, res, next) => {
       startDate,
       endDate,
       pax,
-      minPax: minPax || 0,         // <-- הוסף
-      hostingType: hostingType || 'seminar', // <-- הוסף
+      minPax: minPax || 0,
+      hostingType: hostingType || 'seminar',
       createdBy: req.user.id
     });
     res.status(201).json(group);
   } catch (err) { next(err); }
 };
 
+// --- עדכון פרטי קבוצה ---
 export const updateGroupDetails = async (req, res, next) => {
     try {
         const { groupId } = req.params;
+        // תמיכה גם ב-id רגיל אם הראוט מוגדר אחרת
+        const idToUpdate = groupId || req.params.id;
         const updates = req.body; 
 
         const group = await Group.findByIdAndUpdate(
-            groupId,
+            idToUpdate,
             { $set: updates },
             { new: true, runValidators: true }
         ).populate('schedule.hall');
@@ -45,10 +58,27 @@ export const updateGroupDetails = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
+// --- מחיקת קבוצה (התיקון שביקשת!) ---
+export const deleteGroup = async (req, res, next) => {
+  try {
+    // מנסה למצוא את ה-ID גם אם קראת לו id וגם אם groupId בראוטים
+    const { id, groupId } = req.params;
+    const idToDelete = id || groupId;
+
+    const group = await Group.findByIdAndDelete(idToDelete);
+
+    if (!group) {
+      return next(new AppError('Group not found', 404));
+    }
+
+    res.status(200).json({ message: 'Group deleted successfully', id: idToDelete });
+  } catch (err) { next(err); }
+};
+
+// --- הוספת אירוע לקבוצה ---
 export const addEventToGroup = async (req, res, next) => {
   try {
     const { groupId } = req.params;
-    // פירוק כל השדות החדשים
     const { title, date, startTime, endTime, hall, requirements, pax, eventType, mealType, kosherType, locationText } = req.body;
 
     // בדיקת חפיפות רק אם זה אירוע עם אולם פיזי
@@ -89,6 +119,7 @@ export const addEventToGroup = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// --- עדכון אירוע קיים ---
 export const updateGroupEvent = async (req, res, next) => {
   try {
     const { groupId, eventId } = req.params;
@@ -128,7 +159,6 @@ export const updateGroupEvent = async (req, res, next) => {
         "schedule.$.mealType": mealType,
         "schedule.$.kosherType": kosherType,
         "schedule.$.locationText": locationText,
-        // אם אין אולם (באירוע כללי), שולחים null כדי לאפס את השדה ב-DB
         "schedule.$.hall": hall || null 
     };
 
@@ -144,10 +174,13 @@ export const updateGroupEvent = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// --- מחיקת אירוע מקבוצה ---
 export const removeEventFromGroup = async (req, res, next) => {
   try {
     const { groupId, eventId } = req.params;
     const group = await Group.findById(groupId);
+    if (!group) return next(new AppError('Group not found', 404));
+    
     group.schedule.pull({ _id: eventId });
     await group.save();
     const updated = await Group.findById(groupId).populate('schedule.hall');
@@ -155,13 +188,14 @@ export const removeEventFromGroup = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// --- דוח מטבח (עם לוגיקה עסקית) ---
 export const getKitchenReport = async (req, res, next) => {
   try {
     const { startDate, endDate } = req.query;
     const start = new Date(startDate);
     const end = new Date(endDate);
     
-    // מאריכים את טווח החיפוש ביום אחד קדימה כדי לתפוס אירועים של הלילה (למשל 02:00 של מחר ששייך להיום)
+    // מאריכים את טווח החיפוש ביום אחד קדימה
     const searchEnd = new Date(end);
     searchEnd.setDate(searchEnd.getDate() + 1);
     searchEnd.setHours(23, 59, 59, 999);
@@ -170,21 +204,20 @@ export const getKitchenReport = async (req, res, next) => {
       // 1. סינון ראשוני רחב
       { $match: { "schedule.date": { $gte: start, $lte: searchEnd } } },
       { $unwind: "$schedule" },
-      { $match: { "schedule.eventType": "meal" } }, // סינון לארוחות בלבד (אפשר לשנות אם רוצים הכל)
+      { $match: { "schedule.eventType": "meal" } },
 
-      // 2. חישוב "יום עסקים" (Business Date)
-      // אם השעה קטנה מ-06:00, נחשיב את זה כיום אחד אחורה
+      // 2. חישוב "יום עסקים"
       { $addFields: {
           "schedule.businessDate": {
             $cond: {
               if: { $lt: [ { $toInt: { $substrCP: ["$schedule.startTime", 0, 2] } }, 6 ] },
-              then: { $subtract: ["$schedule.date", 24 * 60 * 60 * 1000] }, // החסרת יום (במילישניות)
+              then: { $subtract: ["$schedule.date", 24 * 60 * 60 * 1000] },
               else: "$schedule.date"
             }
           }
       }},
 
-      // 3. סינון סופי לפי התאריך העסקי המבוקש
+      // 3. סינון סופי
       { $match: { "schedule.businessDate": { $gte: start, $lte: end } } },
 
       // 4. הבאת פרטי אולם
@@ -196,11 +229,11 @@ export const getKitchenReport = async (req, res, next) => {
           contactPerson: "$contactPerson",
           title: "$schedule.title",
           originalDate: "$schedule.date",
-          date: "$schedule.businessDate", // זה התאריך שיקבע באיזה יום זה יוצג
+          date: "$schedule.businessDate",
           startTime: "$schedule.startTime",
           endTime: "$schedule.endTime",
           pax: "$schedule.pax",
-          price: "$schedule.price", // הוספת מחיר
+          price: "$schedule.price",
           mealType: "$schedule.mealType",
           kosherType: "$schedule.kosherType",
           requirements: "$schedule.requirements",
@@ -208,7 +241,7 @@ export const getKitchenReport = async (req, res, next) => {
           locationText: "$schedule.locationText"
       }},
 
-      // 6. מיון לפי תאריך ושעה
+      // 6. מיון
       { $sort: { "date": 1, "startTime": 1 } }
     ]);
 
@@ -216,21 +249,19 @@ export const getKitchenReport = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// --- פונקציה חדשה: דוח סיכום לפי קבוצות ---
+// --- דוח סיכום קבוצות ---
 export const getGroupSummaryReport = async (req, res, next) => {
   try {
     const { startDate, endDate } = req.query;
     const start = new Date(startDate);
     const end = new Date(endDate);
     
-    // גם כאן נשתמש בלוגיקה של הרחבת הטווח
     const searchEnd = new Date(end);
     searchEnd.setDate(searchEnd.getDate() + 1);
 
     const report = await Group.aggregate([
       { $match: { "schedule.date": { $gte: start, $lte: searchEnd } } },
       { $unwind: "$schedule" },
-      // חישוב יום עסקים
       { $addFields: {
           businessDate: {
             $cond: {
@@ -240,22 +271,20 @@ export const getGroupSummaryReport = async (req, res, next) => {
             }
           }
       }},
-      // סינון לפי הטווח המבוקש
       { $match: { businessDate: { $gte: start, $lte: end } } },
       
-      // קיבוץ לפי שם הקבוצה
       { $group: {
-          _id: "$name", // שם הקבוצה
+          _id: "$name",
           totalEvents: { $sum: 1 },
           totalPax: { $sum: "$schedule.pax" },
-          totalPrice: { $sum: "$schedule.price" }, // סיכום כספי אם רלוונטי
+          totalPrice: { $sum: "$schedule.price" },
           events: { $push: { 
             title: "$schedule.title", 
             date: "$businessDate",
             pax: "$schedule.pax" 
           }}
       }},
-      { $sort: { totalPax: -1 } } // מיון לפי כמות אנשים יורדת
+      { $sort: { totalPax: -1 } }
     ]);
 
     res.json(report);

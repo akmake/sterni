@@ -2,19 +2,29 @@ import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import useProjectsStore from '@/stores/projectsStore';
 import { Button } from '@/components/ui/Button';
-import { Plus, ArrowRight } from 'lucide-react';
+import { Plus, ArrowRight, Trash2 } from 'lucide-react'; // הוספתי את Trash2
 import { Progress } from '@/components/ui/progress';
 
 export default function ProjectsPage() {
-  const { projects, fetchProjects, loading } = useProjectsStore();
+  // הוספנו את deleteProject מהחנות
+  const { projects, fetchProjects, deleteProject, loading } = useProjectsStore();
   const navigate = useNavigate();
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
 
+  // פונקציית המחיקה
+  const handleDelete = async (e, id) => {
+    e.preventDefault(); // מונע מהלינק להעביר אותך עמוד
+    e.stopPropagation(); // מונע אירועים מתנגשים
+    if (window.confirm('האם למחוק את הפרויקט לצמיתות?')) {
+      await deleteProject(id);
+    }
+  };
+
   if (loading && projects.length === 0) return <div className="flex justify-center pt-20 text-slate-400">טוען נתונים...</div>;
 
   return (
-    <div className="min-h-screen bg-[#F5F5F7] p-6 md:p-10 font-sans">
+    <div className="min-h-screen bg-[#F5F5F7] p-6 md:p-10 font-sans dir-rtl">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-10">
@@ -24,9 +34,9 @@ export default function ProjectsPage() {
           </div>
           <Button 
             onClick={() => navigate('/projects/new')}
-            className="bg-black hover:bg-slate-800 text-white rounded-full px-6 py-6 shadow-lg transition-transform active:scale-95"
+            className="bg-black hover:bg-slate-800 text-white rounded-full px-6 py-6 shadow-lg transition-transform active:scale-95 flex items-center gap-2"
           >
-            <Plus className="mr-2 h-5 w-5" />
+            <Plus className="h-5 w-5" />
             פרויקט חדש
           </Button>
         </div>
@@ -49,14 +59,29 @@ export default function ProjectsPage() {
                 <Link 
                   key={project._id} 
                   to={`/projects/${project._id}`}
-                  className="group relative bg-white rounded-3xl p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border border-slate-100/50"
+                  className="group relative bg-white rounded-3xl p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border border-slate-100/50 block"
                 >
+                  {/* --- כפתור מחיקה (Ghost Button) --- */}
+                  <button
+                    onClick={(e) => handleDelete(e, project._id)}
+                    className="absolute top-4 left-4 p-2.5 rounded-full text-slate-300 
+                               hover:text-red-500 hover:bg-red-50 
+                               transition-all duration-300 ease-out
+                               opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0
+                               z-20"
+                    title="מחק פרויקט"
+                  >
+                    <Trash2 size={20} strokeWidth={2} />
+                  </button>
+                  {/* ---------------------------------- */}
+
                   <div className="flex flex-col h-full justify-between">
                     <div>
+                      {/* תוקן: שימוש ב-name במקום projectName */}
                       <h3 className="text-xl font-semibold text-slate-900 mb-2 truncate">
-                        {project.projectName}
+                        {project.name || project.projectName || 'פרויקט ללא שם'}
                       </h3>
-                      <p className="text-slate-500 text-sm line-clamp-2 leading-relaxed">
+                      <p className="text-slate-500 text-sm line-clamp-2 leading-relaxed h-10">
                         {project.description || 'אין תיאור לפרויקט'}
                       </p>
                     </div>

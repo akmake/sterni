@@ -1,15 +1,33 @@
 import express from 'express';
-import { getKitchenReport,getGroupSummaryReport,getGroups,updateGroupEvent, createGroup, addEventToGroup, removeEventFromGroup, updateGroupDetails } from '../controllers/groupController.js';
+import { 
+    getKitchenReport,
+    getGroupSummaryReport,
+    getGroups,
+    updateGroupEvent, 
+    createGroup, 
+    addEventToGroup, 
+    removeEventFromGroup, 
+    updateGroupDetails,
+    deleteGroup // <-- 1. הוספנו את הייבוא של הפונקציה
+} from '../controllers/groupController.js';
 
 const router = express.Router();
 
+// --- דוחות (חייבים להיות ראשונים!) ---
+router.get('/reports/kitchen', getKitchenReport);
+router.get('/reports/groups', getGroupSummaryReport);
+
+// --- ראוטים כלליים ---
 router.get('/', getGroups);
 router.post('/', createGroup);
-router.patch('/:groupId', updateGroupDetails); // <-- נתיב חדש לעדכון פרטים
 
+// --- ראוטים לפי ID של קבוצה ---
+router.patch('/:groupId', updateGroupDetails);
+router.delete('/:groupId', deleteGroup); // <-- 2. הנה התיקון! זה מה שהיה חסר לך
+
+// --- ראוטים לאירועים בתוך קבוצה ---
 router.post('/:groupId/events', addEventToGroup);
-router.patch('/:groupId/events/:eventId', updateGroupEvent); // <-- נתיב חדש לעריכה
+router.patch('/:groupId/events/:eventId', updateGroupEvent);
 router.delete('/:groupId/events/:eventId', removeEventFromGroup);
-router.get('/reports/kitchen', getKitchenReport); // <-- הוסף את השורה הזו לפני הנתיבים עם :id
-router.get('/reports/groups', getGroupSummaryReport); // <-- הוסף שורה זו
+
 export default router;

@@ -5,115 +5,122 @@ import { toast } from 'react-hot-toast';
 const useGroupsStore = create((set, get) => ({
   groups: [],
   halls: [],
-  activeGroup: null,
   loading: false,
 
-  fetchHalls: async () => {
-    try {
-      const { data } = await api.get('/halls');
-      set({ halls: data });
-    } catch (error) { console.error(error); }
-  },
-
-  createHall: async (hallData) => {
-    try {
-      const { data } = await api.post('/halls', hallData);
-      set(state => ({ halls: [...state.halls, data] }));
-      toast.success('האולם נוסף');
-    } catch (error) { toast.error('שגיאה ביצירת אולם'); }
-  },
-
-  deleteHall: async (id) => {
-    try {
-        await api.delete(`/halls/${id}`);
-        set(state => ({ halls: state.halls.filter(h => h._id !== id) }));
-    } catch(e) { toast.error('שגיאה במחיקה'); }
-  },
+  // --- קבוצות ---
 
   fetchGroups: async () => {
     set({ loading: true });
     try {
-      const { data } = await api.get('/groups');
-      set({ groups: data, loading: false });
+      const res = await api.get('/groups');
+      set({ groups: res.data, loading: false });
     } catch (error) {
       set({ loading: false });
+      console.error('Failed to fetch groups:', error);
+      toast.error('שגיאה בטעינת קבוצות');
     }
   },
 
-  createGroup: async (groupData) => {
-    set({ loading: true });
+  addGroup: async (groupData) => {
     try {
-      const { data } = await api.post('/groups', groupData);
-      set(state => ({ groups: [...state.groups, data], loading: false }));
-      toast.success('הקבוצה נוצרה!');
-      return data;
+      const res = await api.post('/groups', groupData);
+      set((state) => ({ groups: [...state.groups, res.data] }));
+      toast.success('קבוצה נוצרה בהצלחה');
+      return res.data;
     } catch (error) {
-      set({ loading: false });
+      console.error('Failed to add group:', error);
       toast.error('שגיאה ביצירת קבוצה');
       throw error;
     }
   },
 
-  // --- פעולה חדשה: עדכון פרטי קבוצה (כמות אנשים וכו') ---
-  updateGroup: async (groupId, updates) => {
-      try {
-          const { data } = await api.patch(`/groups/${groupId}`, updates);
-          // עדכון הסטייט המקומי
-          set(state => ({
-              groups: state.groups.map(g => g._id === groupId ? data : g),
-              activeGroup: state.activeGroup?._id === groupId ? data : state.activeGroup
-          }));
-          toast.success('הפרטים עודכנו');
-      } catch (error) {
-          toast.error('שגיאה בעדכון פרטים');
-      }
+  updateGroup: async (id, data) => {
+    try {
+      const res = await api.put(`/groups/${id}`, data);
+      set((state) => ({
+        groups: state.groups.map((g) => (g._id === id ? res.data : g)),
+      }));
+      toast.success('הקבוצה עודכנה בהצלחה');
+      return res.data;
+    } catch (error) {
+      console.error('Failed to update group:', error);
+      toast.error('שגיאה בעדכון הקבוצה');
+      throw error;
+    }
   },
 
-  
+  // הפונקציה החדשה למחיקת קבוצה
+  deleteGroup: async (id) => {
+    try {
+      await api.delete(`/groups/${id}`);
+      set((state) => ({
+        groups: state.groups.filter((g) => g._id !== id)
+      }));
+      toast.success('הקבוצה נמחקה בהצלחה');
+    } catch (error) {
+      console.error('Failed to delete group:', error);
+      toast.error('שגיאה במחיקת הקבוצה');
+      throw error;
+    }
+  },
+
+  // --- אולמות ---
+
+  fetchHalls: async () => {
+    try {
+      const res = await api.get('/halls'); // או הנתיב המתאים אצלך
+      set({ halls: res.data });
+    } catch (error) {
+      console.error('Failed to fetch halls:', error);
+    }
+  },
+
+  // --- אירועים (Schedule) ---
 
   addEvent: async (groupId, eventData) => {
     try {
-      const { data: updatedGroup } = await api.post(`/groups/${groupId}/events`, eventData);
-      set(state => ({
-        groups: state.groups.map(g => g._id === groupId ? updatedGroup : g)
+      const res = await api.post(`/groups/${groupId}/events`, eventData);
+      // השרת מחזיר את הקבוצה המעודכנת
+      set((state) => ({
+        groups: state.groups.map((g) => (g._id === groupId ? res.data : g)),
       }));
-      toast.success('האירוע שובץ');
+      return res.data; 
     } catch (error) {
-      const msg = error.response?.data?.message || 'שגיאה בשיבוץ';
-      toast.error(msg);
+      console.error('Failed to add event:', error);
+      toast.error('שגיאה בהוספת אירוע');
+      throw error;
     }
   },
+
   updateEvent: async (groupId, eventId, eventData) => {
     try {
-        const { data: updatedGroup } = await api.patch(`/groups/${groupId}/events/${eventId}`, eventData);
-        
-        set(state => ({
-            activeGroup: updatedGroup,
-            groups: state.groups.map(g => g._id === groupId ? updatedGroup : g)
-        }));
-        toast.success('האירוע עודכן בהצלחה');
+      const res = await api.put(`/groups/${groupId}/events/${eventId}`, eventData);
+      set((state) => ({
+        groups: state.groups.map((g) => (g._id === groupId ? res.data : g)),
+      }));
+      toast.success('האירוע עודכן');
+      return res.data;
     } catch (error) {
-        const msg = error.response?.data?.message || 'שגיאה בעדכון האירוע';
-        toast.error(msg);
-        throw error; // זורקים שגיאה כדי שהקומפוננטה תדע לא לסגור את הדיאלוג
+      console.error('Failed to update event:', error);
+      toast.error('שגיאה בעדכון אירוע');
+      throw error;
     }
   },
 
   deleteEvent: async (groupId, eventId) => {
-      try {
-          const { data: updatedGroup } = await api.delete(`/groups/${groupId}/events/${eventId}`);
-           set(state => ({
-            activeGroup: updatedGroup,
-            groups: state.groups.map(g => g._id === groupId ? updatedGroup : g)
-        }));
-        toast.success('האירוע נמחק');
-      } catch (error) {
-          toast.error('שגיאה במחיקת האירוע');
-      }
-  }
-
-
-
+    try {
+      const res = await api.delete(`/groups/${groupId}/events/${eventId}`);
+      set((state) => ({
+        groups: state.groups.map((g) => (g._id === groupId ? res.data : g)),
+      }));
+      toast.success('האירוע נמחק');
+      return res.data;
+    } catch (error) {
+      console.error('Failed to delete event:', error);
+      toast.error('שגיאה במחיקת אירוע');
+      throw error;
+    }
+  },
 }));
 
 export default useGroupsStore;

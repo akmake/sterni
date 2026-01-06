@@ -1,4 +1,4 @@
-// client/src/pages/GroupDetailsPage.jsx
+// client/src/pages/GroupDetails/GroupDetailsPage.jsx
 
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
@@ -55,7 +55,7 @@ const MEAL_DEFINITIONS = {
   },
   night_treats: {
     label: 'פינוקי לילה',
-    isManual: true // אין כאן kosherOptions, ולכן זה קרס
+    isManual: true // אין כאן kosherOptions
   }
 };
 
@@ -152,8 +152,8 @@ export default function GroupDetailsPage() {
     if (isMeal) {
       const def = MEAL_DEFINITIONS[data.mealType];
       if (!def) {
-         toast.error('סוג ארוחה לא תקין');
-         return null;
+          toast.error('סוג ארוחה לא תקין');
+          return null;
       }
 
       // בניית כותרת יפה לתצוגה
@@ -171,11 +171,15 @@ export default function GroupDetailsPage() {
       }
       finalLocation = '';
     } else {
+      // אירוע כללי
       if (!finalTitle) {
         toast.error('יש להזין כותרת לאירוע');
         return null;
       }
-      finalHall = null;
+      // התיקון: אנחנו לא מאפסים את האולם! מאפשרים גם אולם וגם טקסט.
+      if (!finalHall && !finalLocation) {
+         // אפשר להחליט אם לחייב אחד מהם, כרגע נשאיר אופציונלי או נדרוש אחד לפחות אם תרצה
+      }
     }
 
     // --- תיקון לוגיקת לילה ---
@@ -188,7 +192,7 @@ export default function GroupDetailsPage() {
     return {
       ...data,
       title: finalTitle,
-      hall: finalHall,
+      hall: finalHall || null, // שליחת ID או null
       locationText: finalLocation,
       pax: parseInt(data.pax, 10) || 0,
       price: parseInt(data.price, 10) || 0,
@@ -392,7 +396,7 @@ export default function GroupDetailsPage() {
                         <h3 className="text-xl font-bold text-slate-800 group-hover:text-blue-700 transition-colors">
                           {event.title}
                         </h3>
-                        {/* תגית כשרות - הגנה מפני קריסה ידנית */}
+                        {/* תגית כשרות */}
                         {MEAL_DEFINITIONS[event.mealType] && 
                          !MEAL_DEFINITIONS[event.mealType].isManual && 
                          event.kosherType && (
@@ -404,7 +408,7 @@ export default function GroupDetailsPage() {
                                  : 'bg-blue-50 text-blue-600 border-blue-100'
                              }
                            `}>
-                              {event.kosherType === 'meat' ? 'בשרי' : event.kosherType === 'parve' ? 'פרווה' : 'חלבי'}
+                             {event.kosherType === 'meat' ? 'בשרי' : event.kosherType === 'parve' ? 'פרווה' : 'חלבי'}
                            </span>
                         )}
                     </div>
@@ -413,7 +417,7 @@ export default function GroupDetailsPage() {
 
                   <div className="flex flex-wrap gap-3 mt-2">
                     <span className="flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
-                      <MapPin size={14} /> {event.hall?.name || event.locationText || 'אולם לא ידוע'}
+                      <MapPin size={14} /> {event.hall?.name || event.locationText || 'ללא מיקום'}
                     </span>
                     {event.pax > 0 && (
                       <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1">
@@ -463,7 +467,6 @@ export default function GroupDetailsPage() {
                                 const newType = e.target.value;
                                 const def = MEAL_DEFINITIONS[newType];
                                 
-                                // --- תיקון השגיאה כאן: בדיקה אם קיים kosherOptions ---
                                 let defaultKosher = 'parve';
                                 if (def.kosherOptions && def.kosherOptions.length === 1) {
                                   defaultKosher = def.kosherOptions[0];
@@ -537,6 +540,7 @@ export default function GroupDetailsPage() {
                     )}
                   </div>
 
+                  {/* --- מיקום (התיקון שלנו: תמיכה גם בבחירת אולם וגם בטקסט) --- */}
                   <div className="md:col-span-3 space-y-2">
                     <label className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">
                       מיקום
@@ -555,13 +559,29 @@ export default function GroupDetailsPage() {
                         ))}
                       </AppleSelect>
                     ) : (
-                      <AppleInput
-                        placeholder="טקסט חופשי..."
-                        value={quickEvent.locationText}
-                        onChange={(e) =>
-                          setQuickEvent({ ...quickEvent, locationText: e.target.value })
-                        }
-                      />
+                      <div className="flex flex-col gap-2">
+                        {/* אופציה 1: בחירת אולם */}
+                        <AppleSelect
+                            value={quickEvent.hallId}
+                            onChange={(e) => setQuickEvent({ ...quickEvent, hallId: e.target.value })}
+                        >
+                            <option value="">אולם (אופציונלי)...</option>
+                            {halls.map((hall) => (
+                            <option key={hall._id} value={hall._id}>
+                                {hall.name}
+                            </option>
+                            ))}
+                        </AppleSelect>
+
+                        {/* אופציה 2: טקסט חופשי */}
+                        <AppleInput
+                            placeholder="או טקסט חופשי..."
+                            value={quickEvent.locationText}
+                            onChange={(e) =>
+                            setQuickEvent({ ...quickEvent, locationText: e.target.value })
+                            }
+                        />
+                      </div>
                     )}
                   </div>
 

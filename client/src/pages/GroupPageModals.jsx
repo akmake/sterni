@@ -137,7 +137,7 @@ export default function GroupPageModals({
                   onChange={(e) =>
                     setEditEventData({ ...editEventData, locationText: e.target.value })
                   }
-                  placeholder="מיקום"
+                  placeholder="מיייייקום"
                 />
               </div>
             )}

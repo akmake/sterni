@@ -88,7 +88,7 @@ export default function GroupDetailsPage() {
     price: '',
     requirements: '',
     mealType: 'breakfast', 
-    kosherType: 'parve',
+    kosherType: 'halavi',
     menuItem: '' 
   });
 

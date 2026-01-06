@@ -4,21 +4,28 @@ import useGroupsStore from '@/stores/groupsStore';
 import SmartCalendar from '@/components/SmartCalendar';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { ArrowRight, Calendar as CalendarIcon, Save, Users, Home, Briefcase } from 'lucide-react';
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { ArrowRight, Calendar as CalendarIcon, Save, Briefcase, Home } from 'lucide-react';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogTrigger, 
+  DialogTitle,      
+  DialogDescription 
+} from "@/components/ui/dialog";
 import { toast } from 'react-hot-toast';
 
 export default function NewGroupPage() {
   const navigate = useNavigate();
-  const { createGroup, fetchGroups, groups } = useGroupsStore();
+  // --- תיקון: שינוי מ-createGroup ל-addGroup ---
+  const { addGroup, fetchGroups, groups } = useGroupsStore(); 
 
   useEffect(() => { fetchGroups(); }, []);
 
   const [formData, setFormData] = useState({
     name: '',
     pax: '',
-    minPax: '', // שדה חדש
-    hostingType: 'seminar', // שדה חדש (ברירת מחדל: יום עיון)
+    minPax: '', 
+    hostingType: 'seminar', 
     contactName: '',
     contactPhone: '',
     contactEmail: ''
@@ -34,10 +41,11 @@ export default function NewGroupPage() {
     }
 
     try {
-      await createGroup({
+      // --- תיקון: שימוש ב-addGroup ---
+      await addGroup({
         name: formData.name,
         pax: parseInt(formData.pax),
-        minPax: parseInt(formData.minPax), // המרה למספר
+        minPax: parseInt(formData.minPax),
         hostingType: formData.hostingType,
         contactPerson: {
             name: formData.contactName,
@@ -48,7 +56,10 @@ export default function NewGroupPage() {
         endDate: dates.end
       });
       navigate('/groups');
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+        console.error(e);
+        toast.error('שגיאה ביצירת הקבוצה');
+    }
   };
 
   const getDateDisplay = () => {
@@ -166,7 +177,13 @@ export default function NewGroupPage() {
                             </span>
                         </button>
                     </DialogTrigger>
+                    
                     <DialogContent className="sm:max-w-[800px] bg-transparent border-none shadow-none p-0">
+                        <DialogTitle className="sr-only">בחירת תאריכים</DialogTitle>
+                        <DialogDescription className="sr-only">
+                            בחר תאריכי הגעה ועזיבה עבור הקבוצה
+                        </DialogDescription>
+
                         <div className="bg-white rounded-3xl p-4 shadow-2xl">
                             <SmartCalendar
                                 existingGroups={groups}

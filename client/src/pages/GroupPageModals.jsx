@@ -130,7 +130,7 @@ export default function GroupPageModals({
                   </label>
                 </div>
 
-                {/* --- תפריט (התוספת החסרה!) --- */}
+                {/* --- תפריט --- */}
                 {MEAL_DEFINITIONS && 
                  MEAL_DEFINITIONS[editEventData.mealType] && 
                  !MEAL_DEFINITIONS[editEventData.mealType].isManual && (
@@ -221,8 +221,9 @@ export default function GroupPageModals({
 
             <div>
               <label className="text-xs font-bold text-slate-500">הערות</label>
-              <input
-                className="w-full p-3 border rounded-xl"
+              <textarea
+                className="w-full p-3 border rounded-xl min-h-[100px]"
+                rows={3}
                 value={editEventData.requirements || ''}
                 onChange={(e) => setEditEventData({ ...editEventData, requirements: e.target.value })}
               />

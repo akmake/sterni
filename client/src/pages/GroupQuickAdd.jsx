@@ -40,9 +40,6 @@ export default function GroupQuickAdd({
                     value={quickEvent.mealType}
                     onChange={(e) => {
                       const newType = e.target.value;
-                      // בעת שינוי ארוחה, אנחנו לא נועלים שום דבר.
-                      // משאירים ברירת מחדל (למשל פרווה או מה שהיה)
-                      // אבל הכפתורים למטה תמיד יהיו זמינים לשינוי.
                       setQuickEvent({ 
                         ...quickEvent, 
                         mealType: newType,
@@ -55,10 +52,8 @@ export default function GroupQuickAdd({
                     ))}
                   </AppleSelect>
 
-                  {/* כפתורי כשרות - מוצגים תמיד, ללא תלות בהגדרות! */}
+                  {/* כפתורי כשרות */}
                   <div className="bg-slate-50 rounded-xl p-1 flex items-center shrink-0">
-                    
-                    {/* כפתור בשרי */}
                     <button
                       onClick={() => setQuickEvent({ ...quickEvent, kosherType: 'meat' })}
                       className={`h-full px-3 rounded-lg text-xs font-bold transition-all ${
@@ -66,7 +61,6 @@ export default function GroupQuickAdd({
                       }`}
                     >בשרי</button>
 
-                    {/* כפתור חלבי */}
                     <button
                       onClick={() => setQuickEvent({ ...quickEvent, kosherType: 'halavi' })}
                       className={`h-full px-3 rounded-lg text-xs font-bold transition-all ${
@@ -74,14 +68,12 @@ export default function GroupQuickAdd({
                       }`}
                     >חלבי</button>
 
-                    {/* כפתור פרווה */}
                     <button
                       onClick={() => setQuickEvent({ ...quickEvent, kosherType: 'parve' })}
                       className={`h-full px-3 rounded-lg text-xs font-bold transition-all ${
                         quickEvent.kosherType === 'parve' ? 'bg-white shadow-sm text-green-600' : 'text-slate-400'
                       }`}
                     >פרווה</button>
-
                   </div>
                 </div>
 
@@ -202,14 +194,20 @@ export default function GroupQuickAdd({
           </div>
         </div>
 
-        <div className="mt-4 flex gap-3">
-          <AppleInput
-            placeholder="הערות מיוחדות לאירוע זה..."
+        {/* --- אזור ההערות החדש (תומך אנטרים) --- */}
+        <div className="mt-4 flex items-start gap-3">
+          <textarea
+            placeholder="הערות מיוחדות לאירוע זה... (ניתן לרדת שורה עם Enter)"
             value={quickEvent.requirements}
             onChange={(e) =>
               setQuickEvent({ ...quickEvent, requirements: e.target.value })
             }
-            className="bg-slate-50/50"
+            className="flex-1 min-h-[42px] py-2.5 px-4 bg-slate-50/50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all resize-y"
+            rows={1}
+            style={{
+                // זה יגרום לשדה להיראות כמו אינפוט רגיל אבל יתרחב אם צריך
+                fieldSizing: 'content' 
+            }}
           />
           <Button
             onClick={handleCreateQuickEvent}

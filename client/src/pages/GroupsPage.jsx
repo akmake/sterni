@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useGroupsStore from '@/stores/groupsStore';
-import { Plus, Users, Calendar, Trash2 } from 'lucide-react';
+import { Plus, Users, Calendar, Trash2, Archive, LayoutGrid } from 'lucide-react'; // הוספתי אייקונים
 import { Button } from '@/components/ui/Button';
 
 export default function GroupsPage() {
   const { groups, fetchGroups, deleteGroup } = useGroupsStore();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState('active'); // 'active' or 'archive'
 
   useEffect(() => {
     fetchGroups();
@@ -20,9 +21,44 @@ export default function GroupsPage() {
     }
   };
 
-  const filteredGroups = groups.filter(g => 
-    g.name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // --- לוגיקה של מיון וסינון לארכיון ---
+  const processGroups = () => {
+    const now = new Date();
+    // מאפסים שעות כדי להשוות ימים נטו (אופציונלי, תלוי ברמת הדיוק שרצית)
+    now.setHours(0, 0, 0, 0);
+
+    // 1. קודם מסננים לפי חיפוש
+    let processed = groups.filter(g => 
+      g.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    // 2. מפצלים לפעיל/ארכיון
+    processed = processed.filter(group => {
+      if (!group.endDate) return viewMode === 'active'; // אם אין תאריך, נשאיר בפעיל
+      
+      const end = new Date(group.endDate);
+      // בדיקה: האם התאריך של היום גדול מתאריך הסיום?
+      const isPast = now > end;
+
+      return viewMode === 'active' ? !isPast : isPast;
+    });
+
+    // 3. מיון לפי תאריך
+    processed.sort((a, b) => {
+      const dateA = new Date(a.startDate || 0);
+      const dateB = new Date(b.startDate || 0);
+      
+      // בארכיון נרצה לראות את מה שהיה הכי לאחרונה למעלה (סדר יורד)
+      // בפעיל נרצה לראות את הקרוב ביותר למעלה (סדר עולה)
+      return viewMode === 'active' 
+        ? dateA - dateB 
+        : dateB - dateA;
+    });
+
+    return processed;
+  };
+
+  const filteredGroups = processGroups();
 
   return (
     <div className="p-8 min-h-screen bg-[#F5F5F7] dir-rtl font-sans">
@@ -42,12 +78,39 @@ export default function GroupsPage() {
           </Button>
         </div>
 
-        {/* חיפוש */}
-        <div className="mb-8">
+        {/* שורת חיפוש וטאבים */}
+        <div className="flex flex-col md:flex-row gap-4 mb-8 justify-between items-center">
+           {/* טאבים - פעיל מול ארכיון */}
+           <div className="bg-white p-1 rounded-2xl shadow-sm border border-slate-200 flex">
+              <button
+                onClick={() => setViewMode('active')}
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl transition-all duration-200 font-medium ${
+                  viewMode === 'active' 
+                    ? 'bg-slate-100 text-slate-900 shadow-sm' 
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <LayoutGrid size={18} />
+                קבוצות פעילות
+              </button>
+              <button
+                onClick={() => setViewMode('archive')}
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl transition-all duration-200 font-medium ${
+                  viewMode === 'archive' 
+                    ? 'bg-slate-100 text-slate-900 shadow-sm' 
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <Archive size={18} />
+                ארכיון
+              </button>
+           </div>
+
+           {/* חיפוש */}
            <input 
              type="text" 
              placeholder="חפש קבוצה..." 
-             className="w-full max-w-md p-4 rounded-2xl border border-slate-200 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900/5 transition-all"
+             className="w-full md:max-w-md p-4 rounded-2xl border border-slate-200 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900/5 transition-all"
              value={searchTerm}
              onChange={(e) => setSearchTerm(e.target.value)}
            />
@@ -59,7 +122,7 @@ export default function GroupsPage() {
             <div 
               key={group._id}
               onClick={() => navigate(`/groups/${group._id}`)}
-              className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_10px_20px_-5px_rgba(0,0,0,0.1)] hover:-translate-y-1 transition-all duration-300 cursor-pointer group relative overflow-hidden"
+              className={`bg-white p-6 rounded-[2rem] border border-slate-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_10px_20px_-5px_rgba(0,0,0,0.1)] hover:-translate-y-1 transition-all duration-300 cursor-pointer group relative overflow-hidden ${viewMode === 'archive' ? 'opacity-80 grayscale-[0.3]' : ''}`}
             >
               {/* --- כפתור מחיקה (Ghost Button) --- */}
               <button
@@ -76,7 +139,7 @@ export default function GroupsPage() {
               {/* ------------------------- */}
 
               <div className="flex items-center justify-between mb-6">
-                <div className="bg-blue-50/80 p-3.5 rounded-2xl text-blue-600 backdrop-blur-sm">
+                <div className={`${viewMode === 'archive' ? 'bg-slate-100 text-slate-500' : 'bg-blue-50/80 text-blue-600'} p-3.5 rounded-2xl backdrop-blur-sm`}>
                   <Users size={24} strokeWidth={2} />
                 </div>
                 {group.status && (
@@ -118,9 +181,15 @@ export default function GroupsPage() {
         {filteredGroups.length === 0 && (
             <div className="text-center py-20 text-slate-400 flex flex-col items-center gap-4">
                 <div className="bg-white p-6 rounded-full shadow-sm">
-                  <Users size={48} className="opacity-20" />
+                  {viewMode === 'active' ? (
+                     <Users size={48} className="opacity-20" />
+                  ) : (
+                     <Archive size={48} className="opacity-20" />
+                  )}
                 </div>
-                <p className="text-lg font-medium opacity-60">לא נמצאו קבוצות</p>
+                <p className="text-lg font-medium opacity-60">
+                  {viewMode === 'active' ? 'לא נמצאו קבוצות פעילות' : 'הארכיון ריק'}
+                </p>
             </div>
         )}
       </div>

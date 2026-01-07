@@ -34,24 +34,24 @@ const useGroupsStore = create((set, get) => ({
     }
   },
 
-  updateEvent: async (groupId, eventId, eventData) => {
+  // 👇 זו הפונקציה שהייתה חסרה לך!
+  updateGroup: async (id, groupData) => {
     try {
-      // 👇 השינוי הוא כאן: מ-put ל-patch
-      const res = await api.patch(`/groups/${groupId}/events/${eventId}`, eventData);
-      
+      const res = await api.patch(`/groups/${id}`, groupData);
       set((state) => ({
-        groups: state.groups.map((g) => (g._id === groupId ? res.data : g)),
+        groups: state.groups.map((g) => 
+          g._id === id ? { ...g, ...res.data } : g
+        ),
       }));
-      toast.success('האירוע עודכן');
+      toast.success('פרטי הקבוצה עודכנו בהצלחה');
       return res.data;
     } catch (error) {
-      console.error('Failed to update event:', error);
-      toast.error('שגיאה בעדכון אירוע');
+      console.error('Failed to update group:', error);
+      toast.error('שגיאה בעדכון הקבוצה');
       throw error;
     }
   },
 
-  // הפונקציה החדשה למחיקת קבוצה
   deleteGroup: async (id) => {
     try {
       await api.delete(`/groups/${id}`);
@@ -70,7 +70,7 @@ const useGroupsStore = create((set, get) => ({
 
   fetchHalls: async () => {
     try {
-      const res = await api.get('/halls'); // או הנתיב המתאים אצלך
+      const res = await api.get('/halls');
       set({ halls: res.data });
     } catch (error) {
       console.error('Failed to fetch halls:', error);
@@ -82,7 +82,6 @@ const useGroupsStore = create((set, get) => ({
   addEvent: async (groupId, eventData) => {
     try {
       const res = await api.post(`/groups/${groupId}/events`, eventData);
-      // השרת מחזיר את הקבוצה המעודכנת
       set((state) => ({
         groups: state.groups.map((g) => (g._id === groupId ? res.data : g)),
       }));

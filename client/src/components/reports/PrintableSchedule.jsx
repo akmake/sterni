@@ -125,12 +125,18 @@ export default function PrintableSchedule({ printPages, weekLabel }) {
                 <div className="space-y-1">
                   {day.events.map((ev, i) => {
                     const isLastRow = i === day.events.length - 1;
+
+                    // --- התיקון למניעת כפילות ---
+                    const noteText = ev.requirements || ev.notes;
+                    // מציג הערה רק אם היא קיימת וגם לא מופיעה כבר בתוך הפירוט החכם
+                    const shouldShowNote = noteText && (!ev._smartDetail || !ev._smartDetail.includes(noteText));
+
                     return (
                       <div
                         key={`${idx}-${i}`}
                         className={`row flex items-start py-4 ${!isLastRow ? 'border-b border-gray-100' : ''}`}
                       >
-                        {/* שינוי כאן: קודם סיום ואז התחלה */}
+                        {/* עמודת זמנים */}
                         <div className="w-32 mono text-sm font-bold text-slate-500 pt-1 whitespace-nowrap">
                           {ev.endTime || '--:--'} - {ev.startTime || '--:--'}
                         </div>
@@ -161,9 +167,10 @@ export default function PrintableSchedule({ printPages, weekLabel }) {
                             <div className="text-sm text-slate-400">—</div>
                           )}
 
-                          {(ev.requirements || ev.notes) && (
+                          {/* הצגת הריבוע האפור רק אם צריך */}
+                          {shouldShowNote && (
                             <div className="mt-2 text-xs text-slate-500 bg-slate-50 p-2 rounded inline-block max-w-full whitespace-pre-wrap">
-                              {ev.requirements || ev.notes}
+                              {noteText}
                             </div>
                           )}
                         </div>

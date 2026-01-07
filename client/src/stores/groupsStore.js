@@ -34,17 +34,19 @@ const useGroupsStore = create((set, get) => ({
     }
   },
 
-  updateGroup: async (id, data) => {
+  updateEvent: async (groupId, eventId, eventData) => {
     try {
-      const res = await api.put(`/groups/${id}`, data);
+      // 👇 השינוי הוא כאן: מ-put ל-patch
+      const res = await api.patch(`/groups/${groupId}/events/${eventId}`, eventData);
+      
       set((state) => ({
-        groups: state.groups.map((g) => (g._id === id ? res.data : g)),
+        groups: state.groups.map((g) => (g._id === groupId ? res.data : g)),
       }));
-      toast.success('הקבוצה עודכנה בהצלחה');
+      toast.success('האירוע עודכן');
       return res.data;
     } catch (error) {
-      console.error('Failed to update group:', error);
-      toast.error('שגיאה בעדכון הקבוצה');
+      console.error('Failed to update event:', error);
+      toast.error('שגיאה בעדכון אירוע');
       throw error;
     }
   },
@@ -94,7 +96,7 @@ const useGroupsStore = create((set, get) => ({
 
   updateEvent: async (groupId, eventId, eventData) => {
     try {
-      const res = await api.put(`/groups/${groupId}/events/${eventId}`, eventData);
+      const res = await api.patch(`/groups/${groupId}/events/${eventId}`, eventData);
       set((state) => ({
         groups: state.groups.map((g) => (g._id === groupId ? res.data : g)),
       }));

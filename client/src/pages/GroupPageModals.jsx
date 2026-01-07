@@ -20,7 +20,11 @@ export default function GroupPageModals({
   editEventData,
   setEditEventData,
   handleUpdateEvent,
-  handleDeleteEvent
+  handleDeleteEvent,
+  onSaveEvent,
+  
+  // חובה: קבלת ההגדרות כדי להציג את התפריטים
+  MEAL_DEFINITIONS 
 }) {
   return (
     <>
@@ -37,6 +41,7 @@ export default function GroupPageModals({
                 halls={halls}
                 groups={groups}
                 currentGroupId={currentGroupId}
+                onSaveEvent={onSaveEvent}
               />
             )}
           </div>
@@ -89,25 +94,59 @@ export default function GroupPageModals({
                   ))}
                 </select>
 
-                {['lunch', 'dinner', 'light'].includes(editEventData.mealType) && (
-                  <div className="flex gap-4">
-                    <label className="flex gap-2">
-                      <input
-                        type="radio"
-                        checked={editEventData.kosherType === 'meat'}
-                        onChange={() => setEditEventData({ ...editEventData, kosherType: 'meat' })}
-                      />{' '}
-                      בשרי
-                    </label>
-                    <label className="flex gap-2">
-                      <input
-                        type="radio"
-                        checked={editEventData.kosherType === 'parve'}
-                        onChange={() => setEditEventData({ ...editEventData, kosherType: 'parve' })}
-                      />{' '}
-                      פרווה
-                    </label>
-                  </div>
+                {/* --- כשרות (מוצג תמיד לארוחות) --- */}
+                <div className="flex gap-4 mt-2">
+                  <label className={`flex gap-2 items-center cursor-pointer p-2 rounded-lg flex-1 justify-center transition-all ${editEventData.kosherType === 'meat' ? 'bg-red-50 text-red-600 ring-1 ring-red-200' : 'bg-slate-50 hover:bg-slate-100'}`}>
+                    <input
+                      type="radio"
+                      name="kosherTypeEdit"
+                      checked={editEventData.kosherType === 'meat'}
+                      onChange={() => setEditEventData({ ...editEventData, kosherType: 'meat' })}
+                      className="hidden" 
+                    />
+                    <span className="font-bold text-sm">בשרי</span>
+                  </label>
+                  
+                  <label className={`flex gap-2 items-center cursor-pointer p-2 rounded-lg flex-1 justify-center transition-all ${editEventData.kosherType === 'halavi' ? 'bg-blue-50 text-blue-600 ring-1 ring-blue-200' : 'bg-slate-50 hover:bg-slate-100'}`}>
+                    <input
+                      type="radio"
+                      name="kosherTypeEdit"
+                      checked={editEventData.kosherType === 'halavi'}
+                      onChange={() => setEditEventData({ ...editEventData, kosherType: 'halavi' })}
+                      className="hidden"
+                    />
+                    <span className="font-bold text-sm">חלבי</span>
+                  </label>
+                  
+                  <label className={`flex gap-2 items-center cursor-pointer p-2 rounded-lg flex-1 justify-center transition-all ${editEventData.kosherType === 'parve' ? 'bg-green-50 text-green-600 ring-1 ring-green-200' : 'bg-slate-50 hover:bg-slate-100'}`}>
+                    <input
+                      type="radio"
+                      name="kosherTypeEdit"
+                      checked={editEventData.kosherType === 'parve'}
+                      onChange={() => setEditEventData({ ...editEventData, kosherType: 'parve' })}
+                      className="hidden"
+                    />
+                    <span className="font-bold text-sm">פרווה</span>
+                  </label>
+                </div>
+
+                {/* --- תפריט (התוספת החסרה!) --- */}
+                {MEAL_DEFINITIONS && 
+                 MEAL_DEFINITIONS[editEventData.mealType] && 
+                 !MEAL_DEFINITIONS[editEventData.mealType].isManual && (
+                   <div>
+                      <label className="text-xs font-bold text-slate-500 mb-1 block">תפריט</label>
+                      <select
+                        className="w-full p-3 border rounded-xl"
+                        value={editEventData.menuItem || ''}
+                        onChange={(e) => setEditEventData({ ...editEventData, menuItem: e.target.value })}
+                      >
+                        <option value="">בחר תפריט...</option>
+                        {MEAL_DEFINITIONS[editEventData.mealType].menuOptions.map(opt => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                   </div>
                 )}
 
                 <select
@@ -134,15 +173,12 @@ export default function GroupPageModals({
                 <input
                   className="w-full p-3 border rounded-xl"
                   value={editEventData.locationText || ''}
-                  onChange={(e) =>
-                    setEditEventData({ ...editEventData, locationText: e.target.value })
-                  }
-                  placeholder="מיייייקום"
+                  onChange={(e) => setEditEventData({ ...editEventData, locationText: e.target.value })}
+                  placeholder="מיקום (טקסט חופשי)"
                 />
               </div>
             )}
 
-            {/* גריד לעריכת זמנים, כמות ומחיר */}
             <div className="grid grid-cols-4 gap-3">
               <div>
                 <label className="text-xs font-bold text-slate-500">התחלה</label>
@@ -150,9 +186,7 @@ export default function GroupPageModals({
                   type="time"
                   className="w-full p-3 border rounded-xl text-center"
                   value={editEventData.startTime || ''}
-                  onChange={(e) =>
-                    setEditEventData({ ...editEventData, startTime: e.target.value })
-                  }
+                  onChange={(e) => setEditEventData({ ...editEventData, startTime: e.target.value })}
                 />
               </div>
               <div>
@@ -161,9 +195,7 @@ export default function GroupPageModals({
                   type="time"
                   className="w-full p-3 border rounded-xl text-center"
                   value={editEventData.endTime || ''}
-                  onChange={(e) =>
-                    setEditEventData({ ...editEventData, endTime: e.target.value })
-                  }
+                  onChange={(e) => setEditEventData({ ...editEventData, endTime: e.target.value })}
                 />
               </div>
               <div>
@@ -192,9 +224,7 @@ export default function GroupPageModals({
               <input
                 className="w-full p-3 border rounded-xl"
                 value={editEventData.requirements || ''}
-                onChange={(e) =>
-                  setEditEventData({ ...editEventData, requirements: e.target.value })
-                }
+                onChange={(e) => setEditEventData({ ...editEventData, requirements: e.target.value })}
               />
             </div>
 

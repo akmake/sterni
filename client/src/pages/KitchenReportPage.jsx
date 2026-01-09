@@ -9,14 +9,13 @@ import { cx, heDate, getMealRank } from './KitchenReport/kitchenUtils';
 import KitchenPrintView from './KitchenReport/KitchenPrintView';
 import KitchenScreenView from './KitchenReport/KitchenScreenView';
 
-// פונקציית עזר לדירוג הארוחות (השארתי כאן כי זה משמש רק למיון)
 const getMealRankFn = (type) => {
   if (!type) return 4;
   const t = type.toLowerCase();
   if (t === 'breakfast' || t.includes('בוקר')) return 1;
   if (t === 'lunch' || t.includes('צהרים') || t.includes('צהריים')) return 2;
   if (t === 'dinner' || t.includes('ערב')) return 3;
-  return 4; 
+  return 4;
 };
 
 export default function KitchenReportPage() {
@@ -24,9 +23,8 @@ export default function KitchenReportPage() {
   const [currentWeekStart, setCurrentWeekStart] = useState(
     startOfWeek(new Date(), { weekStartsOn: 0 })
   );
-  
   const [loading, setLoading] = useState(false);
-  const [viewMode, setViewMode] = useState('daily'); // 'daily' | 'groups'
+  const [viewMode, setViewMode] = useState('daily'); 
 
   const weekEnd = useMemo(
     () => endOfWeek(currentWeekStart, { weekStartsOn: 0 }),
@@ -47,7 +45,6 @@ export default function KitchenReportPage() {
     fetchGroups().finally(() => setLoading(false));
   }, [fetchGroups]);
 
-  // לוגיקת תפריט חכם
   const getSmartMenuName = (event) => {
     if (event.menuItem) return event.menuItem;
     const title = event.title || '';
@@ -66,20 +63,19 @@ export default function KitchenReportPage() {
     const flatReportData = [];
 
     groups.forEach(group => {
-        const schedule = group.schedule || [];
-        schedule.forEach(event => {
-            const isMeal = event.isMeal || event.eventType === 'meal' || (event.mealType && event.mealType !== 'regular');
-            
-            if (isMeal) {
-                flatReportData.push({
-                    ...event,
-                    date: event.date,
-                    groupName: group.name,
-                    pax: event.pax || 0,
-                    smartMenu: getSmartMenuName(event) 
-                });
-            }
-        });
+      const schedule = group.schedule || [];
+      schedule.forEach(event => {
+        const isMeal = event.isMeal || event.eventType === 'meal' || (event.mealType && event.mealType !== 'regular');
+        if (isMeal) {
+          flatReportData.push({ 
+            ...event, 
+            date: event.date, 
+            groupName: group.name, 
+            pax: event.pax || 0,
+            smartMenu: getSmartMenuName(event)
+          });
+        }
+      });
     });
 
     weekDays.forEach((day) => {
@@ -88,7 +84,6 @@ export default function KitchenReportPage() {
 
     for (const event of flatReportData) {
       let eventDate = parseISO(event.date);
-
       const [hRaw, mRaw] = String(event.startTime || '00:00').split(':');
       const h = Number(hRaw);
       const m = Number(mRaw);
@@ -97,10 +92,10 @@ export default function KitchenReportPage() {
 
       const sortValue = (h < 6 ? h + 24 : h) * 60 + (Number.isFinite(m) ? m : 0);
       const processedEvent = { ...event, sortValue, _businessDate: eventDate };
+      
       const dateKey = eventDate.toDateString();
-
       if (dailyMap[dateKey]) {
-          dailyMap[dateKey].push(processedEvent);
+        dailyMap[dateKey].push(processedEvent);
       }
 
       if (eventDate >= currentWeekStart && eventDate <= weekEnd) {
@@ -115,8 +110,7 @@ export default function KitchenReportPage() {
       dailyMap[k].sort((a, b) => {
         const rankA = getMealRankFn(a.mealType);
         const rankB = getMealRankFn(b.mealType);
-        
-        if (rankA !== rankB) return rankA - rankB;
+        if (rankA !== rankB) return rankA - rankB; 
         return (a.sortValue ?? 0) - (b.sortValue ?? 0);
       });
     });
@@ -132,32 +126,53 @@ export default function KitchenReportPage() {
 
     const weekEventsCount = Object.values(dailyMap).reduce((acc, arr) => acc + arr.length, 0);
     const weekPaxTotal = flatReportData.reduce((acc, e) => {
-        let d = parseISO(e.date);
-        const [h] = String(e.startTime || '00:00').split(':');
-        if (Number(h) < 6) d = subDays(d, 1);
-        if (d >= currentWeekStart && d <= weekEnd) return acc + Number(e?.pax || 0);
-        return acc;
+      let d = parseISO(e.date);
+      const [h] = String(e.startTime || '00:00').split(':');
+      if (Number(h) < 6) d = subDays(d, 1);
+      if (d >= currentWeekStart && d <= weekEnd) return acc + Number(e?.pax || 0);
+      return acc;
     }, 0);
 
     return { dailyMap, groupMap, weekEventsCount, weekPaxTotal };
   }, [groups, currentWeekStart, weekEnd, weekDays]);
 
   const { dailyMap, groupMap, weekEventsCount, weekPaxTotal } = processed;
-
   const hasAnyData = useMemo(() => {
     return Object.values(dailyMap).some((arr) => arr.length > 0);
   }, [dailyMap]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dir-rtl print:bg-white font-sans">
+      {/* כאן ההגדרה החשובה ל-A3 ולרוחב עבור דוח מטבח 
+      */}
       <style>{`
         @media print {
-          @page { margin: 12mm; }
-          html, body { height: auto !important; overflow: visible !important; }
-          #__next, #root { height: auto !important; overflow: visible !important; }
-          main { height: auto !important; overflow: visible !important; }
-          * { box-shadow: none !important; text-shadow: none !important; filter: none !important; }
-          body { background: #fff !important; -webkit-print-color-adjust: economy; print-color-adjust: economy; }
+          @page {
+            size: A3 landscape;
+            margin: 10mm;
+          }
+          html, body {
+            height: auto !important;
+            overflow: visible !important;
+          }
+          #__next, #root {
+            height: auto !important;
+            overflow: visible !important;
+          }
+          main {
+            height: auto !important;
+            overflow: visible !important;
+          }
+          * {
+            box-shadow: none !important;
+            text-shadow: none !important;
+            filter: none !important;
+          }
+          body {
+            background: #fff !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
           .print-only { display: block !important; }
           .screen-only { display: none !important; }
           .print-break-avoid { break-inside: avoid; page-break-inside: avoid; }
@@ -193,8 +208,7 @@ export default function KitchenReportPage() {
                     viewMode === 'daily' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'
                   )}
                 >
-                  <LayoutList size={16} className="inline ml-1" />
-                  לפי יום
+                  <LayoutList size={16} className="inline ml-1" /> לפי יום
                 </button>
                 <button
                   onClick={() => setViewMode('groups')}
@@ -203,8 +217,7 @@ export default function KitchenReportPage() {
                     viewMode === 'groups' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'
                   )}
                 >
-                  <Layers size={16} className="inline ml-1" />
-                  לפי קבוצות
+                  <Layers size={16} className="inline ml-1" /> לפי קבוצות
                 </button>
               </div>
 
@@ -221,8 +234,7 @@ export default function KitchenReportPage() {
               </div>
 
               <Button onClick={() => window.print()} className="bg-slate-900 text-white gap-2 shadow-sm hover:bg-slate-800">
-                <Printer size={18} />
-                הדפס
+                <Printer size={18} /> הדפס (A3)
               </Button>
             </div>
           </div>
@@ -252,11 +264,10 @@ export default function KitchenReportPage() {
 
       {/* CONTENT WRAPPER */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 print:max-w-none print:px-6 print:py-4">
-        
         {/* --- קריאה לקומפוננטת הדפסה --- */}
         <KitchenPrintView 
-          loading={loading}
-          hasAnyData={hasAnyData}
+          loading={loading} 
+          hasAnyData={hasAnyData} 
           viewMode={viewMode}
           weekRangeText={weekRangeText}
           dailyMap={dailyMap}
@@ -265,15 +276,14 @@ export default function KitchenReportPage() {
         />
 
         {/* --- קריאה לקומפוננטת מסך --- */}
-        <KitchenScreenView
-           loading={loading}
-           hasAnyData={hasAnyData}
-           viewMode={viewMode}
-           weekDays={weekDays}
-           dailyMap={dailyMap}
-           groupMap={groupMap}
+        <KitchenScreenView 
+          loading={loading}
+          hasAnyData={hasAnyData}
+          viewMode={viewMode}
+          weekDays={weekDays}
+          dailyMap={dailyMap}
+          groupMap={groupMap}
         />
-
       </div>
     </div>
   );

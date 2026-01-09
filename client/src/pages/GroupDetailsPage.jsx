@@ -247,9 +247,28 @@ export default function GroupDetailsPage() {
 
   const openEditDialog = (event) => {
     setEditingEventId(event._id);
-    let type = event.eventType || 'meal';
-    if (type === 'regular') type = 'meal'; 
     
+    let type = event.eventType || 'meal';
+    if (type === 'regular') type = 'meal';
+
+    // --- חישוב הערך הנכון לתפריט (מונע את הבעיה שזה מגיע ריק) ---
+    // 1. קודם מנסים לקחת מהשדה הישיר במסד הנתונים
+    let finalMenu = event.menuItem || event.menu || '';
+
+    // 2. אם השדה ריק, מנסים לחלץ אותו מתוך הכותרת (למשל: "ארוחת צהריים - שניצל")
+    if (!finalMenu && event.title && type === 'meal') {
+        // שימוש בלוגיקה חכמה כמו בדוחות שלך
+        const dashMatch = event.title.match(/-\s+(.*?)(\s*\||$)/);
+        if (dashMatch && dashMatch[1]) {
+            finalMenu = dashMatch[1].trim();
+        } else {
+            // גיבוי פשוט למקרה שה-Regex לא תפס
+            const parts = event.title.split(' - ');
+            if (parts.length > 1) finalMenu = parts[1].trim();
+        }
+    }
+
+    // הגדרת הנתונים לטופס העריכה
     setEditEventData({
       eventType: type,
       title: event.title,
@@ -262,11 +281,13 @@ export default function GroupDetailsPage() {
       requirements: event.requirements || '',
       mealType: event.mealType || 'breakfast',
       kosherType: event.kosherType || 'parve',
-      menuItem: event.menuItem || '' 
+      
+      // כאן אנחנו מכניסים את המשתנה שחישבנו למעלה
+      menuItem: finalMenu 
     });
+    
     setIsEditEventDialogOpen(true);
   };
-
   const handleUpdateEvent = async () => {
     const payload = validatePayload(editEventData, selectedDate);
     if (!payload) return;

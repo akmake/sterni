@@ -183,7 +183,7 @@ export default function KitchenPrintView({ loading, hasAnyData, viewMode, weekRa
       )}
 
       <div className="mt-6 pt-2 border-t text-center text-[10px] text-slate-700">
-        הופק ע"י מערכת ניהול בתאריך {new Date().toLocaleDateString('he-IL')}
+        הופק ע"י דהאן פתרונות טכנולוגים לעסקים בתאריך {new Date().toLocaleDateString('he-IL')}
       </div>
     </div>
   );

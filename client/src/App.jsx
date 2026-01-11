@@ -20,6 +20,8 @@ import EmailsPage         from './pages/EmailsPage';
 import TasksPage          from './pages/TasksPage';
 import FullScheduleReportPage from '@/pages/FullScheduleReportPage'; // וודא שהנתיב נכון
 import NotFoundPage from "@/pages/NotFoundPage";
+import ChatPage from './pages/ChatPage'; // וודא שהנתיב נכון
+import WhatsAppPage from './pages/WhatsAppPage'; // וודא שיצרת את הקובץ למעלה
 
 export default function App() {
   return (
@@ -44,7 +46,8 @@ export default function App() {
           <Route path="/emails"        element={<EmailsPage />} />
           <Route path="/tasks"         element={<TasksPage />} />
           <Route path="full-schedule" element={<FullScheduleReportPage />} />
-          
+          <Route path="/chat/:ticketId" element={<ChatPage />} />
+          <Route path="/whatsapp" element={<WhatsAppPage />} />
         </Route>
 
      

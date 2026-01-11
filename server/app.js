@@ -8,16 +8,19 @@ import csurf from 'csurf';
 import mongoose from 'mongoose';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import emailRoutes from './routes/emailRoutes.js';
-import { startEmailListener } from './services/emailListener.js';// --- Imports ---
+
+// --- Imports ---
 import authRoutes from './routes/auth.js';
-import hallRoutes from './routes/hallRoutes.js';   // <-- הוסף
-import groupRoutes from './routes/groupRoutes.js'; // <-- הוסף
+import hallRoutes from './routes/hallRoutes.js';
+import groupRoutes from './routes/groupRoutes.js';
 import projectRoutes from './routes/projectRoutes.js';
 import taskRoutes from './routes/taskRoutes.js';
+import emailRoutes from './routes/emailRoutes.js'; // הקוד הישן שלך
+import chatRoutes from './routes/chatRoutes.js';   // <--- הוסף את זה (הקובץ החדש שיצרנו)
+
 import rateLimiter from './middlewares/rateLimiter.js';
 import { requireAuth } from './middlewares/authMiddleware.js';
-
+import { startEmailListener } from './services/emailListener.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -46,14 +49,21 @@ app.use(cors({
   credentials: true
 }));
 
+// הגדלת ה-Limit קריטית לקבלת קבצים במייל/צ'אט
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
 app.use(mongoSanitize());
 
-// --- התיקון הקריטי: שים את זה כאן! לפני הכל! ---
-// זה אומר לשרת: "כל בקשה שמתחילה ב-/uploads, תגיש ישר מהתיקייה, בלי שאלות של אבטחה"
+// הגשת קבצים סטטיים (העלאות)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// =================================================================
+// 🚨 איזור ה-Webhook (קריטי!)
+// חייב להיות לפני ה-CSRF Protection כי ספק המייל (SendGrid וכו') לא שולח Token.
+// =================================================================
+app.use('/api/chat', chatRoutes); 
+
 
 // --- CSRF ---
 const csrfProtection = csurf({
@@ -72,12 +82,13 @@ app.get('/api/csrf-token', rateLimiter, csrfProtection, (req, res) => {
 });
 
 // --- Protected Routes ---
-app.use(csrfProtection); // מכאן והלאה הכל מוגן
+// כל מה שנמצא מתחת לשורה הזו דורש CSRF Token (הגנה למשתמשים בדפדפן)
+app.use(csrfProtection); 
 
 app.use('/api/projects', requireAuth, projectRoutes);
-app.use('/api/halls', requireAuth, hallRoutes);   // <-- הוסף
-app.use('/api/groups', requireAuth, groupRoutes); // <-- הוסף
-app.use('/api/emails', emailRoutes);
+app.use('/api/halls', requireAuth, hallRoutes);
+app.use('/api/groups', requireAuth, groupRoutes);
+app.use('/api/emails', emailRoutes); // זה הנתיב הישן שלך, שקול אם אתה עדיין צריך אותו
 app.use('/api/tasks', taskRoutes);
 
 // Error Handling
@@ -92,7 +103,11 @@ app.use((err, req, res, next) => {
   console.error(err);
   res.status(err.statusCode || 500).json({ message: err.message || 'Internal Server Error' });
 });
-startEmailListener();
+
+// הערה: אם אתה עובר מלא לשיטת ה-Webhook, ייתכן שלא תצטרך את startEmailListener
+// אבל אם אתה רוצה לשמור על המנגנון הישן במקביל, תשאיר את זה.
+startEmailListener(); 
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 

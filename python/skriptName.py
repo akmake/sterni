@@ -1,3 +1,4 @@
+from math import dist
 import os
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -10,11 +11,15 @@ MAX_DEPTH = 7
 ALLOWED_ROOT_DIRS = {"client", "server"}
 
 # תיקיות שיש לדלג עליהן בתוך client/server
-SKIP_DIRS = {"node_modules", ".git", "__pycache__", "package-lock.json", ".venv",".wwebjs_cache",".wwebjs_auth"}
+SKIP_DIRS = {"node_modules",dist, ".git", "__pycache__", "package-lock.json", ".venv",".wwebjs_cache",".wwebjs_auth"}
 
 # קבצים שיש לדלג עליהם
 SKIP_FILES = {
     "index-DEKCV7q4.js","תיעוד"
+    "index-B07_lXo7.js","index-HK6lY2bD.js",
+    "index-OE6k33bD.js","index-PLK3jXo7.js",
+    "index-QLk33bD.js","index-WE6k33bD.js",
+    "index-ZLK3jXo7.js",
 }
 
 # סיומות שמותר להציג

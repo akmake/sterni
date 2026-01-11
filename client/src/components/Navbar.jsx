@@ -1,6 +1,6 @@
 import { useState, Fragment } from "react";
 import { Link, NavLink  } from "react-router-dom";
-import { Menu, X, LogOut, Home, Briefcase,Utensils, ChevronDown, Settings,MapPin, UserCircle,ListTodo, User, Users,Mail,CalendarDays } from "lucide-react";
+import { Menu, X, LogOut, Home, Briefcase,Utensils, ChevronDown,MessageSquare, Settings,MapPin, UserCircle,ListTodo, User, Users,Mail,CalendarDays } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/stores/authStore";
 import { Button } from "@/components/ui/Button";
@@ -18,7 +18,8 @@ const navItems = [
     { to: '/full-schedule', label: 'לו"ז מפורט', icon: CalendarDays, type: 'link', auth: true },
     { to: '/halls', label: 'ניהול אולמות', icon: MapPin, type: 'link', auth: true },
     { to: '/emails', label: 'ניהול פניות', icon: Mail, type: 'link', auth: true },
-    
+    { to: '/emails', label: 'צ׳אט ופניות', icon: MessageSquare, type: 'link', auth: true },
+    { to: '/whatsapp', label: 'מערכת צ׳אט', icon: MessageSquare, type: 'link', auth: true }, // <--- זה הלינק הנכון
 ];
 
 const getVisibleItems = (isAuthenticated, user) => {

@@ -15,5 +15,12 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "@sendgrid/eventwebhook": "^8.0.0",
+    "imap-simple": "^5.1.0",
+    "multer": "^2.0.2",
+    "nodemailer": "^7.0.12",
+    "simple-parser": "^0.0.0"
   }
 }

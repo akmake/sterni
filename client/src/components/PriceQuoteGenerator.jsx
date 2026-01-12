@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { Save, Printer, Trash2, Table as TableIcon, Type, FileDown, LoaderCircle, Bold, Italic, Underline, AlignRight, AlignCenter, AlignLeft, List, ListOrdered, MousePointerClick } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import html2canvas from 'html2canvas';
+import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
 
 // --- הגדרות A4 ---
@@ -356,38 +356,56 @@ const PriceQuoteGenerator = () => {
       }
   };
 
-  const handleGeneratePDF = async () => {
+// npm install html2canvas@latest
+
+const handleGeneratePDF = async () => {
     if (!containerRef.current || isDownloading) return;
     setIsDownloading(true);
-    const toastId = toast.loading('מייצר PDF...');
+    const toastId = toast.loading('מייצר PDF קליל...');
 
     try {
-        const pdf = new jsPDF('p', 'mm', 'a4');
+        // שינוי 1: הפעלת דחיסה מובנית ב-jsPDF (הפרמטר האחרון 'true')
+        const pdf = new jsPDF('p', 'mm', 'a4', true);
+        const pdfWidth = 210;
+        const pdfHeight = 297;
+        
         const pageElements = containerRef.current.querySelectorAll('.quote-page');
 
         for (let i = 0; i < pageElements.length; i++) {
-            const canvas = await html2canvas(pageElements[i], {
-                scale: 2,
-                useCORS: true,
-                backgroundColor: '#ffffff',
-                logging: false,
-                ignoreElements: (el) => el.classList.contains('no-print')
+            const element = pageElements[i];
+
+            // שינוי 2: שימוש ב-toJpeg במקום toPng
+            // שינוי 3: הגדרת איכות ו-PixelRatio חסכוניים
+            const dataUrl = await htmlToImage.toJpeg(element, {
+                quality: 3, // איכות 75% - מעולה למסמכים וחוסך המון מקום
+                pixelRatio: 4, // רזולוציה טיפה נמוכה יותר (עדיין חדה להדפסה)
+                backgroundColor: '#ffffff', // חובה ב-JPEG כדי שהרקע לא יהיה שחור
+                width: 794, 
+                height: 1123, 
+                style: {
+                    margin: 0,
+                    transform: 'none', 
+                    display: 'flex',
+                    flexDirection: 'column'
+                },
+                filter: (node) => !node.classList?.contains('no-print')
             });
-            const imgData = canvas.toDataURL('image/jpeg', 1.0);
+
             if (i > 0) pdf.addPage();
-            pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+            // פרמטרים נוספים ('FAST') לטעינה מהירה יותר ב-PDF
+            pdf.addImage(dataUrl, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
         }
 
-        pdf.save(`הצעת_מחיר_${clientName.replace(/\s+/g, '_')}.pdf`);
+        pdf.save(`הצעת_מחיר_${clientName.replace(/[^a-zA-Z0-9א-ת]/g, '_')}.pdf`);
         toast.success('הקובץ נוצר!', { id: toastId });
+
     } catch (err) {
-        console.error(err);
+        console.error("PDF Error:", err);
         toast.error('שגיאה ביצירת הקובץ', { id: toastId });
     } finally {
         setIsDownloading(false);
     }
   };
-
   return (
     <div className="min-h-screen bg-slate-100 py-10 font-sans text-slate-800">
       <style>{printStyles}</style>

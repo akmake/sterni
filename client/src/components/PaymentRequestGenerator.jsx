@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Save, Printer, Trash2, Table as TableIcon, Type, FileDown, LoaderCircle, Bold, Italic, Underline, AlignRight, AlignCenter, AlignLeft, List, ListOrdered, MousePointerClick, Plus } from 'lucide-react';
+import { Save, Printer, Trash2, Table as TableIcon, Type, FileDown, LoaderCircle, Bold, Italic, Underline, AlignRight, AlignCenter, AlignLeft, List, ListOrdered, MousePointerClick, Plus, Send, Mail } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import useGroupsStore from '@/stores/groupsStore';
 import { toast } from 'react-hot-toast';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import axios from 'axios'; // וודא שמותקן axios
 
 // --- הגדרות A4 ---
 const A4_HEIGHT_PX = 1123;
@@ -54,19 +55,7 @@ const toGematria = (num) => {
   return str.slice(0, -1) + '"' + str.slice(-1);
 };
 
-const formatEventDateDayHebrew = (dateStr) => {
-    if (!dateStr) return '-';
-    const date = new Date(dateStr);
-    const dayName = date.toLocaleDateString('he-IL', { weekday: 'long' });
-    const parts = new Intl.DateTimeFormat('he-IL', { calendar: 'hebrew', day: 'numeric', month: 'long' }).formatToParts(date);
-    const hDay = parts.find(p => p.type === 'day')?.value;
-    const hMonth = parts.find(p => p.type === 'month')?.value;
-    const hDayGematria = isNaN(hDay) ? hDay : toGematria(parseInt(hDay));
-    const gregDate = date.toLocaleDateString('en-GB');
-    return `${dayName}, ${hDayGematria} ב${hMonth} (${gregDate})`;
-};
-
-// --- רכיב הוספה (תוקן: לא צף על הטקסט) ---
+// --- רכיב הוספה ---
 const Inserter = ({ onAddText, onAddTable }) => (
     <div className="inserter-bar flex items-center justify-center py-2 group cursor-pointer no-print opacity-0 hover:opacity-100 transition-opacity">
         <div className="flex gap-2 bg-gray-100 p-1 rounded-full shadow-sm border">
@@ -80,7 +69,6 @@ const Inserter = ({ onAddText, onAddTable }) => (
 // --- תפריט קליק ימני ---
 const RichTextMenu = ({ position, onClose, onAction, type }) => {
     if (!position) return null;
-    
     return (
         <div 
             className="fixed z-[9999] bg-white rounded-lg shadow-2xl border border-gray-200 p-2 flex flex-col gap-1 w-60 text-sm text-right font-sans"
@@ -120,14 +108,16 @@ const PaymentRequestGenerator = () => {
 
   const [blocks, setBlocks] = useState([]);
   const [orderNumber, setOrderNumber] = useState('');
+  const [targetEmail, setTargetEmail] = useState(''); // מייל יעד
   const [paginatedPages, setPaginatedPages] = useState([]);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [headerDetails, setHeaderDetails] = useState({ arrival: null, departure: null, type: '' });
+  const [isSending, setIsSending] = useState(false); // סטטוס שליחה
   
   const [contextMenu, setContextMenu] = useState(null);
 
   const blockRefs = useRef({});
   const containerRef = useRef(null);
+  const DRAFT_KEY = `draft_payment_${groupId}`; // מפתח ייחודי לטיוטה
 
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
@@ -135,31 +125,58 @@ const PaymentRequestGenerator = () => {
     return () => window.removeEventListener('click', handleClick);
   }, []);
 
+  // --- טעינת נתונים וטיוטות ---
   useEffect(() => {
-      if (group) {
-        const events = group.events || [];
-        const sortedEvents = [...events].sort((a, b) => new Date(a.start) - new Date(b.start));
-
-        const arrival = sortedEvents.length > 0 ? sortedEvents[0].start : group.startDate;
-        const departure = sortedEvents.length > 0 ? sortedEvents[sortedEvents.length - 1].end : group.endDate;
-
-        const isLodging = new Date(group.startDate).toDateString() !== new Date(group.endDate).toDateString();
-        const type = isLodging ? 'אירוח ולינה' : 'יום עיון';
-
-        setHeaderDetails({ arrival, departure, type });
-      }
-  }, [group]);
-
-  useEffect(() => {
-    if (!group) { fetchGroups(); }
-    else if (group.paymentRequest?.blocks && group.paymentRequest.blocks.length > 0) {
-        setBlocks(group.paymentRequest.blocks);
-        setOrderNumber(group.paymentRequest.orderNumber || '');
+    if (!group) { 
+        fetchGroups(); 
     } else {
-        initializeDefaultPaymentRequest(group);
-    }
-  }, [group]);
+        // בדיקה אם יש טיוטה שמורה בלוקאל
+        const savedDraft = localStorage.getItem(DRAFT_KEY);
+        let loadedFromDraft = false;
 
+        if (savedDraft) {
+            try {
+                const draftData = JSON.parse(savedDraft);
+                // אם הטיוטה חדשה יותר מהעדכון האחרון בשרת (או שאין נתונים בשרת)
+                const serverTime = group.paymentRequest?.lastUpdated ? new Date(group.paymentRequest.lastUpdated).getTime() : 0;
+                if (draftData.timestamp > serverTime) {
+                    setBlocks(draftData.blocks);
+                    setOrderNumber(draftData.orderNumber);
+                    setTargetEmail(draftData.targetEmail || group.contactPerson?.email || '');
+                    toast.success('טיוטה שלא נשמרה שוחזרה', { position: 'bottom-center', icon: '📝' });
+                    loadedFromDraft = true;
+                }
+            } catch (e) {
+                console.error("Error parsing draft", e);
+            }
+        }
+
+        if (!loadedFromDraft) {
+            if (group.paymentRequest?.blocks && group.paymentRequest.blocks.length > 0) {
+                setBlocks(group.paymentRequest.blocks);
+                setOrderNumber(group.paymentRequest.orderNumber || '');
+            } else {
+                initializeDefaultPaymentRequest(group);
+            }
+            setTargetEmail(group.contactPerson?.email || '');
+        }
+    }
+  }, [group, DRAFT_KEY]);
+
+  // --- שמירת טיוטה אוטומטית (Auto-Save) ---
+  useEffect(() => {
+      if (blocks.length > 0 && groupId) {
+          const draftData = {
+              blocks,
+              orderNumber,
+              targetEmail,
+              timestamp: Date.now()
+          };
+          localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+      }
+  }, [blocks, orderNumber, targetEmail, groupId, DRAFT_KEY]);
+
+  // --- פגינציה (לוגיקה קיימת) ---
   useLayoutEffect(() => {
     if (!blocks.length) return;
     const newPages = [];
@@ -275,31 +292,22 @@ const PaymentRequestGenerator = () => {
       });
   };
 
-  // --- חישוב אגרסיבי ומדויק ---
   const calculateAndSetTable = (rows) => {
       const newRows = rows.map(r => [...r]);
       let grandTotal = 0;
-      
-      // ריצה על כל השורות למעט האחרונה
       for(let i=0; i<newRows.length-1; i++) {
-          // המרה נקיה למספר
           const qty = parseFloat(String(newRows[i][1]).replace(/[^\d.-]/g, '')) || 0;
           const price = parseFloat(String(newRows[i][2]).replace(/[^\d.-]/g, '')) || 0;
-          
           if(qty || price) {
               const rowTotal = qty * price;
               grandTotal += rowTotal;
-              // עדכון העמודה הרביעית (אינדקס 3)
               newRows[i][3] = rowTotal.toLocaleString('he-IL', { maximumFractionDigits: 2 });
           }
       }
-
-      // עדכון שורת הסיכום (תא אחרון בשורה אחרונה)
       if (newRows.length > 0) {
           const lastIdx = newRows.length - 1;
           newRows[lastIdx][3] = grandTotal.toLocaleString('he-IL', { maximumFractionDigits: 2 });
       }
-
       return newRows;
   };
 
@@ -317,7 +325,6 @@ const PaymentRequestGenerator = () => {
 
           switch (action) {
               case 'addRowBelow':
-                  // הוספה: תמיד מוסיף שורה "נקייה" לפני שורת הסיכום אם קיימת
                   const insertIndex = rowIndex !== null ? rowIndex + 1 : newRows.length - 1;
                   newRows.splice(insertIndex, 0, new Array(block.headers.length).fill(''));
                   updateBlock(blockId, { rows: newRows });
@@ -325,7 +332,6 @@ const PaymentRequestGenerator = () => {
               case 'deleteRow':
                   if (newRows.length <= 1) return;
                   newRows.splice(rowIndex, 1);
-                  // חישוב מחדש אחרי מחיקה
                   if (block.headers.length === 4) newRows = calculateAndSetTable(newRows);
                   updateBlock(blockId, { rows: newRows });
                   break;
@@ -352,13 +358,10 @@ const PaymentRequestGenerator = () => {
   const tableActions = {
       updateCell: (blockId, rIdx, cIdx, val) => {
           const block = blocks.find(b => b.id === blockId);
-          let newRows = block.rows.map(row => [...row]); // Deep copy
-          
+          let newRows = block.rows.map(row => [...row]);
           newRows[rIdx][cIdx] = val;
-          
-          // אם זו טבלת תשלומים (4 עמודות) והשורה היא לא הסיכום - נחשב
           if (block.headers.length === 4 && rIdx !== newRows.length - 1) {
-             if (cIdx === 1 || cIdx === 2) { // עריכת כמות או מחיר
+             if (cIdx === 1 || cIdx === 2) {
                  newRows = calculateAndSetTable(newRows);
              }
           }
@@ -378,32 +381,84 @@ const PaymentRequestGenerator = () => {
       }
   };
 
-  const handleGeneratePDF = async () => {
-    if (!containerRef.current || isDownloading) return;
+  // --- פונקציה ראשית ליצירת PDF (גם להורדה וגם לשליחה) ---
+  const generatePDFBlob = async () => {
+    if (!containerRef.current) return null;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageElements = containerRef.current.querySelectorAll('.quote-page');
+    for (let i = 0; i < pageElements.length; i++) {
+        const canvas = await html2canvas(pageElements[i], { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false, ignoreElements: (el) => el.classList.contains('no-print') });
+        if (i > 0) pdf.addPage();
+        pdf.addImage(canvas.toDataURL('image/jpeg', 1.0), 'JPEG', 0, 0, 210, 297);
+    }
+    return pdf;
+  };
+
+  const handleDownloadPDF = async () => {
+    if (isDownloading) return;
     setIsDownloading(true);
-    const toastId = toast.loading('מייצר PDF...');
+    const toastId = toast.loading('מייצר PDF להורדה...');
     try {
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pageElements = containerRef.current.querySelectorAll('.quote-page');
-        for (let i = 0; i < pageElements.length; i++) {
-            const canvas = await html2canvas(pageElements[i], { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false, ignoreElements: (el) => el.classList.contains('no-print') });
-            if (i > 0) pdf.addPage();
-            pdf.addImage(canvas.toDataURL('image/jpeg', 1.0), 'JPEG', 0, 0, 210, 297);
-        }
+        const pdf = await generatePDFBlob();
         pdf.save(`דרישת_תשלום_${group.name}.pdf`);
         toast.success('הקובץ נוצר!', { id: toastId });
     } catch (err) {
         console.error(err);
-        toast.error('שגיאה', { id: toastId });
+        toast.error('שגיאה ביצירת הקובץ', { id: toastId });
     } finally {
         setIsDownloading(false);
     }
   };
 
-  const handleSave = async () => {
+  const handleSendEmail = async () => {
+    if (!targetEmail) {
+        toast.error('נא להזין כתובת מייל לשליחה');
+        return;
+    }
+    if (isSending) return;
+    
+    setIsSending(true);
+    const toastId = toast.loading('מייצר PDF ושולח למייל...');
+
+    try {
+        // 1. שמירה לשרת קודם כל (כדי שיהיה גיבוי)
+        await handleSave(false); 
+
+        // 2. יצירת ה-PDF
+        const pdf = await generatePDFBlob();
+        const pdfBlob = pdf.output('blob');
+
+        // 3. הכנת הטופס לשליחה
+        const formData = new FormData();
+        formData.append('file', pdfBlob, `payment_request_${group.name}.pdf`);
+        formData.append('email', targetEmail);
+        formData.append('subject', `דרישת תשלום - ${group.name}`);
+        formData.append('body', `מצורפת דרישת תשלום עבור ${group.name}.\n\nבברכה,\nצוות ציפורי.`);
+
+        // 4. שליחה לשרת (יש ליצור את ה-Route הזה בצד שרת!)
+        await axios.post('/api/email/send-attachment', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+
+        toast.success('המייל נשלח בהצלחה!', { id: toastId });
+        
+        // אופציונלי: מחיקת הטיוטה לאחר שליחה מוצלחת
+        localStorage.removeItem(DRAFT_KEY);
+
+    } catch (err) {
+        console.error(err);
+        toast.error('שגיאה בשליחת המייל: ' + (err.response?.data?.message || err.message), { id: toastId });
+    } finally {
+        setIsSending(false);
+    }
+  };
+
+  const handleSave = async (showToast = true) => {
       if(!group) return;
       await updateGroup(group._id, { paymentRequest: { blocks, orderNumber, lastUpdated: new Date() }});
-      toast.success("נשמר בשרת");
+      if(showToast) toast.success("נשמר בשרת");
+      // אחרי שמירה מוצלחת בשרת, אפשר למחוק את הטיוטה המקומית כדי למנוע קונפליקטים עתידיים
+      localStorage.removeItem(DRAFT_KEY);
   };
 
   if (!group) return <div className="flex justify-center pt-20">טוען נתונים...</div>;
@@ -421,13 +476,36 @@ const PaymentRequestGenerator = () => {
           />
       )}
 
+      {/* --- סרגל כלים עליון --- */}
       <div className="fixed top-0 left-0 w-full bg-white z-50 shadow-sm border-b h-16 flex items-center justify-between px-8 no-print">
          <div className="font-bold text-gray-700 text-lg flex items-center gap-2">
              <FileDown className="text-amber-500"/> מחולל דרישת תשלום
+             <span className="text-xs font-normal text-gray-400 mr-2 bg-gray-100 px-2 py-0.5 rounded-full">נשמר בטיוטה אוטומטית</span>
          </div>
+         
+         {/* אזור שליחת מייל */}
+         <div className="flex items-center gap-2 bg-blue-50 px-3 py-1 rounded-md border border-blue-100 mx-4">
+            <Mail size={16} className="text-blue-500"/>
+            <input 
+                type="email" 
+                value={targetEmail}
+                onChange={(e) => setTargetEmail(e.target.value)}
+                placeholder="מייל לשליחה..."
+                className="bg-transparent text-sm outline-none w-48 text-blue-900 placeholder:text-blue-300"
+            />
+            <button 
+                onClick={handleSendEmail} 
+                disabled={isSending}
+                className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded hover:bg-blue-700 flex items-center gap-1 disabled:opacity-50"
+            >
+                {isSending ? <LoaderCircle className="animate-spin" size={14}/> : <Send size={14}/>}
+                שלח
+            </button>
+         </div>
+
          <div className="flex gap-3">
-             <button onClick={handleSave} className="flex items-center gap-2 bg-slate-100 text-slate-700 border px-4 py-2 rounded hover:bg-slate-200 font-bold text-sm"><Save size={16}/> שמור</button>
-             <button onClick={handleGeneratePDF} disabled={isDownloading} className="flex items-center gap-2 bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 font-bold text-sm shadow-sm">
+             <button onClick={() => handleSave(true)} className="flex items-center gap-2 bg-slate-100 text-slate-700 border px-4 py-2 rounded hover:bg-slate-200 font-bold text-sm"><Save size={16}/> שמור בשרת</button>
+             <button onClick={handleDownloadPDF} disabled={isDownloading} className="flex items-center gap-2 bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 font-bold text-sm shadow-sm">
                  {isDownloading ? <LoaderCircle className="animate-spin" size={16}/> : <FileDown size={16}/>} הורד PDF
              </button>
              <button onClick={() => window.print()} className="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded hover:bg-slate-900 font-bold text-sm shadow-sm"><Printer size={16}/> הדפס</button>
@@ -482,7 +560,7 @@ const PaymentRequestGenerator = () => {
                     {pageBlocks.map((block) => {
                         const realIndex = blocks.findIndex(b => b.id === block.id);
                         return (
-                            <div key={block.id} ref={el => blockRefs.current[block.id] = el} className="relative group/block mb-2">
+                            <div key={block.id} ref={el => blockRefs.current[block.id] = el} className="relative group/block mb-0"> {/* מרווח חיצוני 0 */}
                                 <button onClick={() => removeBlock(block.id)} className="absolute -right-10 top-0 text-gray-300 hover:text-red-500 no-print opacity-0 group-hover/block:opacity-100 transition-opacity p-2 z-30"><Trash2 size={16}/></button>
 
                                 {block.type === 'text' ? (
@@ -491,7 +569,8 @@ const PaymentRequestGenerator = () => {
                                         onContextMenu={(e) => handleContextMenu(e, 'text', block.id)}
                                         dangerouslySetInnerHTML={{ __html: block.content }}
                                         onBlur={(e) => updateBlock(block.id, { content: e.target.innerHTML })}
-                                        className="w-full min-h-[2em] outline-none border border-transparent hover:border-blue-200 focus:border-blue-400 p-2 rounded transition-colors text-sm leading-relaxed whitespace-pre-wrap relative z-20"
+                                        // חזרנו ל-p-2 (המקורי). לא נוגעים בפנים!
+                                        className="w-full min-h-[1.5em] outline-none border border-transparent hover:border-blue-200 focus:border-blue-400 p-2 rounded transition-colors text-sm leading-relaxed whitespace-pre-wrap relative z-20"
                                     />
                                 ) : (
                                     <div className="w-full border border-transparent hover:border-amber-200 rounded p-1 transition-colors relative group/table z-10">
@@ -502,7 +581,8 @@ const PaymentRequestGenerator = () => {
                                         <input
                                             value={block.title || ''}
                                             onChange={(e) => updateBlock(block.id, { title: e.target.value })}
-                                            className="font-bold text-slate-700 text-base bg-transparent border-b border-transparent hover:border-gray-300 focus:border-amber-500 outline-none px-1 w-full mb-2"
+                                            // הקטנת רווח רק בין הכותרת לטבלה שלה
+                                            className="font-bold text-slate-700 text-base bg-transparent border-b border-transparent hover:border-gray-300 focus:border-amber-500 outline-none px-1 w-full mb-1"
                                             placeholder="כותרת טבלה..."
                                         />
 
@@ -510,29 +590,10 @@ const PaymentRequestGenerator = () => {
                                             <thead>
                                                 <tr className="bg-white text-slate-700 border-b border-t border-slate-300" style={{ borderTopColor: GOLD, borderTopWidth: '2px' }}>
                                                     {block.headers.map((h, idx) => (
-                                                        <th 
-                                                            key={idx} 
-                                                            className="border-l border-slate-200 p-2 align-bottom relative group/th bg-gray-50" 
-                                                            style={{ width: `${h.width}%` }}
-                                                            onContextMenu={(e) => handleContextMenu(e, 'table', block.id, -1, idx)}
-                                                        >
-                                                            <div 
-                                                                contentEditable
-                                                                suppressContentEditableWarning
-                                                                onBlur={(e) => tableActions.updateHeaderTitle(block.id, idx, e.target.innerText)}
-                                                                className="w-full bg-transparent text-center font-bold text-sm outline-none whitespace-normal break-words min-h-[1.5em] relative z-50"
-                                                            >
-                                                                {h.title}
-                                                            </div>
-                                                            
-                                                            {/* התיקון: התיבה מוצגת כלפי מעלה (bottom-full) במקום מטה, כדי לא להסתיר את השורה הראשונה */}
+                                                        <th key={idx} className="border-l border-slate-200 p-2 align-bottom relative group/th bg-gray-50" style={{ width: `${h.width}%` }} onContextMenu={(e) => handleContextMenu(e, 'table', block.id, -1, idx)}>
+                                                            <div contentEditable suppressContentEditableWarning onBlur={(e) => tableActions.updateHeaderTitle(block.id, idx, e.target.innerText)} className="w-full bg-transparent text-center font-bold text-sm outline-none whitespace-normal break-words min-h-[1.5em] relative z-50">{h.title}</div>
                                                             <div className="flex items-center justify-center gap-1 no-print opacity-0 group-hover/th:opacity-100 transition-opacity bg-white absolute bottom-full left-0 w-full z-[60] shadow border p-1 rounded mb-1">
-                                                                <input 
-                                                                    type="number" 
-                                                                    value={h.width} 
-                                                                    onChange={(e) => tableActions.updateHeaderWidth(block.id, idx, e.target.value)} 
-                                                                    className="w-8 text-[10px] text-center border rounded bg-gray-50"
-                                                                />
+                                                                <input type="number" value={h.width} onChange={(e) => tableActions.updateHeaderWidth(block.id, idx, e.target.value)} className="w-8 text-[10px] text-center border rounded bg-gray-50"/>
                                                                 <span className="text-[10px]">%</span>
                                                             </div>
                                                         </th>
@@ -543,17 +604,8 @@ const PaymentRequestGenerator = () => {
                                                 {block.rows.map((row, rIdx) => (
                                                     <tr key={rIdx} className="border-b border-slate-200 hover:bg-slate-50">
                                                         {row.map((cell, cIdx) => (
-                                                            <td 
-                                                                key={cIdx} 
-                                                                className="border-l border-slate-200 p-2 align-top relative"
-                                                                onContextMenu={(e) => handleContextMenu(e, 'table', block.id, rIdx, cIdx)}
-                                                            >
-                                                                <div
-                                                                    contentEditable
-                                                                    suppressContentEditableWarning
-                                                                    onBlur={(e) => tableActions.updateCell(block.id, rIdx, cIdx, e.target.innerText)}
-                                                                    className="w-full min-h-[1.5em] outline-none whitespace-pre-wrap text-sm relative z-50 cursor-text"
-                                                                >{cell}</div>
+                                                            <td key={cIdx} className="border-l border-slate-200 p-2 align-top relative" onContextMenu={(e) => handleContextMenu(e, 'table', block.id, rIdx, cIdx)}>
+                                                                <div contentEditable suppressContentEditableWarning onBlur={(e) => tableActions.updateCell(block.id, rIdx, cIdx, e.target.innerText)} className="w-full min-h-[1.5em] outline-none whitespace-pre-wrap text-sm relative z-50 cursor-text">{cell}</div>
                                                             </td>
                                                         ))}
                                                     </tr>
@@ -562,8 +614,12 @@ const PaymentRequestGenerator = () => {
                                         </table>
                                     </div>
                                 )}
-                                <div className="w-full flex justify-center mt-1">
-                                     <Inserter onAddText={() => addBlock(realIndex, 'text')} onAddTable={() => addBlock(realIndex, 'table')} />
+                                
+                                {/* כאן התיקון הקריטי: הגובה הוא 0, כדי ששורת ההוספה לא תתפוס מקום פיזי בין האלמנטים */}
+                                <div className="w-full flex justify-center h-0 overflow-visible relative z-50 no-print">
+                                    <div className="absolute top-[-14px]"> {/* ממוקם בדיוק על התפר */}
+                                        <Inserter onAddText={() => addBlock(realIndex, 'text')} onAddTable={() => addBlock(realIndex, 'table')} />
+                                    </div>
                                 </div>
                             </div>
                         );
@@ -577,10 +633,6 @@ const PaymentRequestGenerator = () => {
                            <div className="font-bold text-base">שטערני דהאן</div>
                            <div className="text-slate-600">צפורי אירוח ואירועים בע"מ</div>
                            <div className="font-bold text-slate-800 mt-1">0548471446</div>
-                       </div>
-                       <div className="text-center">
-                           <div className="border-b border-black w-60 mb-2"></div>
-                           <div className="font-bold text-base" style={{ color: GOLD, borderColor: GOLD }}>חתימה וחותמת</div>
                        </div>
                     </div>
                 )}

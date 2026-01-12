@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useGroupsStore from '@/stores/groupsStore';
 import { Plus, Users, Calendar, Trash2, Archive, LayoutGrid } from 'lucide-react'; // הוספתי אייקונים
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 
 export default function GroupsPage() {
   const { groups, fetchGroups, deleteGroup } = useGroupsStore();

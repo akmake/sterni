@@ -1,6 +1,6 @@
 import { useState, Fragment } from "react";
 import { Link, NavLink  } from "react-router-dom";
-import { Menu, X, LogOut, Home, Briefcase,Utensils, ChevronDown,MessageSquare, Settings,MapPin, UserCircle,ListTodo, User, Users,Mail,CalendarDays } from "lucide-react";
+import { Menu, X, LogOut, Home, Briefcase,Utensils,FileText, ChevronDown,MessageSquare, Settings,MapPin, UserCircle,ListTodo, User, Users,Mail,CalendarDays } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/stores/authStore";
 import { Button } from "@/components/ui/Button";
@@ -14,6 +14,7 @@ const navItems = [
     { to: '/tasks', label: 'מטלות מהירות', icon: ListTodo, type: 'link', auth: true },
     { to: '/projects', label: 'פרויקטים', icon: Briefcase, type: 'link', auth: true },
     { to: '/groups', label: 'ניהול קבוצות', icon: Users, type: 'link', auth: true },
+    { to: '/price-quote', label: 'הצעות מחיר', icon: FileText },
     { to: '/reports/kitchen', label: 'דוח מטבח', icon: Utensils, type: 'link', auth: true },
     { to: '/full-schedule', label: 'לו"ז מפורט', icon: CalendarDays, type: 'link', auth: true },
     { to: '/halls', label: 'ניהול אולמות', icon: MapPin, type: 'link', auth: true },

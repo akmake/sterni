@@ -23,8 +23,7 @@ import NotFoundPage from "@/pages/NotFoundPage";
 import ChatPage from './pages/ChatPage'; // וודא שהנתיב נכון
 import WhatsAppPage from './pages/WhatsAppPage'; // וודא שיצרת את הקובץ למעלה
 import PriceQuoteGenerator from './components/PriceQuoteGenerator'; // וודא שהנתיב תואם למיקום ששמרת
-
-
+import PaymentRequestGenerator from './components/PaymentRequestGenerator';
 export default function App() {
   return (
     <Routes>
@@ -36,7 +35,7 @@ export default function App() {
         <Route path="register" element={<RegisterPage />} />
 
         <Route element={<ProtectedRoute />}>
-          <Route path="/groups/:groupId/quote" element={<PriceQuoteGenerator />} />
+          <Route path="price-quote" element={<PriceQuoteGenerator />} />
           <Route path="projects"       element={<ProjectsPage />}   />
           <Route path="projects/new"   element={<NewProjectPage />} />
           <Route path="projects/:id"   element={<ProjectPage />}    />
@@ -50,6 +49,7 @@ export default function App() {
           <Route path="full-schedule" element={<FullScheduleReportPage />} />
           <Route path="/chat/:ticketId" element={<ChatPage />} />
           <Route path="/whatsapp" element={<WhatsAppPage />} />
+          <Route path="/groups/:groupId/payment-request" element={<PaymentRequestGenerator />} />
         </Route>
 
      

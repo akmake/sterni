@@ -1,14 +1,12 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { Save, Printer, Trash2, Table as TableIcon, Type, FileDown, LoaderCircle, Bold, Italic, Underline, AlignRight, AlignCenter, AlignLeft, List, ListOrdered, MousePointerClick } from 'lucide-react';
-import { useParams } from 'react-router-dom';
-import useGroupsStore from '@/stores/groupsStore';
 import { toast } from 'react-hot-toast';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
 // --- הגדרות A4 ---
 const A4_HEIGHT_PX = 1123;
-const PAGE_MARGIN_Y = 140; 
+const PAGE_MARGIN_Y = 140;
 const CONTENT_HEIGHT = A4_HEIGHT_PX - PAGE_MARGIN_Y;
 const GOLD = '#C5A059';
 
@@ -30,9 +28,21 @@ const printStyles = `
     button { display: none !important; }
     .inserter-line { display: none !important; }
     [contenteditable] { outline: none !important; }
+    input { border: none !important; background: transparent !important; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   }
 `;
+
+// --- רכיב אינפוט שקוף לעריכה ידנית ---
+const TransparentInput = ({ value, onChange, className, placeholder, style }) => (
+  <input
+    value={value}
+    onChange={(e) => onChange(e.target.value)}
+    className={`bg-transparent border-none outline-none p-0 m-0 w-full placeholder:text-gray-300 focus:ring-0 ${className}`}
+    placeholder={placeholder}
+    style={{ font: 'inherit', color: 'inherit', letterSpacing: 'inherit', ...style }}
+  />
+);
 
 // --- פונקציות עזר לתאריכים ---
 const toGematria = (num) => {
@@ -54,23 +64,19 @@ const toGematria = (num) => {
   return str.slice(0, -1) + '"' + str.slice(-1);
 };
 
-const formatEventDateDayHebrew = (dateStr) => {
-    if (!dateStr) return '-';
-    const date = new Date(dateStr);
+const formatEventDateDayHebrew = (dateInput) => {
+    if (!dateInput) return '-';
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) return dateInput; // אם זה כבר טקסט חופשי
+    
     const dayName = date.toLocaleDateString('he-IL', { weekday: 'long' });
     const parts = new Intl.DateTimeFormat('he-IL', { calendar: 'hebrew', day: 'numeric', month: 'long' }).formatToParts(date);
     const hDay = parts.find(p => p.type === 'day')?.value;
     const hMonth = parts.find(p => p.type === 'month')?.value;
     const hDayGematria = isNaN(hDay) ? hDay : toGematria(parseInt(hDay));
     const gregDate = date.toLocaleDateString('en-GB');
+    
     return `${dayName}, ${hDayGematria} ב${hMonth} (${gregDate})`;
-};
-
-const getHebrewYear = (date) => {
-    const yearPart = new Intl.DateTimeFormat('he-IL', { calendar: 'hebrew', year: 'numeric' }).format(date);
-    if (yearPart.includes('תש')) return yearPart.split(' ').pop().replace(/['"]/g, '') + '"' + yearPart.slice(-1);
-    const numericYear = parseInt(yearPart.replace(/\D/g, ''));
-    return toGematria(numericYear % 1000);
 };
 
 // --- רכיב הוספה ---
@@ -88,9 +94,8 @@ const Inserter = ({ onAddText, onAddTable }) => (
 // --- תפריט קליק ימני (Context Menu) ---
 const RichTextMenu = ({ position, onClose, onAction, type }) => {
     if (!position) return null;
-    
     return (
-        <div 
+        <div
             className="fixed z-[9999] bg-white rounded-lg shadow-xl border border-gray-200 p-2 flex flex-col gap-1 w-56 text-sm text-right"
             style={{ top: position.y, left: position.x, direction: 'rtl' }}
         >
@@ -104,11 +109,12 @@ const RichTextMenu = ({ position, onClose, onAction, type }) => {
                 <button onClick={() => onAction('justifyCenter')} className="p-1 hover:bg-gray-100 rounded"><AlignCenter size={16}/></button>
                 <button onClick={() => onAction('justifyLeft')} className="p-1 hover:bg-gray-100 rounded"><AlignLeft size={16}/></button>
             </div>
-             <div className="flex gap-1 border-b pb-2 mb-1">
+            
+            <div className="flex gap-1 border-b pb-2 mb-1">
                 <button onClick={() => onAction('insertUnorderedList')} className="p-1 hover:bg-gray-100 rounded w-full text-center flex justify-center"><List size={16}/></button>
                 <button onClick={() => onAction('insertOrderedList')} className="p-1 hover:bg-gray-100 rounded w-full text-center flex justify-center"><ListOrdered size={16}/></button>
             </div>
-
+   
             {/* כלי טבלה */}
             {type === 'table' && (
                 <>
@@ -116,7 +122,7 @@ const RichTextMenu = ({ position, onClose, onAction, type }) => {
                     <button onClick={() => onAction('addRowAbove')} className="text-right px-2 py-1 hover:bg-blue-50 rounded flex items-center justify-between"><span>הוסף שורה מעל</span></button>
                     <button onClick={() => onAction('addRowBelow')} className="text-right px-2 py-1 hover:bg-blue-50 rounded flex items-center justify-between"><span>הוסף שורה מתחת</span></button>
                     <button onClick={() => onAction('deleteRow')} className="text-right px-2 py-1 hover:bg-red-50 text-red-600 rounded flex items-center justify-between"><span>מחק שורה</span><Trash2 size={12}/></button>
-                    
+
                     <div className="text-[10px] font-bold text-gray-400 mt-1">עמודות</div>
                     <button onClick={() => onAction('addColRight')} className="text-right px-2 py-1 hover:bg-blue-50 rounded flex items-center justify-between"><span>הוסף עמודה מימין</span></button>
                     <button onClick={() => onAction('addColLeft')} className="text-right px-2 py-1 hover:bg-blue-50 rounded flex items-center justify-between"><span>הוסף עמודה משמאל</span></button>
@@ -128,114 +134,65 @@ const RichTextMenu = ({ position, onClose, onAction, type }) => {
 };
 
 const PriceQuoteGenerator = () => {
-  const { groupId } = useParams();
-  const { groups, fetchGroups, updateGroup } = useGroupsStore();
-  const group = groups.find(g => g._id === groupId);
+  // ניהול State ידני לכל השדות
+  const [clientName, setClientName] = useState('שם הלקוח / הקבוצה');
+  const [contactName, setContactName] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [eventType, setEventType] = useState('יום עיון'); 
+  const [arrivalDate, setArrivalDate] = useState('');
+  const [departureDate, setDepartureDate] = useState('');
+  const [minPax, setMinPax] = useState('0');
 
   const [blocks, setBlocks] = useState([]);
   const [paginatedPages, setPaginatedPages] = useState([]);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [headerDetails, setHeaderDetails] = useState({ arrival: null, departure: null, type: '' });
-  
   const [contextMenu, setContextMenu] = useState(null);
-
+  
   const blockRefs = useRef({});
   const containerRef = useRef(null);
 
+  // סגירת תפריט קליק ימני בלחיצה בחוץ
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
     window.addEventListener('click', handleClick);
     return () => window.removeEventListener('click', handleClick);
   }, []);
 
+  // אתחול נתונים ראשוני
   useEffect(() => {
-      if (group) {
-        const events = group.events || [];
-        const sortedEvents = [...events].sort((a, b) => new Date(a.start) - new Date(b.start));
+    // אתחול תאריכים להיום
+    const today = new Date();
+    setArrivalDate(formatEventDateDayHebrew(today));
+    setDepartureDate(formatEventDateDayHebrew(today));
 
-        const arrival = sortedEvents.length > 0 ? sortedEvents[0].start : group.startDate;
-        const departure = sortedEvents.length > 0 ? sortedEvents[sortedEvents.length - 1].end : group.endDate;
-
-        const isLodging = new Date(group.startDate).toDateString() !== new Date(group.endDate).toDateString();
-        const type = isLodging ? 'אירוח ולינה' : 'יום עיון';
-
-        setHeaderDetails({ arrival, departure, type });
-      }
-  }, [group]);
-
-  useEffect(() => {
-    if (!group) { fetchGroups(); }
-    else if (group.priceQuote?.blocks && group.priceQuote.blocks.length > 0) {
-        setBlocks(group.priceQuote.blocks);
-    } else {
-        initializeDefaultQuote(group);
-    }
-  }, [group]);
-
-  useLayoutEffect(() => {
-    if (!blocks.length) return;
-
-    const newPages = [];
-    let currentPage = [];
-    let currentHeight = 350; 
-
-    blocks.forEach((block) => {
-        const element = blockRefs.current[block.id];
-        const blockHeight = element ? element.offsetHeight + 30 : 100;
-
-        if (currentHeight + blockHeight > CONTENT_HEIGHT) {
-            newPages.push(currentPage);
-            currentPage = [block];
-            currentHeight = 150 + blockHeight; 
-        } else {
-            currentPage.push(block);
-            currentHeight += blockHeight;
-        }
-    });
-
-    if (currentPage.length > 0) newPages.push(currentPage);
-
-    // בדיקה אם יש מקום לחתימה בעמוד האחרון
-    const signatureHeight = 200; 
-    if (newPages.length > 0 && currentHeight + signatureHeight > A4_HEIGHT_PX) {
-        newPages.push([]); 
-    }
-
-    if (JSON.stringify(newPages.map(p => p.map(b => b.id))) !== JSON.stringify(paginatedPages.map(p => p.map(b => b.id)))) {
-        setPaginatedPages(newPages);
-    }
-  }, [blocks, paginatedPages.length]);
-
-  const initializeDefaultQuote = (groupData) => {
-    const isLodging = new Date(groupData.startDate).toDateString() !== new Date(groupData.endDate).toDateString();
-    const quoteType = isLodging ? 'אירוח ולינה' : 'יום עיון';
-
+    // תוכן ברירת מחדל אם אין בלוקים
     const defaultTopNotes = `<b>תנאי האירוח:</b><br>
-• קפה / תה רץ ושתייה קרה (מים ותפוזים) לאורך היום - בכל זמן הנופש סמוך לאולם הפעילות.<br>
-• כיבוד קל בהגעה, עוגות ומאפים.<br>
-• ארוחת צהריים בשרית לפי החלטת המלון.<br>
-• אפשרויות חניה - חינם.<br>
-• המלון כולו נמצא בכל ימות השנה בהשגחת בד"ץ העדה החרדית ירושלים.`;
-
+    • קפה / תה רץ ושתייה קרה (מים ותפוזים) לאורך היום - בכל זמן הנופש סמוך לאולם הפעילות.<br>
+    • כיבוד קל בהגעה, עוגות ומאפים.<br>
+    • ארוחת צהריים בשרית לפי החלטת המלון.<br>
+    • אפשרויות חניה - חינם.<br>
+    • המלון כולו נמצא בכל ימות השנה בהשגחת בד"ץ העדה החרדית ירושלים.`;
+    
     const defaultBottomNotes = `<b>המחירים כוללים מע"מ והם נט למלון.</b><br>
-<b>ההזמנה תכנס לתוקף רק לאחר חתימה על חוזה זה ושליחה למייל חזרה.</b><br>
-<br>
-<b>תנאי תשלום וביטול:</b><br>
-• <b>התשלום: ביום ההגעה באשראי או יומיים לפני האירוח בהעברה בנקאית.</b><br>
-• פרטי בנק: בנק פועלים סניף 655, מס' חשבון 444574.<br>
-• ניתן לעדכן מס' סופי של המשתתפים עד 48 שעות לפני מועד ההגעה, אך לא יפחת ממספר המשתתפים המקורי בהסכם.<br>
-• ביטול ההזמנה מיום החתימה ועד 14 יום מיום ההגעה - ייגבה תשלום של 50% מעלות ההזמנה.<br>
-• ביטול ההזמנה בתוך 7-14 ימים מתאריך ההגעה - ייגבה תשלום של 75% מעלות ההזמנה.<br>
-• ביטול ההזמנה בתוך 7 ימים מיום ההגעה - ייגבה תשלום של 100% מעלות ההזמנה.<br>
-<br>
-<b>הערות נוספות:</b><br>
-• קבוצה המונה פחות מ-50 איש - עלות אולם פעילות 1000 ₪.<br>
-• יש להשאיר צ'ק פיקדון ע"ס 5,000 ₪ לכל נזק שייגרם.<br>
-• הצעת מחיר תקפה ל-3 ימים.`;
+    <b>ההזמנה תכנס לתוקף רק לאחר חתימה על חוזה זה ושליחה למייל חזרה.</b><br>
+    <br>
+    <b>תנאי תשלום וביטול:</b><br>
+    • <b>התשלום: ביום ההגעה באשראי או יומיים לפני האירוח בהעברה בנקאית.</b><br>
+    • פרטי בנק: בנק פועלים סניף 655, מס' חשבון 444574.<br>
+    • ניתן לעדכן מס' סופי של המשתתפים עד 48 שעות לפני מועד ההגעה, אך לא יפחת ממספר המשתתפים המקורי בהסכם.<br>
+    • ביטול ההזמנה מיום החתימה ועד 14 יום מיום ההגעה - ייגבה תשלום של 50% מעלות ההזמנה.<br>
+    • ביטול ההזמנה בתוך 7-14 ימים מתאריך ההגעה - ייגבה תשלום של 75% מעלות ההזמנה.<br>
+    • ביטול ההזמנה בתוך 7 ימים מיום ההגעה - ייגבה תשלום של 100% מעלות ההזמנה.<br>
+    <br>
+    <b>הערות נוספות:</b><br>
+    • קבוצה המונה פחות מ-50 איש - עלות אולם פעילות 1000 ₪.<br>
+    • יש להשאיר צ'ק פיקדון ע"ס 5,000 ₪ לכל נזק שייגרם.<br>
+    • הצעת מחיר תקפה ל-3 ימים.`;
 
     setBlocks([
-      { id: 'text-top', type: 'text', content: defaultTopNotes },
-      {
+        { id: 'text-top', type: 'text', content: defaultTopNotes },
+        {
         id: 'table-main',
         type: 'table',
         title: 'עלויות:',
@@ -245,12 +202,48 @@ const PriceQuoteGenerator = () => {
             { title: 'כמות', width: 10 },
             { title: 'סה"כ', width: 20 }
         ],
-        rows: [[`חבילת ${quoteType} - ${groupData.name}`, '0', groupData.pax?.toString() || '0', '0']]
-      },
-      { id: 'text-bottom', type: 'text', content: defaultBottomNotes }
+        rows: [['פירוט החבילה...', '0', '0', '0']]
+        },
+        { id: 'text-bottom', type: 'text', content: defaultBottomNotes }
     ]);
-  };
+  }, []);
 
+  // חישוב עמודים (Pagination)
+  useLayoutEffect(() => {
+    if (!blocks.length) return;
+
+    const newPages = [];
+    let currentPage = [];
+    let currentHeight = 350; // מקום לכותרת בעמוד הראשון
+
+    blocks.forEach((block) => {
+        const element = blockRefs.current[block.id];
+        const blockHeight = element ? element.offsetHeight + 30 : 100;
+
+        if (currentHeight + blockHeight > CONTENT_HEIGHT) {
+            newPages.push(currentPage);
+            currentPage = [block];
+            currentHeight = 150 + blockHeight; // שוליים בעמוד חדש
+        } else {
+            currentPage.push(block);
+            currentHeight += blockHeight;
+        }
+    });
+
+    if (currentPage.length > 0) newPages.push(currentPage);
+
+    // בדיקה אם יש מקום לחתימה בעמוד האחרון
+    const signatureHeight = 200;
+    if (newPages.length > 0 && currentHeight + signatureHeight > A4_HEIGHT_PX) {
+        newPages.push([]);
+    }
+
+    if (JSON.stringify(newPages.map(p => p.map(b => b.id))) !== JSON.stringify(paginatedPages.map(p => p.map(b => b.id)))) {
+        setPaginatedPages(newPages);
+    }
+  }, [blocks, paginatedPages.length]);
+
+  // --- ניהול הבלוקים ---
   const addBlock = (index, type) => {
     const newBlock = type === 'text'
         ? { id: crypto.randomUUID(), type: 'text', content: 'הקלד טקסט כאן...' }
@@ -277,7 +270,7 @@ const PriceQuoteGenerator = () => {
 
   const handleContextMenu = (e, type, blockId, rowIndex = null, colIndex = null) => {
       e.preventDefault();
-      e.stopPropagation(); 
+      e.stopPropagation();
       setContextMenu({
           visible: true,
           x: e.clientX,
@@ -312,29 +305,21 @@ const PriceQuoteGenerator = () => {
                   break;
               case 'deleteRow':
                   newRows.splice(rowIndex, 1);
-                  if (newRows.length === 0) newRows.push(new Array(block.headers.length).fill('')); 
+                  if (newRows.length === 0) newRows.push(new Array(block.headers.length).fill(''));
                   updateBlock(blockId, { rows: newRows });
                   break;
-              case 'addColRight': 
+              case 'addColRight':
                   const width = Math.floor(100 / (newHeaders.length + 1));
                   newHeaders.forEach(h => h.width = width);
                   newHeaders.splice(colIndex, 0, { title: 'חדש', width });
-                  newRows = newRows.map(r => {
-                      const nr = [...r];
-                      nr.splice(colIndex, 0, '');
-                      return nr;
-                  });
+                  newRows = newRows.map(r => { const nr = [...r]; nr.splice(colIndex, 0, ''); return nr; });
                   updateBlock(blockId, { headers: newHeaders, rows: newRows });
                   break;
                case 'addColLeft':
                   const width2 = Math.floor(100 / (newHeaders.length + 1));
                   newHeaders.forEach(h => h.width = width2);
                   newHeaders.splice(colIndex + 1, 0, { title: 'חדש', width: width2 });
-                  newRows = newRows.map(r => {
-                      const nr = [...r];
-                      nr.splice(colIndex + 1, 0, '');
-                      return nr;
-                  });
+                  newRows = newRows.map(r => { const nr = [...r]; nr.splice(colIndex + 1, 0, ''); return nr; });
                   updateBlock(blockId, { headers: newHeaders, rows: newRows });
                   break;
               case 'deleteCol':
@@ -381,9 +366,9 @@ const PriceQuoteGenerator = () => {
         const pageElements = containerRef.current.querySelectorAll('.quote-page');
 
         for (let i = 0; i < pageElements.length; i++) {
-            const canvas = await html2canvas(pageElements[i], { 
-                scale: 2, 
-                useCORS: true, 
+            const canvas = await html2canvas(pageElements[i], {
+                scale: 2,
+                useCORS: true,
                 backgroundColor: '#ffffff',
                 logging: false,
                 ignoreElements: (el) => el.classList.contains('no-print')
@@ -393,7 +378,7 @@ const PriceQuoteGenerator = () => {
             pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
         }
 
-        pdf.save(`הצעת_מחיר_${group.name}.pdf`);
+        pdf.save(`הצעת_מחיר_${clientName.replace(/\s+/g, '_')}.pdf`);
         toast.success('הקובץ נוצר!', { id: toastId });
     } catch (err) {
         console.error(err);
@@ -403,33 +388,15 @@ const PriceQuoteGenerator = () => {
     }
   };
 
-  const handleSave = async () => {
-      if(!group) return;
-      await updateGroup(group._id, { priceQuote: { blocks, lastUpdated: new Date() }});
-      toast.success("נשמר בשרת");
-  };
-
-  const getFormattedDateString = () => {
-    if (!group?.startDate || !group?.endDate) return "";
-    const start = new Date(group.startDate);
-    const end = new Date(group.endDate);
-    const hebrewYear = getHebrewYear(start);
-    const sD = String(start.getDate()).padStart(2, '0');
-    const sM = String(start.getMonth()+1).padStart(2, '0');
-    return `${start.toDateString() === end.toDateString() ? sD+'/'+sM : '...'} ${hebrewYear}`;
-  };
-
-  if (!group) return <div className="flex justify-center pt-20">טוען נתונים...</div>;
-
   return (
     <div className="min-h-screen bg-slate-100 py-10 font-sans text-slate-800">
       <style>{printStyles}</style>
 
       {/* תפריט הקשר */}
       {contextMenu && (
-          <RichTextMenu 
-            position={contextMenu} 
-            onClose={() => setContextMenu(null)} 
+          <RichTextMenu
+            position={contextMenu}
+            onClose={() => setContextMenu(null)}
             onAction={executeAction}
             type={contextMenu.type}
           />
@@ -438,10 +405,10 @@ const PriceQuoteGenerator = () => {
       {/* סרגל כלים עליון */}
       <div className="fixed top-0 left-0 w-full bg-white z-50 shadow-sm border-b h-16 flex items-center justify-between px-8 no-print">
          <div className="font-bold text-gray-700 text-lg flex items-center gap-2">
-             <FileDown className="text-amber-500"/> מחולל הצעות
+            <FileDown className="text-amber-500"/> מחולל הצעות
          </div>
          <div className="flex gap-3">
-             <button onClick={handleSave} className="flex items-center gap-2 bg-slate-100 text-slate-700 border px-4 py-2 rounded hover:bg-slate-200 font-bold text-sm"><Save size={16}/> שמור</button>
+             {/* כפתור שמירה לשרת הוסר כי אין שיוך לקבוצה */}
              <button onClick={handleGeneratePDF} disabled={isDownloading} className="flex items-center gap-2 bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 font-bold text-sm shadow-sm">
                  {isDownloading ? <LoaderCircle className="animate-spin" size={16}/> : <FileDown size={16}/>} הורד PDF
              </button>
@@ -457,20 +424,40 @@ const PriceQuoteGenerator = () => {
                 {pageIndex === 0 ? (
                     <header className="border-b-[3px] pb-4 mb-6" style={{ borderColor: GOLD }}>
                         <div className="flex justify-between items-start">
-                            {/* פרטי הקבוצה מימין */}
+                            {/* פרטי הקבוצה מימין - עריכה ידנית מלאה */}
                             <div className="text-right pt-2 w-[55%]">
-                                <div className="text-sm font-serif mb-2 text-gray-500">בס"ד</div>
-                                <h2 className="text-2xl font-bold mb-2 text-slate-900">לכבוד: {group.name}</h2>
-                                <div className="text-slate-700 text-base space-y-1 mb-4">
-                                    <div className="font-medium">{group.contactPerson?.name}</div>
-                                    <div>{group.contactPerson?.phone}</div>
-                                    <div>{group.contactPerson?.email}</div>
+                                <div className="text-sm font-bold mb-2 text-gray-500">בס"ד</div>
+                                
+                                <div className="text-2xl font-bold mb-2 text-slate-900 flex items-center gap-1">
+                                    <span>לכבוד:</span>
+                                    <TransparentInput 
+                                        value={clientName} 
+                                        onChange={setClientName} 
+                                        className="font-bold text-slate-900" 
+                                    />
                                 </div>
+
+                                <div className="text-slate-700 text-base space-y-1 mb-4">
+                                    <TransparentInput value={contactName} onChange={setContactName} className="font-medium" placeholder="שם איש קשר" />
+                                    <TransparentInput value={contactPhone} onChange={setContactPhone} placeholder="טלפון" />
+                                    <TransparentInput value={contactEmail} onChange={setContactEmail} placeholder="מייל" />
+                                </div>
+
                                 {/* פרטי הגעה/עזיבה */}
-                                <div className="mt-2 text-sm space-y-1">
-                                    <div className="text-slate-900"><span className="font-bold">סוג פעילות:</span> {headerDetails.type}</div>
-                                    <div className="text-slate-900"><span className="font-bold">הגעה:</span> {formatEventDateDayHebrew(headerDetails.arrival)}</div>
-                                    <div className="text-slate-900"><span className="font-bold">עזיבה:</span> {formatEventDateDayHebrew(headerDetails.departure)}</div>
+                                <div className="mt-4 text-sm space-y-1">
+                                    <div className="text-slate-900 flex">
+                                        {/* הוספתי min-w-[100px] כדי לקבע את רוחב הכותרת */}
+                                        <span className="font-bold ml-1 min-w-[65px]">סוג פעילות:</span>
+                                        <TransparentInput value={eventType} onChange={setEventType} />
+                                    </div>
+                                    <div className="text-slate-900 flex">
+                                        <span className="font-bold ml-1">הגעה:</span>
+                                        <TransparentInput value={arrivalDate} onChange={setArrivalDate} />
+                                    </div>
+                                    <div className="text-slate-900 flex">
+                                        <span className="font-bold ml-1">עזיבה:</span>
+                                        <TransparentInput value={departureDate} onChange={setDepartureDate} />
+                                    </div>
                                 </div>
                             </div>
 
@@ -479,16 +466,29 @@ const PriceQuoteGenerator = () => {
                                 <img src="/opo.png" alt="Logo" className="h-32 object-contain mb-3" />
                             </div>
                         </div>
-                        <div className="text-center mt-4">
-                            <h1 className="text-5xl font-bold mb-4 inline-block pb-1" style={{ color: GOLD, borderColor: GOLD }}>הצעת מחיר</h1>
-                            <div className="text-lg font-medium">
-                                 מינימום משתתפים: {group.minPax || group.pax || 0}
+
+                        <div className="w-full flex flex-col items-center justify-center mt-6">
+                            
+                            {/* כותרת ראשית */}
+                            <h1 className="text-5xl font-bold mb-1 pb-1 text-center" style={{ color: GOLD, borderColor: GOLD }}>
+                                הצעת מחיר
+                            </h1>
+
+                            {/* שורת המינימום - ממורכזת בתוך הרוחב המלא */}
+                            <div className="flex items-center justify-center gap-2 w-full relative right-[15px]">
+                                <span className="text-lg font-bold text-slate-900">מינימום משתתפים:</span>
+                                <input 
+                                    type="text"
+                                    value={minPax} 
+                                    onChange={(e) => setMinPax(e.target.value)} 
+                                    className="w-16 text-lg font-bold text-right bg-transparent border-none outline-none p-0 focus:ring-0"
+                                />
                             </div>
                         </div>
                     </header>
                 ) : (
                     <div className="border-b mb-6 pb-2 flex justify-between text-gray-400 text-xs uppercase tracking-wider">
-                        <span>המשך הצעה: {group.name}</span>
+                        <span>המשך הצעה: {clientName}</span>
                         <span>עמוד {pageIndex + 1}</span>
                     </div>
                 )}
@@ -531,13 +531,13 @@ const PriceQuoteGenerator = () => {
                                             <thead>
                                                 <tr className="bg-white text-slate-700 border-b border-t border-slate-300" style={{ borderTopColor: GOLD, borderTopWidth: '2px' }}>
                                                     {block.headers.map((h, idx) => (
-                                                        <th 
-                                                            key={idx} 
-                                                            className="border-l border-slate-200 p-2 align-bottom relative group/th bg-gray-50" 
+                                                        <th
+                                                            key={idx}
+                                                            className="border-l border-slate-200 p-2 align-bottom relative group/th bg-gray-50"
                                                             style={{ width: `${h.width}%` }}
                                                             onContextMenu={(e) => handleContextMenu(e, 'table', block.id, -1, idx)}
                                                         >
-                                                            <div 
+                                                            <div
                                                                 contentEditable
                                                                 suppressContentEditableWarning
                                                                 onBlur={(e) => tableActions.updateHeaderTitle(block.id, idx, e.target.innerText)}
@@ -545,7 +545,8 @@ const PriceQuoteGenerator = () => {
                                                             >
                                                                 {h.title}
                                                             </div>
-                                                            <div className="flex items-center justify-center gap-1 no-print opacity-0 group-hover/th:opacity-100 transition-opacity bg-white absolute top-full left-0 w-full z-10 shadow border p-1 rounded mt-1">
+                                                            {/* התיקון לידית הגרירה: bottom-full ו-mb-1 */}
+                                                            <div className="flex items-center justify-center gap-1 no-print opacity-0 group-hover/th:opacity-100 transition-opacity bg-white absolute bottom-full left-0 w-full z-10 shadow border p-1 rounded mb-1">
                                                                 <input type="number" value={h.width} onChange={(e) => tableActions.updateHeaderWidth(block.id, idx, e.target.value)} className="w-8 text-[10px] text-center border rounded bg-gray-50"/>
                                                                 <span className="text-[10px]">%</span>
                                                             </div>
@@ -557,8 +558,8 @@ const PriceQuoteGenerator = () => {
                                                 {block.rows.map((row, rIdx) => (
                                                     <tr key={rIdx} className="border-b border-slate-200 hover:bg-slate-50">
                                                         {row.map((cell, cIdx) => (
-                                                            <td 
-                                                                key={cIdx} 
+                                                            <td
+                                                                key={cIdx}
                                                                 className="border-l border-slate-200 p-2 align-top relative"
                                                                 onContextMenu={(e) => handleContextMenu(e, 'table', block.id, rIdx, cIdx)}
                                                             >
@@ -600,7 +601,7 @@ const PriceQuoteGenerator = () => {
                        </div>
                     </div>
                 )}
-            </div> 
+            </div>
         ))}
 
         <div className="h-20"></div>

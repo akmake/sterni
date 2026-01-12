@@ -8,6 +8,7 @@ import {
   Calendar as CalIcon,
   Users,
   Edit2,
+  Receipt,
   MapPin,
   Eye,
   FileText, // Icon added
@@ -356,12 +357,8 @@ export default function GroupDetailsPage() {
 
         {/* --- כפתור הצעת מחיר (חדש!) --- */}
         <div className="flex justify-end px-1">
-          <Link 
-            to={`/groups/${group._id}/quote`} 
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition shadow-sm font-medium"
-          >
-            <FileText size={18} />
-            יצירת הצעת מחיר
+          <Link to={`/groups/${group._id}/payment-request`} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition shadow-sm font-medium ml-2">
+              <Receipt size={18} /> יצירת דרישת תשלום
           </Link>
         </div>
 

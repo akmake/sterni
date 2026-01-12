@@ -437,9 +437,9 @@ const PaymentRequestGenerator = () => {
 
         // 4. שליחה לשרת (יש ליצור את ה-Route הזה בצד שרת!)
         await axios.post('/api/email/send-attachment', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
+            headers: { 'Content-Type': 'multipart/form-data' },
+            withCredentials: true // <--- הנה התיקון! זה אומר לו לשלוח את הקוקי של החיבור
         });
-
         toast.success('המייל נשלח בהצלחה!', { id: toastId });
         
         // אופציונלי: מחיקת הטיוטה לאחר שליחה מוצלחת
@@ -560,7 +560,7 @@ const PaymentRequestGenerator = () => {
                     {pageBlocks.map((block) => {
                         const realIndex = blocks.findIndex(b => b.id === block.id);
                         return (
-                            <div key={block.id} ref={el => blockRefs.current[block.id] = el} className="relative group/block mb-0"> {/* מרווח חיצוני 0 */}
+                            <div key={block.id} ref={el => blockRefs.current[block.id] = el} className="relative group/block mb-1"> {/* מרווח חיצוני 0 */}
                                 <button onClick={() => removeBlock(block.id)} className="absolute -right-10 top-0 text-gray-300 hover:text-red-500 no-print opacity-0 group-hover/block:opacity-100 transition-opacity p-2 z-30"><Trash2 size={16}/></button>
 
                                 {block.type === 'text' ? (
@@ -631,7 +631,7 @@ const PaymentRequestGenerator = () => {
                        <div className="text-right text-sm leading-relaxed">
                            <div className="font-bold text-base" style={{ color: GOLD, borderColor: GOLD }}>בברכה,</div>
                            <div className="font-bold text-base">שטערני דהאן</div>
-                           <div className="text-slate-600">צפורי אירוח ואירועים בע"מ</div>
+                           <div className="text-slate-600">ציפורי אירוח ואירועים בע"מ</div>
                            <div className="font-bold text-slate-800 mt-1">0548471446</div>
                        </div>
                     </div>

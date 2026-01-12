@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 
 // הנתיב שכבר וידאנו שהוא נכון:
-import { Button } from "../components/ui/button"; 
+import { Button } from "../components/ui/Button"; 
 
 // --- אייקונים של וואטסאפ ---
 const TailIn = () => (

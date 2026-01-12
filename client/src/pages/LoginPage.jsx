@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Lock, Mail, ArrowRight, Loader2, User } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/Button";
 
 // שים לב: אנחנו מייבאים את ה-api ואת ה-store
 import api from "@/utils/api";

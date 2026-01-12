@@ -18,7 +18,9 @@
   },
   "dependencies": {
     "@sendgrid/eventwebhook": "^8.0.0",
+    "html2canvas": "^1.4.1",
     "imap-simple": "^5.1.0",
+    "jspdf": "^4.0.0",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.12",
     "simple-parser": "^0.0.0"

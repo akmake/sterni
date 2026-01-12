@@ -1,7 +1,7 @@
 // client/src/pages/GroupDetails/GroupDetailsPage.jsx
 
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom'; // Link added
 import useGroupsStore from '@/stores/groupsStore';
 import { Button } from '@/components/ui/Button';
 import {
@@ -10,6 +10,7 @@ import {
   Edit2,
   MapPin,
   Eye,
+  FileText, // Icon added
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -17,7 +18,7 @@ import { toast } from 'react-hot-toast';
 import { SegmentedControl, AppleInput, AppleSelect } from './GroupPageComponents';
 import GroupPageHeader from './GroupPageHeader';
 import GroupPageModals from './GroupPageModals';
-import GroupQuickAdd from './GroupQuickAdd'; // <--- הוספתי את זה
+import GroupQuickAdd from './GroupQuickAdd';
 
 // --- הגדרות ארוחות ---
 const MEAL_DEFINITIONS = {
@@ -353,6 +354,17 @@ export default function GroupDetailsPage() {
           handleSaveDetails={handleSaveDetails}
         />
 
+        {/* --- כפתור הצעת מחיר (חדש!) --- */}
+        <div className="flex justify-end px-1">
+          <Link 
+            to={`/groups/${group._id}/quote`} 
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition shadow-sm font-medium"
+          >
+            <FileText size={18} />
+            יצירת הצעת מחיר
+          </Link>
+        </div>
+
         {/* בחירת ימים */}
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
           {days.map((date, i) => {
@@ -421,7 +433,7 @@ export default function GroupDetailsPage() {
                         {MEAL_DEFINITIONS[event.mealType] && 
                          !MEAL_DEFINITIONS[event.mealType].isManual && 
                          event.kosherType && (
-                           <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border 
+                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border 
                              ${event.kosherType === 'meat' 
                                ? 'bg-rose-50 text-rose-600 border-rose-100'
                                : event.kosherType === 'parve' 

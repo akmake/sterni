@@ -1,0 +1,612 @@
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import { Save, Printer, Trash2, Table as TableIcon, Type, FileDown, LoaderCircle, Bold, Italic, Underline, AlignRight, AlignCenter, AlignLeft, List, ListOrdered, MousePointerClick } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import useGroupsStore from '@/stores/groupsStore';
+import { toast } from 'react-hot-toast';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+
+// --- הגדרות A4 ---
+const A4_HEIGHT_PX = 1123;
+const PAGE_MARGIN_Y = 140; 
+const CONTENT_HEIGHT = A4_HEIGHT_PX - PAGE_MARGIN_Y;
+const GOLD = '#C5A059';
+
+const printStyles = `
+  @media print {
+    @page { size: A4; margin: 0; }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background-color: white; margin: 0; padding: 0; }
+    .no-print { display: none !important; }
+    .quote-page {
+        width: 210mm !important;
+        height: 297mm !important;
+        overflow: hidden !important;
+        page-break-after: always;
+        break-after: page;
+        margin: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+    }
+    button { display: none !important; }
+    .inserter-line { display: none !important; }
+    [contenteditable] { outline: none !important; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  }
+`;
+
+// --- פונקציות עזר לתאריכים ---
+const toGematria = (num) => {
+  const letters = { 1:'א', 2:'ב', 3:'ג', 4:'ד', 5:'ה', 6:'ו', 7:'ז', 8:'ח', 9:'ט', 10:'י', 20:'כ', 30:'ל', 40:'מ', 50:'נ', 60:'ס', 70:'ע', 80:'פ', 90:'צ', 100:'ק', 200:'ר', 300:'ש', 400:'ת' };
+  let str = "";
+  if (num >= 400) { str += letters[400]; num -= 400; }
+  if (num >= 300) { str += letters[300]; num -= 300; }
+  if (num >= 200) { str += letters[200]; num -= 200; }
+  if (num >= 100) { str += letters[100]; num -= 100; }
+  if (num >= 10) {
+    if (num === 15) return str + "טו";
+    if (num === 16) return str + "טז";
+    const tens = Math.floor(num / 10) * 10;
+    str += letters[tens];
+    num -= tens;
+  }
+  if (num > 0) str += letters[num];
+  if (str.length === 1) return str + "'";
+  return str.slice(0, -1) + '"' + str.slice(-1);
+};
+
+const formatEventDateDayHebrew = (dateStr) => {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    const dayName = date.toLocaleDateString('he-IL', { weekday: 'long' });
+    const parts = new Intl.DateTimeFormat('he-IL', { calendar: 'hebrew', day: 'numeric', month: 'long' }).formatToParts(date);
+    const hDay = parts.find(p => p.type === 'day')?.value;
+    const hMonth = parts.find(p => p.type === 'month')?.value;
+    const hDayGematria = isNaN(hDay) ? hDay : toGematria(parseInt(hDay));
+    const gregDate = date.toLocaleDateString('en-GB');
+    return `${dayName}, ${hDayGematria} ב${hMonth} (${gregDate})`;
+};
+
+const getHebrewYear = (date) => {
+    const yearPart = new Intl.DateTimeFormat('he-IL', { calendar: 'hebrew', year: 'numeric' }).format(date);
+    if (yearPart.includes('תש')) return yearPart.split(' ').pop().replace(/['"]/g, '') + '"' + yearPart.slice(-1);
+    const numericYear = parseInt(yearPart.replace(/\D/g, ''));
+    return toGematria(numericYear % 1000);
+};
+
+// --- רכיב הוספה ---
+const Inserter = ({ onAddText, onAddTable }) => (
+    <div className="inserter-line group flex items-center justify-center h-4 -my-2 hover:my-1 transition-all cursor-pointer z-10 relative no-print">
+        <div className="absolute w-full h-[2px] bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+        <div className="bg-blue-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-all transform scale-0 group-hover:scale-100 flex gap-2 shadow-xl relative z-20">
+            <button onClick={onAddText} className="flex items-center gap-1 px-3 py-1 hover:bg-blue-700 rounded-full text-xs font-bold"><Type size={14}/> טקסט</button>
+            <div className="w-[1px] bg-blue-400 h-4 self-center"></div>
+            <button onClick={onAddTable} className="flex items-center gap-1 px-3 py-1 hover:bg-blue-700 rounded-full text-xs font-bold"><TableIcon size={14}/> טבלה</button>
+        </div>
+    </div>
+);
+
+// --- תפריט קליק ימני (Context Menu) ---
+const RichTextMenu = ({ position, onClose, onAction, type }) => {
+    if (!position) return null;
+    
+    return (
+        <div 
+            className="fixed z-[9999] bg-white rounded-lg shadow-xl border border-gray-200 p-2 flex flex-col gap-1 w-56 text-sm text-right"
+            style={{ top: position.y, left: position.x, direction: 'rtl' }}
+        >
+            {/* כלי טקסט */}
+            <div className="flex justify-between border-b pb-2 mb-1 gap-1">
+                <button onClick={() => onAction('bold')} className="p-1 hover:bg-gray-100 rounded" title="הדגשה"><Bold size={16}/></button>
+                <button onClick={() => onAction('italic')} className="p-1 hover:bg-gray-100 rounded" title="נטוי"><Italic size={16}/></button>
+                <button onClick={() => onAction('underline')} className="p-1 hover:bg-gray-100 rounded" title="קו תחתי"><Underline size={16}/></button>
+                <div className="w-[1px] bg-gray-200 mx-1"></div>
+                <button onClick={() => onAction('justifyRight')} className="p-1 hover:bg-gray-100 rounded"><AlignRight size={16}/></button>
+                <button onClick={() => onAction('justifyCenter')} className="p-1 hover:bg-gray-100 rounded"><AlignCenter size={16}/></button>
+                <button onClick={() => onAction('justifyLeft')} className="p-1 hover:bg-gray-100 rounded"><AlignLeft size={16}/></button>
+            </div>
+             <div className="flex gap-1 border-b pb-2 mb-1">
+                <button onClick={() => onAction('insertUnorderedList')} className="p-1 hover:bg-gray-100 rounded w-full text-center flex justify-center"><List size={16}/></button>
+                <button onClick={() => onAction('insertOrderedList')} className="p-1 hover:bg-gray-100 rounded w-full text-center flex justify-center"><ListOrdered size={16}/></button>
+            </div>
+
+            {/* כלי טבלה */}
+            {type === 'table' && (
+                <>
+                    <div className="text-[10px] font-bold text-gray-400 mt-1">שורות</div>
+                    <button onClick={() => onAction('addRowAbove')} className="text-right px-2 py-1 hover:bg-blue-50 rounded flex items-center justify-between"><span>הוסף שורה מעל</span></button>
+                    <button onClick={() => onAction('addRowBelow')} className="text-right px-2 py-1 hover:bg-blue-50 rounded flex items-center justify-between"><span>הוסף שורה מתחת</span></button>
+                    <button onClick={() => onAction('deleteRow')} className="text-right px-2 py-1 hover:bg-red-50 text-red-600 rounded flex items-center justify-between"><span>מחק שורה</span><Trash2 size={12}/></button>
+                    
+                    <div className="text-[10px] font-bold text-gray-400 mt-1">עמודות</div>
+                    <button onClick={() => onAction('addColRight')} className="text-right px-2 py-1 hover:bg-blue-50 rounded flex items-center justify-between"><span>הוסף עמודה מימין</span></button>
+                    <button onClick={() => onAction('addColLeft')} className="text-right px-2 py-1 hover:bg-blue-50 rounded flex items-center justify-between"><span>הוסף עמודה משמאל</span></button>
+                    <button onClick={() => onAction('deleteCol')} className="text-right px-2 py-1 hover:bg-red-50 text-red-600 rounded flex items-center justify-between"><span>מחק עמודה</span><Trash2 size={12}/></button>
+                </>
+            )}
+        </div>
+    );
+};
+
+const PriceQuoteGenerator = () => {
+  const { groupId } = useParams();
+  const { groups, fetchGroups, updateGroup } = useGroupsStore();
+  const group = groups.find(g => g._id === groupId);
+
+  const [blocks, setBlocks] = useState([]);
+  const [paginatedPages, setPaginatedPages] = useState([]);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [headerDetails, setHeaderDetails] = useState({ arrival: null, departure: null, type: '' });
+  
+  const [contextMenu, setContextMenu] = useState(null);
+
+  const blockRefs = useRef({});
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    window.addEventListener('click', handleClick);
+    return () => window.removeEventListener('click', handleClick);
+  }, []);
+
+  useEffect(() => {
+      if (group) {
+        const events = group.events || [];
+        const sortedEvents = [...events].sort((a, b) => new Date(a.start) - new Date(b.start));
+
+        const arrival = sortedEvents.length > 0 ? sortedEvents[0].start : group.startDate;
+        const departure = sortedEvents.length > 0 ? sortedEvents[sortedEvents.length - 1].end : group.endDate;
+
+        const isLodging = new Date(group.startDate).toDateString() !== new Date(group.endDate).toDateString();
+        const type = isLodging ? 'אירוח ולינה' : 'יום עיון';
+
+        setHeaderDetails({ arrival, departure, type });
+      }
+  }, [group]);
+
+  useEffect(() => {
+    if (!group) { fetchGroups(); }
+    else if (group.priceQuote?.blocks && group.priceQuote.blocks.length > 0) {
+        setBlocks(group.priceQuote.blocks);
+    } else {
+        initializeDefaultQuote(group);
+    }
+  }, [group]);
+
+  useLayoutEffect(() => {
+    if (!blocks.length) return;
+
+    const newPages = [];
+    let currentPage = [];
+    let currentHeight = 350; 
+
+    blocks.forEach((block) => {
+        const element = blockRefs.current[block.id];
+        const blockHeight = element ? element.offsetHeight + 30 : 100;
+
+        if (currentHeight + blockHeight > CONTENT_HEIGHT) {
+            newPages.push(currentPage);
+            currentPage = [block];
+            currentHeight = 150 + blockHeight; 
+        } else {
+            currentPage.push(block);
+            currentHeight += blockHeight;
+        }
+    });
+
+    if (currentPage.length > 0) newPages.push(currentPage);
+
+    // בדיקה אם יש מקום לחתימה בעמוד האחרון
+    const signatureHeight = 200; 
+    if (newPages.length > 0 && currentHeight + signatureHeight > A4_HEIGHT_PX) {
+        newPages.push([]); 
+    }
+
+    if (JSON.stringify(newPages.map(p => p.map(b => b.id))) !== JSON.stringify(paginatedPages.map(p => p.map(b => b.id)))) {
+        setPaginatedPages(newPages);
+    }
+  }, [blocks, paginatedPages.length]);
+
+  const initializeDefaultQuote = (groupData) => {
+    const isLodging = new Date(groupData.startDate).toDateString() !== new Date(groupData.endDate).toDateString();
+    const quoteType = isLodging ? 'אירוח ולינה' : 'יום עיון';
+
+    const defaultTopNotes = `<b>תנאי האירוח:</b><br>
+• קפה / תה רץ ושתייה קרה (מים ותפוזים) לאורך היום - בכל זמן הנופש סמוך לאולם הפעילות.<br>
+• כיבוד קל בהגעה, עוגות ומאפים.<br>
+• ארוחת צהריים בשרית לפי החלטת המלון.<br>
+• אפשרויות חניה - חינם.<br>
+• המלון כולו נמצא בכל ימות השנה בהשגחת בד"ץ העדה החרדית ירושלים.`;
+
+    const defaultBottomNotes = `<b>המחירים כוללים מע"מ והם נט למלון.</b><br>
+<b>ההזמנה תכנס לתוקף רק לאחר חתימה על חוזה זה ושליחה למייל חזרה.</b><br>
+<br>
+<b>תנאי תשלום וביטול:</b><br>
+• <b>התשלום: ביום ההגעה באשראי או יומיים לפני האירוח בהעברה בנקאית.</b><br>
+• פרטי בנק: בנק פועלים סניף 655, מס' חשבון 444574.<br>
+• ניתן לעדכן מס' סופי של המשתתפים עד 48 שעות לפני מועד ההגעה, אך לא יפחת ממספר המשתתפים המקורי בהסכם.<br>
+• ביטול ההזמנה מיום החתימה ועד 14 יום מיום ההגעה - ייגבה תשלום של 50% מעלות ההזמנה.<br>
+• ביטול ההזמנה בתוך 7-14 ימים מתאריך ההגעה - ייגבה תשלום של 75% מעלות ההזמנה.<br>
+• ביטול ההזמנה בתוך 7 ימים מיום ההגעה - ייגבה תשלום של 100% מעלות ההזמנה.<br>
+<br>
+<b>הערות נוספות:</b><br>
+• קבוצה המונה פחות מ-50 איש - עלות אולם פעילות 1000 ₪.<br>
+• יש להשאיר צ'ק פיקדון ע"ס 5,000 ₪ לכל נזק שייגרם.<br>
+• הצעת מחיר תקפה ל-3 ימים.`;
+
+    setBlocks([
+      { id: 'text-top', type: 'text', content: defaultTopNotes },
+      {
+        id: 'table-main',
+        type: 'table',
+        title: 'עלויות:',
+        headers: [
+            { title: 'פירוט', width: 55 },
+            { title: 'מחיר יחידה', width: 15 },
+            { title: 'כמות', width: 10 },
+            { title: 'סה"כ', width: 20 }
+        ],
+        rows: [[`חבילת ${quoteType} - ${groupData.name}`, '0', groupData.pax?.toString() || '0', '0']]
+      },
+      { id: 'text-bottom', type: 'text', content: defaultBottomNotes }
+    ]);
+  };
+
+  const addBlock = (index, type) => {
+    const newBlock = type === 'text'
+        ? { id: crypto.randomUUID(), type: 'text', content: 'הקלד טקסט כאן...' }
+        : {
+            id: crypto.randomUUID(),
+            type: 'table',
+            title: 'טבלה חדשה',
+            headers: [{ title: 'כותרת', width: 50 }, { title: 'כותרת', width: 50 }],
+            rows: [['', '']]
+          };
+    const newBlocks = [...blocks];
+    if (index === -1) newBlocks.unshift(newBlock);
+    else newBlocks.splice(index + 1, 0, newBlock);
+    setBlocks(newBlocks);
+  };
+
+  const removeBlock = (id) => {
+    if(confirm('למחוק את החלק הזה?')) setBlocks(blocks.filter(b => b.id !== id));
+  };
+
+  const updateBlock = (id, updates) => {
+    setBlocks(blocks.map(b => b.id === id ? { ...b, ...updates } : b));
+  };
+
+  const handleContextMenu = (e, type, blockId, rowIndex = null, colIndex = null) => {
+      e.preventDefault();
+      e.stopPropagation(); 
+      setContextMenu({
+          visible: true,
+          x: e.clientX,
+          y: e.clientY,
+          type,
+          blockId,
+          rowIndex,
+          colIndex
+      });
+  };
+
+  const executeAction = (action) => {
+      const { blockId, rowIndex, colIndex } = contextMenu;
+      const block = blocks.find(b => b.id === blockId);
+
+      if (['bold', 'italic', 'underline', 'justifyLeft', 'justifyCenter', 'justifyRight', 'insertUnorderedList', 'insertOrderedList'].includes(action)) {
+          document.execCommand(action, false, null);
+      }
+
+      if (block && block.type === 'table') {
+          let newRows = [...block.rows];
+          let newHeaders = [...block.headers];
+
+          switch (action) {
+              case 'addRowAbove':
+                  newRows.splice(rowIndex, 0, new Array(block.headers.length).fill(''));
+                  updateBlock(blockId, { rows: newRows });
+                  break;
+              case 'addRowBelow':
+                  newRows.splice(rowIndex + 1, 0, new Array(block.headers.length).fill(''));
+                  updateBlock(blockId, { rows: newRows });
+                  break;
+              case 'deleteRow':
+                  newRows.splice(rowIndex, 1);
+                  if (newRows.length === 0) newRows.push(new Array(block.headers.length).fill('')); 
+                  updateBlock(blockId, { rows: newRows });
+                  break;
+              case 'addColRight': 
+                  const width = Math.floor(100 / (newHeaders.length + 1));
+                  newHeaders.forEach(h => h.width = width);
+                  newHeaders.splice(colIndex, 0, { title: 'חדש', width });
+                  newRows = newRows.map(r => {
+                      const nr = [...r];
+                      nr.splice(colIndex, 0, '');
+                      return nr;
+                  });
+                  updateBlock(blockId, { headers: newHeaders, rows: newRows });
+                  break;
+               case 'addColLeft':
+                  const width2 = Math.floor(100 / (newHeaders.length + 1));
+                  newHeaders.forEach(h => h.width = width2);
+                  newHeaders.splice(colIndex + 1, 0, { title: 'חדש', width: width2 });
+                  newRows = newRows.map(r => {
+                      const nr = [...r];
+                      nr.splice(colIndex + 1, 0, '');
+                      return nr;
+                  });
+                  updateBlock(blockId, { headers: newHeaders, rows: newRows });
+                  break;
+              case 'deleteCol':
+                  if (newHeaders.length <= 1) return;
+                  newHeaders.splice(colIndex, 1);
+                  const newW = Math.floor(100 / newHeaders.length);
+                  newHeaders.forEach(h => h.width = newW);
+                  newRows = newRows.map(r => r.filter((_, i) => i !== colIndex));
+                  updateBlock(blockId, { headers: newHeaders, rows: newRows });
+                  break;
+          }
+      }
+      setContextMenu(null);
+  };
+
+  const tableActions = {
+      updateCell: (blockId, rIdx, cIdx, val) => {
+          const block = blocks.find(b => b.id === blockId);
+          const newRows = [...block.rows];
+          newRows[rIdx][cIdx] = val;
+          updateBlock(blockId, { rows: newRows });
+      },
+      updateHeaderTitle: (blockId, cIdx, val) => {
+          const block = blocks.find(b => b.id === blockId);
+          const newHeaders = [...block.headers];
+          newHeaders[cIdx].title = val;
+          updateBlock(blockId, { headers: newHeaders });
+      },
+      updateHeaderWidth: (blockId, cIdx, val) => {
+          const block = blocks.find(b => b.id === blockId);
+          const newHeaders = [...block.headers];
+          newHeaders[cIdx].width = Number(val);
+          updateBlock(blockId, { headers: newHeaders });
+      }
+  };
+
+  const handleGeneratePDF = async () => {
+    if (!containerRef.current || isDownloading) return;
+    setIsDownloading(true);
+    const toastId = toast.loading('מייצר PDF...');
+
+    try {
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pageElements = containerRef.current.querySelectorAll('.quote-page');
+
+        for (let i = 0; i < pageElements.length; i++) {
+            const canvas = await html2canvas(pageElements[i], { 
+                scale: 2, 
+                useCORS: true, 
+                backgroundColor: '#ffffff',
+                logging: false,
+                ignoreElements: (el) => el.classList.contains('no-print')
+            });
+            const imgData = canvas.toDataURL('image/jpeg', 1.0);
+            if (i > 0) pdf.addPage();
+            pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+        }
+
+        pdf.save(`הצעת_מחיר_${group.name}.pdf`);
+        toast.success('הקובץ נוצר!', { id: toastId });
+    } catch (err) {
+        console.error(err);
+        toast.error('שגיאה ביצירת הקובץ', { id: toastId });
+    } finally {
+        setIsDownloading(false);
+    }
+  };
+
+  const handleSave = async () => {
+      if(!group) return;
+      await updateGroup(group._id, { priceQuote: { blocks, lastUpdated: new Date() }});
+      toast.success("נשמר בשרת");
+  };
+
+  const getFormattedDateString = () => {
+    if (!group?.startDate || !group?.endDate) return "";
+    const start = new Date(group.startDate);
+    const end = new Date(group.endDate);
+    const hebrewYear = getHebrewYear(start);
+    const sD = String(start.getDate()).padStart(2, '0');
+    const sM = String(start.getMonth()+1).padStart(2, '0');
+    return `${start.toDateString() === end.toDateString() ? sD+'/'+sM : '...'} ${hebrewYear}`;
+  };
+
+  if (!group) return <div className="flex justify-center pt-20">טוען נתונים...</div>;
+
+  return (
+    <div className="min-h-screen bg-slate-100 py-10 font-sans text-slate-800">
+      <style>{printStyles}</style>
+
+      {/* תפריט הקשר */}
+      {contextMenu && (
+          <RichTextMenu 
+            position={contextMenu} 
+            onClose={() => setContextMenu(null)} 
+            onAction={executeAction}
+            type={contextMenu.type}
+          />
+      )}
+
+      {/* סרגל כלים עליון */}
+      <div className="fixed top-0 left-0 w-full bg-white z-50 shadow-sm border-b h-16 flex items-center justify-between px-8 no-print">
+         <div className="font-bold text-gray-700 text-lg flex items-center gap-2">
+             <FileDown className="text-amber-500"/> מחולל הצעות
+         </div>
+         <div className="flex gap-3">
+             <button onClick={handleSave} className="flex items-center gap-2 bg-slate-100 text-slate-700 border px-4 py-2 rounded hover:bg-slate-200 font-bold text-sm"><Save size={16}/> שמור</button>
+             <button onClick={handleGeneratePDF} disabled={isDownloading} className="flex items-center gap-2 bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 font-bold text-sm shadow-sm">
+                 {isDownloading ? <LoaderCircle className="animate-spin" size={16}/> : <FileDown size={16}/>} הורד PDF
+             </button>
+             <button onClick={() => window.print()} className="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded hover:bg-slate-900 font-bold text-sm shadow-sm"><Printer size={16}/> הדפס</button>
+         </div>
+      </div>
+
+      <div className="flex flex-col items-center gap-8 mt-10" ref={containerRef}>
+
+        {paginatedPages.map((pageBlocks, pageIndex) => (
+            <div key={pageIndex} className="quote-page bg-white w-[210mm] h-[297mm] relative shadow-2xl p-[15mm] flex flex-col mx-auto">
+
+                {pageIndex === 0 ? (
+                    <header className="border-b-[3px] pb-4 mb-6" style={{ borderColor: GOLD }}>
+                        <div className="flex justify-between items-start">
+                            {/* פרטי הקבוצה מימין */}
+                            <div className="text-right pt-2 w-[55%]">
+                                <div className="text-sm font-serif mb-2 text-gray-500">בס"ד</div>
+                                <h2 className="text-2xl font-bold mb-2 text-slate-900">לכבוד: {group.name}</h2>
+                                <div className="text-slate-700 text-base space-y-1 mb-4">
+                                    <div className="font-medium">{group.contactPerson?.name}</div>
+                                    <div>{group.contactPerson?.phone}</div>
+                                    <div>{group.contactPerson?.email}</div>
+                                </div>
+                                {/* פרטי הגעה/עזיבה */}
+                                <div className="mt-2 text-sm space-y-1">
+                                    <div className="text-slate-900"><span className="font-bold">סוג פעילות:</span> {headerDetails.type}</div>
+                                    <div className="text-slate-900"><span className="font-bold">הגעה:</span> {formatEventDateDayHebrew(headerDetails.arrival)}</div>
+                                    <div className="text-slate-900"><span className="font-bold">עזיבה:</span> {formatEventDateDayHebrew(headerDetails.departure)}</div>
+                                </div>
+                            </div>
+
+                            {/* לוגו משמאל */}
+                            <div className="text-left w-[45%] flex flex-col items-end">
+                                <img src="/opo.png" alt="Logo" className="h-32 object-contain mb-3" />
+                            </div>
+                        </div>
+                        <div className="text-center mt-4">
+                            <h1 className="text-5xl font-bold mb-4 inline-block pb-1" style={{ color: GOLD, borderColor: GOLD }}>הצעת מחיר</h1>
+                            <div className="text-lg font-medium">
+                                 מינימום משתתפים: {group.minPax || group.pax || 0}
+                            </div>
+                        </div>
+                    </header>
+                ) : (
+                    <div className="border-b mb-6 pb-2 flex justify-between text-gray-400 text-xs uppercase tracking-wider">
+                        <span>המשך הצעה: {group.name}</span>
+                        <span>עמוד {pageIndex + 1}</span>
+                    </div>
+                )}
+
+                <div className="flex-grow flex flex-col">
+                    {pageIndex === 0 && pageBlocks.length === 0 && (
+                        <Inserter onAddText={() => addBlock(-1, 'text')} onAddTable={() => addBlock(-1, 'table')} />
+                    )}
+
+                    {pageBlocks.map((block) => {
+                        const realIndex = blocks.findIndex(b => b.id === block.id);
+                        return (
+                            <div key={block.id} ref={el => blockRefs.current[block.id] = el} className="relative group/block mb-4 transition-all">
+                                <button onClick={() => removeBlock(block.id)} className="absolute -right-10 top-0 text-gray-300 hover:text-red-500 no-print opacity-0 group-hover/block:opacity-100 transition-opacity p-2"><Trash2 size={16}/></button>
+
+                                {block.type === 'text' ? (
+                                    <div
+                                        contentEditable
+                                        onContextMenu={(e) => handleContextMenu(e, 'text', block.id)}
+                                        dangerouslySetInnerHTML={{ __html: block.content }}
+                                        onBlur={(e) => updateBlock(block.id, { content: e.target.innerHTML })}
+                                        className="w-full min-h-[2em] outline-none border border-transparent hover:border-blue-200 focus:border-blue-400 p-2 rounded transition-colors text-sm leading-relaxed whitespace-pre-wrap"
+                                    />
+                                ) : (
+                                    <div className="w-full border border-transparent hover:border-amber-200 rounded p-1 transition-colors relative group/table">
+                                        <div className="no-print absolute -top-5 left-0 text-[10px] text-gray-400 bg-white border px-2 rounded opacity-0 group-hover/table:opacity-100 transition-opacity flex items-center gap-1">
+                                            <MousePointerClick size={10}/> לחיצה ימנית לעריכה מתקדמת
+                                        </div>
+
+                                        <div className="flex justify-between items-end mb-2">
+                                            <input
+                                                value={block.title || ''}
+                                                onChange={(e) => updateBlock(block.id, { title: e.target.value })}
+                                                className="font-bold text-slate-700 text-base bg-transparent border-b border-transparent hover:border-gray-300 focus:border-amber-500 outline-none px-1 w-full"
+                                                placeholder="כותרת טבלה..."
+                                            />
+                                        </div>
+
+                                        <table className="w-full border-collapse table-fixed">
+                                            <thead>
+                                                <tr className="bg-white text-slate-700 border-b border-t border-slate-300" style={{ borderTopColor: GOLD, borderTopWidth: '2px' }}>
+                                                    {block.headers.map((h, idx) => (
+                                                        <th 
+                                                            key={idx} 
+                                                            className="border-l border-slate-200 p-2 align-bottom relative group/th bg-gray-50" 
+                                                            style={{ width: `${h.width}%` }}
+                                                            onContextMenu={(e) => handleContextMenu(e, 'table', block.id, -1, idx)}
+                                                        >
+                                                            <div 
+                                                                contentEditable
+                                                                suppressContentEditableWarning
+                                                                onBlur={(e) => tableActions.updateHeaderTitle(block.id, idx, e.target.innerText)}
+                                                                className="w-full bg-transparent text-center font-bold text-sm outline-none whitespace-normal break-words min-h-[1.5em]"
+                                                            >
+                                                                {h.title}
+                                                            </div>
+                                                            <div className="flex items-center justify-center gap-1 no-print opacity-0 group-hover/th:opacity-100 transition-opacity bg-white absolute top-full left-0 w-full z-10 shadow border p-1 rounded mt-1">
+                                                                <input type="number" value={h.width} onChange={(e) => tableActions.updateHeaderWidth(block.id, idx, e.target.value)} className="w-8 text-[10px] text-center border rounded bg-gray-50"/>
+                                                                <span className="text-[10px]">%</span>
+                                                            </div>
+                                                        </th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {block.rows.map((row, rIdx) => (
+                                                    <tr key={rIdx} className="border-b border-slate-200 hover:bg-slate-50">
+                                                        {row.map((cell, cIdx) => (
+                                                            <td 
+                                                                key={cIdx} 
+                                                                className="border-l border-slate-200 p-2 align-top relative"
+                                                                onContextMenu={(e) => handleContextMenu(e, 'table', block.id, rIdx, cIdx)}
+                                                            >
+                                                                <div
+                                                                    contentEditable
+                                                                    suppressContentEditableWarning
+                                                                    onBlur={(e) => tableActions.updateCell(block.id, rIdx, cIdx, e.target.innerText)}
+                                                                    className="w-full min-h-[1.5em] outline-none whitespace-pre-wrap text-sm"
+                                                                >{cell}</div>
+                                                            </td>
+                                                        ))}
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                                <div className="absolute -bottom-4 left-0 w-full flex justify-center opacity-0 group-hover/block:opacity-100 transition-opacity z-20">
+                                     <Inserter onAddText={() => addBlock(realIndex, 'text')} onAddTable={() => addBlock(realIndex, 'table')} />
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* אזור חתימה */}
+                {pageIndex === paginatedPages.length - 1 && (
+                    <div className="mt-auto pt-10 px-4 flex justify-between items-end pb-8 text-slate-800">
+                       <div className="text-right text-sm leading-relaxed">
+                           <div className="font-bold text-base" style={{ color: GOLD, borderColor: GOLD }}>בברכה,</div>
+                           <div className="font-bold text-base">שטערני דהאן</div>
+                           <div className="text-slate-600">08-8593775</div>
+                           <div className="font-bold text-slate-800 mt-1">ציפורי אירוח ואירועים בע"מ</div>
+                       </div>
+
+                       <div className="text-center">
+                           <div className="border-b border-black w-60 mb-2"></div>
+                           <div className="font-bold text-base" style={{ color: GOLD, borderColor: GOLD }}>חתימה וחותמת</div>
+                       </div>
+                    </div>
+                )}
+            </div> 
+        ))}
+
+        <div className="h-20"></div>
+      </div>
+    </div>
+  );
+};
+
+export default PriceQuoteGenerator;

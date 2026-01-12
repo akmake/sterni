@@ -22,6 +22,8 @@ import FullScheduleReportPage from '@/pages/FullScheduleReportPage'; // וודא
 import NotFoundPage from "@/pages/NotFoundPage";
 import ChatPage from './pages/ChatPage'; // וודא שהנתיב נכון
 import WhatsAppPage from './pages/WhatsAppPage'; // וודא שיצרת את הקובץ למעלה
+import PriceQuoteGenerator from './components/PriceQuoteGenerator'; // וודא שהנתיב תואם למיקום ששמרת
+
 
 export default function App() {
   return (
@@ -34,7 +36,7 @@ export default function App() {
         <Route path="register" element={<RegisterPage />} />
 
         <Route element={<ProtectedRoute />}>
-
+          <Route path="/groups/:groupId/quote" element={<PriceQuoteGenerator />} />
           <Route path="projects"       element={<ProjectsPage />}   />
           <Route path="projects/new"   element={<NewProjectPage />} />
           <Route path="projects/:id"   element={<ProjectPage />}    />

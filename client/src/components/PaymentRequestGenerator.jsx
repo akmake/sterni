@@ -227,7 +227,7 @@ const PaymentRequestGenerator = () => {
 בתאריך: <b>${dateHeb} (${dateGreg})</b>`;
 
     const bankDetails = `<b>בהעברה בנקאית לחשבוננו:</b><br>
-ע"ש צפורי אירוח ואירועים בע"מ<br>
+ע"ש ציפורי אירוח ואירועים בע"מ<br>
 מספר חשבון: 444574<br>
 בנק פועלים מס' 12<br>
 סניף 655 בני ברק<br>
@@ -436,7 +436,7 @@ const PaymentRequestGenerator = () => {
         formData.append('body', `מצורפת דרישת תשלום עבור ${group.name}.\n\nבברכה,\nצוות ציפורי.`);
 
         // 4. שליחה לשרת (יש ליצור את ה-Route הזה בצד שרת!)
-        await axios.post('/api/email/send-attachment', formData, {
+        await axios.post('/api/emails/send-attachment', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
             withCredentials: true // <--- הנה התיקון! זה אומר לו לשלוח את הקוקי של החיבור
         });
@@ -631,8 +631,8 @@ const PaymentRequestGenerator = () => {
                        <div className="text-right text-sm leading-relaxed">
                            <div className="font-bold text-base" style={{ color: GOLD, borderColor: GOLD }}>בברכה,</div>
                            <div className="font-bold text-base">שטערני דהאן</div>
-                           <div className="text-slate-600">ציפורי אירוח ואירועים בע"מ</div>
                            <div className="font-bold text-slate-800 mt-1">0548471446</div>
+                           <div className="text-slate-600">ציפורי אירוח ואירועים בע"מ</div>
                        </div>
                     </div>
                 )}

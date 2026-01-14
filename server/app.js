@@ -80,6 +80,7 @@ app.use('/api/auth', authRoutes);
 app.get('/api/csrf-token', rateLimiter, csrfProtection, (req, res) => {
   res.json({ csrfToken: req.csrfToken() });
 });
+app.use('/api/emails', emailRoutes); // זה הנתיב הישן שלך, שקול אם אתה עדיין צריך אותו
 
 // --- Protected Routes ---
 // כל מה שנמצא מתחת לשורה הזו דורש CSRF Token (הגנה למשתמשים בדפדפן)
@@ -88,7 +89,6 @@ app.use(csrfProtection);
 app.use('/api/projects', requireAuth, projectRoutes);
 app.use('/api/halls', requireAuth, hallRoutes);
 app.use('/api/groups', requireAuth, groupRoutes);
-app.use('/api/emails', emailRoutes); // זה הנתיב הישן שלך, שקול אם אתה עדיין צריך אותו
 app.use('/api/tasks', taskRoutes);
 
 // Error Handling

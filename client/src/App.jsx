@@ -1,4 +1,3 @@
-
 import { Routes, Route, Navigate } from "react-router-dom";
 
 import Layout from "@/components/Layout";
@@ -18,19 +17,22 @@ import GroupDetailsPage   from "@/pages/GroupDetailsPage";
 import KitchenReportPage  from "@/pages/KitchenReportPage"
 import EmailsPage         from './pages/EmailsPage';
 import TasksPage          from './pages/TasksPage';
-import FullScheduleReportPage from '@/pages/FullScheduleReportPage'; // וודא שהנתיב נכון
+import KitchenPrintPageA3 from './pages/KitchenPrintPageA3'; // וודא נתיב
+import FullScheduleReportPage from '@/pages/FullScheduleReportPage'; 
 import NotFoundPage from "@/pages/NotFoundPage";
-import ChatPage from './pages/ChatPage'; // וודא שהנתיב נכון
-import WhatsAppPage from './pages/WhatsAppPage'; // וודא שיצרת את הקובץ למעלה
-import PriceQuoteGenerator from './components/PriceQuoteGenerator'; // וודא שהנתיב תואם למיקום ששמרת
+import ChatPage from './pages/ChatPage'; 
+import WhatsAppPage from './pages/WhatsAppPage'; 
+import PriceQuoteGenerator from './components/PriceQuoteGenerator'; 
 import PaymentRequestGenerator from './components/PaymentRequestGenerator';
+
 export default function App() {
   return (
     <Routes>
+      {/* --- אזור האפליקציה הרגיל (עם תפריטים ועיצוב) --- */}
       <Route path="/" element={<Layout />}>
         
         <Route index element={<Navigate to="/tasks" replace />} />
-     
+      
         <Route path="login"    element={<LoginPage />}    />
         <Route path="register" element={<RegisterPage />} />
 
@@ -52,9 +54,13 @@ export default function App() {
           <Route path="/groups/:groupId/payment-request" element={<PaymentRequestGenerator />} />
         </Route>
 
-     
         <Route path="*" element={<NotFoundPage />} />
       </Route>
+
+      {/* --- אזור ההדפסה והדפים החיצוניים (ללא Layout!) --- */}
+      {/* שים לב: זה נמצא מחוץ ל-Route שסוגר את ה-Layout */}
+      <Route path="/print/kitchen-a3" element={<KitchenPrintPageA3 />} />
+
     </Routes>
   );
 }

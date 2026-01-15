@@ -4,19 +4,10 @@ import { startOfWeek, endOfWeek, addDays, subDays, parseISO } from 'date-fns';
 import { CalendarDays, LayoutList, Layers, ArrowRight, ArrowLeft, Printer, Utensils } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
-// ייבוא הקבצים החדשים
-import { cx, heDate, getMealRank } from './KitchenReport/kitchenUtils';
+// ייבוא הקבצים המקוריים
+import { cx, heDate } from './KitchenReport/kitchenUtils'; // הסרתי את getMealRank שאינו בשימוש יותר למיון
 import KitchenPrintView from './KitchenReport/KitchenPrintView';
 import KitchenScreenView from './KitchenReport/KitchenScreenView';
-
-const getMealRankFn = (type) => {
-  if (!type) return 4;
-  const t = type.toLowerCase();
-  if (t === 'breakfast' || t.includes('בוקר')) return 1;
-  if (t === 'lunch' || t.includes('צהרים') || t.includes('צהריים')) return 2;
-  if (t === 'dinner' || t.includes('ערב')) return 3;
-  return 4;
-};
 
 export default function KitchenReportPage() {
   const { groups, fetchGroups } = useGroupsStore();
@@ -88,9 +79,12 @@ export default function KitchenReportPage() {
       const h = Number(hRaw);
       const m = Number(mRaw);
 
+      // --- לוגיקת יום עסקים: שעות 00:00-05:59 שייכות ליום הקודם ---
       if (h < 6) eventDate = subDays(eventDate, 1);
 
+      // חישוב ערך למיון: שעות הלילה (0-5) מקבלות "קנס" של 24 שעות כדי שיופיעו בסוף
       const sortValue = (h < 6 ? h + 24 : h) * 60 + (Number.isFinite(m) ? m : 0);
+      
       const processedEvent = { ...event, sortValue, _businessDate: eventDate };
       
       const dateKey = eventDate.toDateString();
@@ -106,11 +100,10 @@ export default function KitchenReportPage() {
       }
     }
 
+    // --- תיקון המיון: אך ורק לפי שעות (sortValue) ---
     Object.keys(dailyMap).forEach((k) => {
       dailyMap[k].sort((a, b) => {
-        const rankA = getMealRankFn(a.mealType);
-        const rankB = getMealRankFn(b.mealType);
-        if (rankA !== rankB) return rankA - rankB; 
+        // הסרתי את המיון לפי סוג ארוחה (rank)
         return (a.sortValue ?? 0) - (b.sortValue ?? 0);
       });
     });
@@ -141,38 +134,28 @@ export default function KitchenReportPage() {
     return Object.values(dailyMap).some((arr) => arr.length > 0);
   }, [dailyMap]);
 
+  // --- הפונקציה לפתיחת חלון A3 החדש ---
+  const handlePrintA3 = () => {
+    const dataToPrint = {
+      weekDays,       
+      dailyMap,       
+      weekRangeText
+    };
+    
+    localStorage.setItem('kitchenPrintData', JSON.stringify(dataToPrint));
+    window.open('/print/kitchen-a3', '_blank');
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 dir-rtl print:bg-white font-sans">
-      {/* כאן ההגדרה החשובה ל-A3 ולרוחב עבור דוח מטבח 
-      */}
       <style>{`
         @media print {
-          @page {
-            size: A3 landscape;
-            margin: 10mm;
-          }
-          html, body {
-            height: auto !important;
-            overflow: visible !important;
-          }
-          #__next, #root {
-            height: auto !important;
-            overflow: visible !important;
-          }
-          main {
-            height: auto !important;
-            overflow: visible !important;
-          }
-          * {
-            box-shadow: none !important;
-            text-shadow: none !important;
-            filter: none !important;
-          }
-          body {
-            background: #fff !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-          }
+          @page { size: A3 landscape; margin: 10mm; }
+          html, body { height: auto !important; overflow: visible !important; }
+          #__next, #root { height: auto !important; overflow: visible !important; }
+          main { height: auto !important; overflow: visible !important; }
+          * { box-shadow: none !important; text-shadow: none !important; filter: none !important; }
+          body { background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .print-only { display: block !important; }
           .screen-only { display: none !important; }
           .print-break-avoid { break-inside: avoid; page-break-inside: avoid; }
@@ -233,8 +216,9 @@ export default function KitchenReportPage() {
                 </Button>
               </div>
 
-              <Button onClick={() => window.print()} className="bg-slate-900 text-white gap-2 shadow-sm hover:bg-slate-800">
-                <Printer size={18} /> הדפס (A3)
+              {/* הכפתור שמפעיל את החלון החדש */}
+              <Button onClick={handlePrintA3} className="bg-slate-900 text-white gap-2 shadow-sm hover:bg-slate-800">
+                <Printer size={18} /> הדפס (חלון A3)
               </Button>
             </div>
           </div>
@@ -262,9 +246,8 @@ export default function KitchenReportPage() {
         </div>
       </div>
 
-      {/* CONTENT WRAPPER */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 print:max-w-none print:px-6 print:py-4">
-        {/* --- קריאה לקומפוננטת הדפסה --- */}
+        {/* קומפוננטות התצוגה הרגילות (לא קשורות להדפסת ה-Popup) */}
         <KitchenPrintView 
           loading={loading} 
           hasAnyData={hasAnyData} 
@@ -274,8 +257,6 @@ export default function KitchenReportPage() {
           weekDays={weekDays}
           groupMap={groupMap}
         />
-
-        {/* --- קריאה לקומפוננטת מסך --- */}
         <KitchenScreenView 
           loading={loading}
           hasAnyData={hasAnyData}

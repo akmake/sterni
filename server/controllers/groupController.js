@@ -98,9 +98,6 @@ export const addEventToGroup = async (req, res, next) => {
             }
           }
         });
-        if (conflict) {
-          return next(new AppError(`האולם תפוס ע"י קבוצה אחרת: ${conflict.name}`, 409));
-        }
     }
 
     const group = await Group.findById(groupId);

@@ -199,7 +199,7 @@ export default function PrintableSchedule({ printPages, weekLabel }) {
                 </div>
               </div>
 
-              {/* --- Footer --- */}
+              {/* --- Fזooter --- */}
               <div className="avoid-break mt-auto pt-6 border-t border-gray-100 flex justify-between items-end text-[10px] text-gray-400 uppercase tracking-widest font-medium">
                 <div>הופק ע"י דהאן פתרונות טכנולוגים לעסקים• {new Date().toLocaleDateString('he-IL')}</div>
                 <div>

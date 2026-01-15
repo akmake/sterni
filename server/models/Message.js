@@ -15,6 +15,13 @@ const MessageSchema = new mongoose.Schema({
     type: String, 
     required: true 
   },
+  // --- התוספת היחידה שחייבים לגשר ---
+  source: {
+    type: String,
+    enum: ['email', 'whatsapp', 'web'], // web = נשלח מהאתר, email = הגיע ממייל, whatsapp = הגיע מוואצפ
+    default: 'email'
+  },
+  // -----------------------------------
   content: { 
     type: String, 
     default: '' 

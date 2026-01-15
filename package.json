@@ -18,12 +18,15 @@
   },
   "dependencies": {
     "@sendgrid/eventwebhook": "^8.0.0",
+    "@whiskeysockets/baileys": "^7.0.0-rc.9",
     "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",
     "imap-simple": "^5.1.0",
     "jspdf": "^4.0.0",
+    "mailparser": "^3.9.1",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.12",
+    "pino": "^10.2.0",
     "simple-parser": "^0.0.0"
   }
 }

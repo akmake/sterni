@@ -17,6 +17,7 @@ import projectRoutes from './routes/projectRoutes.js';
 import taskRoutes from './routes/taskRoutes.js';
 import emailRoutes from './routes/emailRoutes.js'; // הקוד הישן שלך
 import chatRoutes from './routes/chatRoutes.js';   // <--- הוסף את זה (הקובץ החדש שיצרנו)
+import { connectToWhatsApp } from './services/whatsappService.js';
 
 import rateLimiter from './middlewares/rateLimiter.js';
 import { requireAuth } from './middlewares/authMiddleware.js';
@@ -107,6 +108,7 @@ app.use((err, req, res, next) => {
 // הערה: אם אתה עובר מלא לשיטת ה-Webhook, ייתכן שלא תצטרך את startEmailListener
 // אבל אם אתה רוצה לשמור על המנגנון הישן במקביל, תשאיר את זה.
 startEmailListener(); 
+connectToWhatsApp();
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

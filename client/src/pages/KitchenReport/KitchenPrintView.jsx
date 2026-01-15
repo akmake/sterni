@@ -4,17 +4,77 @@ import { he } from 'date-fns/locale';
 import { Utensils } from 'lucide-react';
 import { MEAL_LABELS, heDate, getKosherMeta } from './kitchenUtils';
 
-export default function KitchenPrintView({ loading, hasAnyData, viewMode, weekRangeText, dailyMap, weekDays, groupMap }) {
-  
+export default function KitchenPrintView({
+  loading,
+  hasAnyData,
+  viewMode,
+  weekRangeText,
+  dailyMap,
+  weekDays,
+  groupMap,
+}) {
   // פונקציית עזר לסידור הערות בשורה אחת
   const renderNotes = (ev) => {
     const text = ev.requirements || ev.notes || '';
     if (!text) return '';
-    return text.toString().replace(/\n/g, ", ");
+    return text.toString().replace(/\n/g, ', ');
   };
 
   return (
     <div className="print-only">
+      {/* PRINT FIX: כללי הדפסה שמונעים "חיתוך" ומאפשרים שבירת עמוד תקינה */}
+      <style>{`
+        @media print {
+          /* אל תתן ל-layout לחתוך תוכן בהדפסה */
+          html, body {
+            height: auto !important;
+            overflow: visible !important;
+          }
+
+          /* אם יש קונטיינר עליון עם overflow/height קשיח, זה מציל בהרבה מקרים */
+          #root, #__next, .app, .layout, .page, .print-only {
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+          }
+
+          /* תאפשר שבירת עמוד בתוך סקשנים גדולים (הגורם הנפוץ ל"חיתוך") */
+          .print-section {
+            break-inside: auto !important;
+            page-break-inside: auto !important;
+          }
+
+          /* אבל תשמור שכותרת הסקשן לא תישאר לבד בסוף עמוד */
+          .print-section-header {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
+
+          /* טבלאות: מותר לשבור עמוד, אבל לא לשבור שורה באמצע */
+          table {
+            break-inside: auto !important;
+            page-break-inside: auto !important;
+          }
+          tr {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
+
+          /* כותרת טבלה חוזרת בכל עמוד (חשוב לטבלאות ארוכות) */
+          thead { display: table-header-group !important; }
+          tfoot { display: table-footer-group !important; }
+
+          /* שוליים (אופציונלי, אבל עוזר שלא "יילחץ" לקצה וייכנס לחיתוך) */
+          @page { margin: 12mm; }
+
+          /* צבעים בהדפסה (אופציונלי) */
+          body {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+        }
+      `}</style>
+
       <div className="border-b pb-3 mb-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -51,25 +111,25 @@ export default function KitchenPrintView({ loading, hasAnyData, viewMode, weekRa
             });
 
             return (
-              <div key={dateKey} className="print-break-avoid">
-                <div className="mb-2">
+              // חשוב: לא לשים "avoid" על כל הבלוק (זה מה שגורם לחיתוך)
+              <div key={dateKey} className="print-section">
+                {/* את ה-avoid שמים רק על הכותרת, כדי שלא תישבר מוזר */}
+                <div className="print-section-header mb-2">
                   <div className="text-base font-black">
                     {format(dayDate, 'EEEE', { locale: he })} — {heDate(dayDate)}
                   </div>
                   <div className="text-xs text-slate-700">אירועים: {dayEvents.length}</div>
                 </div>
-                
+
                 <table className="w-full text-[11px] border-collapse table-fixed">
                   <thead>
                     <tr>
                       <th className="border border-slate-400 p-1 text-right w-[70px]">שעה</th>
                       <th className="border border-slate-400 p-1 text-right w-[100px]">סוג ארוחה</th>
-                      {/* עמודה חדשה: קבוצה */}
                       <th className="border border-slate-400 p-1 text-right w-[120px]">קבוצה</th>
                       <th className="border border-slate-400 p-1 text-right w-[180px]">תפריט</th>
                       <th className="border border-slate-400 p-1 text-right w-[100px]">מיקום</th>
                       <th className="border border-slate-400 p-1 text-center w-[50px]">כמות</th>
-                      {/* עמודה חדשה: הערות */}
                       <th className="border border-slate-400 p-1 text-right">הערות</th>
                     </tr>
                   </thead>
@@ -87,7 +147,6 @@ export default function KitchenPrintView({ loading, hasAnyData, viewMode, weekRa
                           <td className="border border-slate-400 p-1">
                             {mealLabel} {kosher ? ` (${kosher})` : ''}
                           </td>
-                          {/* שם הקבוצה */}
                           <td className="border border-slate-400 p-1 font-bold text-blue-900 truncate">
                             {ev.groupName || '-'}
                           </td>
@@ -95,8 +154,9 @@ export default function KitchenPrintView({ loading, hasAnyData, viewMode, weekRa
                             {ev.smartMenu}
                           </td>
                           <td className="border border-slate-400 p-1 truncate">{loc}</td>
-                          <td className="border border-slate-400 p-1 font-bold text-center">{Number(ev.pax || 0)}</td>
-                          {/* הערות בשורה אחת */}
+                          <td className="border border-slate-400 p-1 font-bold text-center">
+                            {Number(ev.pax || 0)}
+                          </td>
                           <td className="border border-slate-400 p-1 text-xs text-gray-700">
                             {renderNotes(ev)}
                           </td>
@@ -129,13 +189,15 @@ export default function KitchenPrintView({ loading, hasAnyData, viewMode, weekRa
               });
 
               return (
-                <div key={groupName} className="print-break-avoid">
-                  <div className="flex items-baseline justify-between mb-2">
+                // חשוב: print-section מאפשר שבירה לעמוד חדש במקום חיתוך
+                <div key={groupName} className="print-section">
+                  <div className="print-section-header flex items-baseline justify-between mb-2">
                     <div className="text-base font-black">{groupName}</div>
                     <div className="text-xs">
                       סה״כ סועדים: <span className="font-black">{g.totalPax}</span>
                     </div>
                   </div>
+
                   <table className="w-full text-[11px] border-collapse table-fixed">
                     <thead>
                       <tr>
@@ -167,9 +229,11 @@ export default function KitchenPrintView({ loading, hasAnyData, viewMode, weekRa
                             </td>
                             <td className="border border-slate-400 p-1 font-bold">{ev.smartMenu}</td>
                             <td className="border border-slate-400 p-1 truncate">{loc}</td>
-                            <td className="border border-slate-400 p-1 font-bold text-center">{Number(ev.pax || 0)}</td>
+                            <td className="border border-slate-400 p-1 font-bold text-center">
+                              {Number(ev.pax || 0)}
+                            </td>
                             <td className="border border-slate-400 p-1 text-xs text-gray-700">
-                               {renderNotes(ev)}
+                              {renderNotes(ev)}
                             </td>
                           </tr>
                         );

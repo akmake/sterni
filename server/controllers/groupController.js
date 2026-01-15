@@ -11,7 +11,7 @@ export const getGroups = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// --- קבלת קבוצה בודדת (חדש - למקרה שתצטרך) ---
+// --- קבלת קבוצה בודדת ---
 export const getGroup = async (req, res, next) => {
   try {
     const group = await Group.findById(req.params.id || req.params.groupId).populate('schedule.hall');
@@ -58,7 +58,7 @@ export const updateGroupDetails = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
-// --- מחיקת קבוצה (התיקון שביקשת!) ---
+// --- מחיקת קבוצה ---
 export const deleteGroup = async (req, res, next) => {
   try {
     // מנסה למצוא את ה-ID גם אם קראת לו id וגם אם groupId בראוטים
@@ -81,7 +81,8 @@ export const addEventToGroup = async (req, res, next) => {
     const { groupId } = req.params;
     const { title, date, startTime, endTime, hall, requirements, pax, eventType, mealType, kosherType, locationText } = req.body;
 
-    // בדיקת חפיפות רק אם זה אירוע עם אולם פיזי
+    // --- ביטול בדיקת חפיפות בצד שרת (האזהרה תוצג בקליינט) ---
+    /*
     if (hall) {
         const conflict = await Group.findOne({
           _id: { $ne: groupId },
@@ -90,15 +91,19 @@ export const addEventToGroup = async (req, res, next) => {
               hall: hall,
               date: new Date(date),
               $or: [{
-                 $and: [
-                   { startTime: { $lt: endTime } },
-                   { endTime: { $gt: startTime } }
-                 ]
+                  $and: [
+                    { startTime: { $lt: endTime } },
+                    { endTime: { $gt: startTime } }
+                  ]
               }]
             }
           }
         });
+        if (conflict) {
+            return next(new AppError(`האולם תפוס ע"י קבוצה אחרת: ${conflict.name}`, 409));
+        }
     }
+    */
 
     const group = await Group.findById(groupId);
     if (!group) return next(new AppError('Group not found', 404));
@@ -122,7 +127,8 @@ export const updateGroupEvent = async (req, res, next) => {
     const { groupId, eventId } = req.params;
     const { title, date, startTime, endTime, hall, requirements, pax, eventType, mealType, kosherType, locationText } = req.body;
 
-    // בדיקת חפיפות (רק אם יש אולם)
+    // --- ביטול בדיקת חפיפות בצד שרת ---
+    /*
     if (hall) {
         const conflict = await Group.findOne({
           schedule: {
@@ -131,10 +137,10 @@ export const updateGroupEvent = async (req, res, next) => {
               hall: hall,
               date: new Date(date),
               $or: [{
-                 $and: [
-                   { startTime: { $lt: endTime } },
-                   { endTime: { $gt: startTime } }
-                 ]
+                  $and: [
+                    { startTime: { $lt: endTime } },
+                    { endTime: { $gt: startTime } }
+                  ]
               }]
             }
           }
@@ -143,6 +149,7 @@ export const updateGroupEvent = async (req, res, next) => {
            return next(new AppError(`האולם תפוס בשעות אלו ע"י: ${conflict.name}`, 409));
         }
     }
+    */
 
     // הכנת אובייקט העדכון
     const setFields = {
@@ -185,7 +192,7 @@ export const removeEventFromGroup = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// --- דוח מטבח (עם לוגיקה עסקית) ---
+// --- דוח מטבח ---
 export const getKitchenReport = async (req, res, next) => {
   try {
     const { startDate, endDate } = req.query;

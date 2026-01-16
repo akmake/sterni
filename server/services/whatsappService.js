@@ -13,11 +13,18 @@ const TARGET_EMAIL = process.env.TARGET_EMAIL_FOR_WHATSAPP;
 
 // הגדרת שירות המיילים (Transporter)
 const transporter = nodemailer.createTransport({
-    service: 'gmail', 
+    host: 'smtp.gmail.com', // מגדירים ידנית ולא service: gmail
+    port: 587,              // פורט שבדרך כלל פתוח בשרתים
+    secure: false,          // false עבור פורט 587
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
     },
+    tls: {
+        rejectUnauthorized: false, // מונע שגיאות תעודה בשרתים מסוימים
+        ciphers: 'SSLv3'
+    },
+    family: 4 // <--- קריטי!!! מכריח שימוש ב-IPv4 ומונע את ה-TIMEOUT
 });
 
 export let sock;

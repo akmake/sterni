@@ -149,11 +149,27 @@ export const connectToWhatsApp = async () => {
 
                 console.log(`📩 הודעה מ-${senderJid} (${messageType}). מעביר למייל...`);
 
+                const senderName = m.pushName || 'לא ידוע';
+
+                // --- העיצוב החדש (HTML) ---
+                // זה פותר את בעיית ה-RTL והעיצוב המיותר
+                const htmlContent = `
+                    <div dir="rtl" style="direction: rtl; text-align: right; font-family: Arial, sans-serif; color: #333; line-height: 1.5;">
+                        <div style="font-size: 12px; color: #888; margin-bottom: 8px;">
+                            ${senderName} (${senderJid})
+                        </div>
+
+                        <div style="font-size: 16px; white-space: pre-wrap; color: #000;">
+                            ${finalBodyText.replace(/\n/g, '<br>')}
+                        </div>
+                    </div>
+                `;
+
                 await transporter.sendMail({
-                    from: process.env.EMAIL_USER,
+                    from: `"אלי צפורי" <${process.env.EMAIL_USER}>`, // שם שולח יפה יותר
                     to: TARGET_EMAIL,
-                    subject: `WA_MSG: ${senderJid} [${today}]`, // שרשור לפי מספר + תאריך
-                    text: `הודעה מאת: ${m.pushName || 'Unknown'} (${senderJid})\n\n${finalBodyText}`,
+                    subject: `WA_MSG: ${senderJid} [${today}]`, // חייב להישאר זהה כדי שהשרשור יעבוד!
+                    html: htmlContent, // שימוש ב-html במקום text
                     attachments: attachments
                 });
             }

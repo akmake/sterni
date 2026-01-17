@@ -5,16 +5,11 @@ import { Contact } from '../models/Contact.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-// ייבוא הסוקט בצורה שתתעדכן בזמן אמת
 import { sock } from './whatsappService.js';
-
-// --- תוספות חובה לחיבור ל-DB (במקום process.env) ---
 import SystemConfig from '../models/SystemConfig.js';
 import EmailAccount from '../models/EmailAccount.js';
 import { decrypt } from '../utils/encryption.js';
-// --------------------------------------------------
 
-// --- הגדרת נתיב השמירה בתוך ה-CLIENT ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const UPLOADS_DIR = path.join(__dirname, '../../client/public/uploads');
@@ -25,68 +20,52 @@ if (!fs.existsSync(UPLOADS_DIR)){
 
 let connection = null;
 
-// פונקציית עזר לשליפת הגדרות החיבור מה-DB (במקום ה-const config הסטטי)
 const getImapConfig = async () => {
-    // 1. בדיקה איזה מייל מוגדר ל"תפעול"
     const sysConfig = await SystemConfig.findOne();
-    if (!sysConfig?.opsEmailId) throw new Error("לא הוגדר חשבון תפעול (Ops) בהגדרות");
-
-    // 2. שליפת פרטי החשבון והסיסמה
+    if (!sysConfig?.opsEmailId) throw new Error("לא הוגדר מייל תפעול ב-DB");
+    
     const account = await EmailAccount.findById(sysConfig.opsEmailId);
-    if (!account) throw new Error("חשבון המייל לא נמצא ב-DB");
+    if (!account) throw new Error("חשבון המייל לא נמצא");
 
     const password = decrypt({ content: account.encryptedPassword, iv: account.iv });
+    const host = account.host === 'smtp.gmail.com' ? 'imap.gmail.com' : account.host;
 
-    // 3. החזרת האובייקט בדיוק במבנה שהספרייה צריכה
     return {
         imap: {
             user: account.user,
             password: password,
-            host: 'imap.gmail.com', // השארתי קבוע כפי שהיה אצלך
+            host: host,
             port: 993,
             tls: true,
             authTimeout: 10000,
             tlsOptions: { rejectUnauthorized: false }
         },
-        userEmail: account.user // כדי לזהות את עצמנו בהמשך
+        systemEmail: account.user 
     };
 };
 
 // ==========================================
-// === 🧹 המטאטא: ניקוי כירורגי (שלך, ללא שינוי) ===
+// === 🧹 המטאטא ===
 // ==========================================
 const cleanEmailBody = (text) => {
     if (!text) return "";
     
-    const lines = text.split(/\r?\n/); // מפצל שורות (כולל תמיכה ב-Windows/Linux)
+    const lines = text.split(/\r?\n/);
     const cleanLines = [];
 
     for (let line of lines) {
-        // מנקה רווחים לבדיקה, אבל שומר על המקורי להדפסה
-        const trimmed = line.trim(); 
-
-        // 1. זיהוי שורת "בתאריך ... מאת ..." (כולל תווים נסתרים!)
-        // ה-Regex הזה תופס גם אם יש תווי כיוון (‫) לפני המילה "בתאריך"
-        if (/[‫\u200f\u202a-\u202e]*בתאריך.+מאת.+/.test(trimmed)) {
-            break; // עוצר הכל ברגע שמצאנו את השורה הזאת
-        }
-
-        // 2. זיהוי אנגלית (On ... wrote:)
+        let trimmed = line.trim(); 
+        
+        // לוגיקת הניקוי הקיימת
+        if (trimmed.includes("On ") && trimmed.includes(" at ") && (trimmed.includes("wrote") || trimmed.includes("<"))) break; 
         if (/^On .* wrote:$/i.test(trimmed)) break;
-
-        // 3. זיהוי Outlook/אחרים (From: ...)
+        if (trimmed.includes("בתאריך") && trimmed.includes("מאת")) break;
         if (/^From:\s/i.test(trimmed)) break;
-
-        // 4. קווים מפרידים (___ או ---)
         if (/^_{3,}/.test(trimmed)) break;
         if (/^-{3,}/.test(trimmed)) break;
-
-        // 5. ציטוטים (שורות שמתחילות ב->)
         if (trimmed.startsWith('>')) break;
-
-        // 6. חתימות נפוצות באייפון
-        if (/^Sent from my iPhone/i.test(trimmed)) continue;
-        if (/^נשלח מה-iPhone שלי/.test(trimmed)) continue;
+        if (trimmed.includes("Sent from my iPhone")) continue;
+        if (trimmed.includes("נשלח מה-iPhone שלי")) continue;
 
         cleanLines.push(line);
     }
@@ -94,29 +73,22 @@ const cleanEmailBody = (text) => {
     return cleanLines.join('\n').trim();
 };
 
-// ==========================================
-// === 🔌 חיבור והאזנה ===
-// ==========================================
-
 export const startEmailListener = async () => {
     try {
-        console.log("🔌 שואב פרטים מה-DB ומתחבר ל-Gmail IMAP...");
+        console.log("🔌 טוען הגדרות ומתחבר ל-IMAP...");
+        const config = await getImapConfig(); 
         
-        // שינוי 1: קבלת הקונפיגורציה מהפונקציה במקום מהמשתנה הסטטי
-        const dynamicConfig = await getImapConfig();
-        
-        connection = await imap.connect(dynamicConfig); // משתמשים ב-dynamicConfig
+        connection = await imap.connect(config);
         console.log("✅ מחובר! מאזין למיילים...");
 
         await connection.openBox('INBOX');
         
-        // שינוי 2: מעבירים את המייל של המערכת לפונקציה (במקום process.env.EMAIL_USER)
-        await checkForNewEmails(dynamicConfig.userEmail);
-        
-        setInterval(() => checkForNewEmails(dynamicConfig.userEmail), 10000);
+        await checkForNewEmails(config.systemEmail);
+        setInterval(() => checkForNewEmails(config.systemEmail), 10000);
 
         connection.on('error', (err) => {
             console.error('IMAP Connection Error:', err);
+            setTimeout(startEmailListener, 10000);
         });
 
     } catch (err) {
@@ -125,18 +97,17 @@ export const startEmailListener = async () => {
     }
 };
 
-// שינוי 3: הפונקציה מקבלת את systemUserEmail כפרמטר
-const checkForNewEmails = async (systemUserEmail) => {
+const checkForNewEmails = async (systemEmail) => {
     try {
         if (!connection) return;
 
+        // markSeen: false (לא לסמן כנקרא עד שלא נשלח בהצלחה!)
         const searchCriteria = ['UNSEEN'];
-        const fetchOptions = { bodies: ['HEADER', 'TEXT', ''], markSeen: true, struct: true };
+        const fetchOptions = { bodies: ['HEADER', 'TEXT', ''], markSeen: false, struct: true };
 
         const messages = await connection.search(searchCriteria, fetchOptions);
         if (messages.length === 0) return;
 
-        // שינוי 4: שליפת ה-TARGET EMAIL מה-DB
         const sysConfig = await SystemConfig.findOne();
         const TARGET_EMAIL = sysConfig?.targetWhatsAppEmail;
 
@@ -149,103 +120,105 @@ const checkForNewEmails = async (systemUserEmail) => {
             const fromEmail = parsed.from.value[0].address;
             const fromName = parsed.from.value[0].name || fromEmail.split('@')[0];
             const subject = parsed.subject || '';
-
-            // --- כאן אנחנו מנקים את המייל ---
-            const cleanContent = cleanEmailBody(parsed.text);
-
-            // =========================================================
-            // תרחיש א': גשר מייל -> וואטסאפ (Bridge Logic)
-            // =========================================================
             
-            // שינוי 5: שימוש במשתנים מה-DB במקום process.env
-            if ((fromEmail === TARGET_EMAIL || fromEmail === systemUserEmail) && subject.includes('WA_MSG:')) {
+            const cleanContent = cleanEmailBody(parsed.text);
+            let shouldMarkAsSeen = false;
+
+            // =========================================================
+            // לוגיקת הגשר (BRIDGE) + דיבוג מטורף
+            // =========================================================
+            if ((fromEmail === TARGET_EMAIL || fromEmail === systemEmail) && subject.includes('WA_MSG:')) {
                 
-                console.log(`🔄 BRIDGE: זוהה מייל להעברה לוואצפ: ${subject}`);
-                
+                console.log(`\n================= 🔍 DEBUG START =================`);
+                console.log(`📧 נושא: ${subject}`);
+                console.log(`📧 מאת: ${fromEmail}`);
+                console.log(`📝 תוכן גולמי (RAW) לפני ניקוי:`);
+                // JSON.stringify יראה לנו בדיוק איפה יש \n ואיפה יש תווים נסתרים
+                console.log(JSON.stringify(parsed.text)); 
+                console.log(`--------------------------------------------------`);
+                console.log(`🧹 תוכן אחרי ניקוי:`);
+                console.log(JSON.stringify(cleanContent));
+                console.log(`================= 🔍 DEBUG END ===================\n`);
+
+                if (!sock || !sock.user) {
+                    console.warn(`⏳ וואצאפ לא מחובר, מדלג...`);
+                    continue; 
+                }
+
                 const match = subject.match(/WA_MSG:\s*([0-9\-\+]+)/);
-                
                 if (match && match[1]) {
                     const phoneNumber = match[1].trim();
                     const remoteJid = `${phoneNumber}@s.whatsapp.net`;
 
-                    if (!sock) {
-                        console.error('❌ שגיאה: מנסה לשלוח לוואטסאפ אך אין חיבור פעיל');
-                        continue; 
-                    }
-
-                    // 1. שליחת טקסט נקי בלבד!
-                    if (cleanContent) {
-                        await sock.sendMessage(remoteJid, { text: cleanContent });
-                        console.log(`📤 נשלחה תשובה נקייה ל-${phoneNumber}`);
-                    }
-
-                    // 2. שליחת קבצים
-                    if (parsed.attachments && parsed.attachments.length > 0) {
-                        for (const attachment of parsed.attachments) {
-                            let msgPayload = {};
-
-                            if (attachment.contentType.startsWith('image/')) {
-                                msgPayload = { image: attachment.content, caption: attachment.filename };
-                            } else if (attachment.contentType.startsWith('video/')) {
-                                msgPayload = { video: attachment.content, caption: attachment.filename };
-                            } else if (attachment.contentType.startsWith('audio/')) {
-                                msgPayload = { audio: attachment.content, mimetype: 'audio/mp4', ptt: true };
-                            } else {
-                                msgPayload = { 
-                                    document: attachment.content,
-                                    mimetype: attachment.contentType,
-                                    fileName: attachment.filename
-                                };
-                            }
-                            await sock.sendMessage(remoteJid, msgPayload);
+                    try {
+                        if (cleanContent && cleanContent.length > 0) {
+                            await sock.sendMessage(remoteJid, { text: cleanContent });
+                            console.log(`📤 נשלחה תשובה ל-${phoneNumber}`);
+                        } else {
+                            console.log(`⚠️ התוכן ריק אחרי ניקוי (אולי נשלח רק קובץ?)`);
                         }
+
+                        if (parsed.attachments && parsed.attachments.length > 0) {
+                            for (const attachment of parsed.attachments) {
+                                let msgPayload = {};
+                                if (attachment.contentType.startsWith('image/')) msgPayload = { image: attachment.content, caption: attachment.filename };
+                                else if (attachment.contentType.startsWith('video/')) msgPayload = { video: attachment.content, caption: attachment.filename };
+                                else if (attachment.contentType.startsWith('audio/')) msgPayload = { audio: attachment.content, mimetype: 'audio/mp4', ptt: true };
+                                else msgPayload = { document: attachment.content, mimetype: attachment.contentType, fileName: attachment.filename };
+                                await sock.sendMessage(remoteJid, msgPayload);
+                            }
+                        }
+                        
+                        shouldMarkAsSeen = true;
+
+                    } catch (waError) {
+                        console.error(`❌ שגיאה בשליחה לוואצאפ:`, waError.message);
                     }
+                } else {
+                     shouldMarkAsSeen = true;
                 }
-                continue; 
+            } 
+            // =========================================================
+            // לוגיקת CRM (ללא שינוי)
+            // =========================================================
+            else {
+                const ticketMatch = subject.match(/#(\d+)/);
+                if (ticketMatch) {
+                    const ticketId = ticketMatch[1];
+                    let fileUrl = null;
+                    let fileType = 'text';
+
+                    if (parsed.attachments && parsed.attachments.length > 0) {
+                        const attachment = parsed.attachments[0]; 
+                        const fileName = `${Date.now()}-${attachment.filename.replace(/\s+/g, '_')}`;
+                        const savePath = path.join(UPLOADS_DIR, fileName);
+                        fs.writeFileSync(savePath, attachment.content);
+                        fileUrl = `/uploads/${fileName}`;
+
+                        if (attachment.contentType.startsWith('image/')) fileType = 'image';
+                        else if (attachment.contentType.startsWith('video/')) fileType = 'video';
+                        else fileType = 'file';
+                    }
+
+                    console.log(`📥 הודעה חדשה לטיקט ${ticketId}.`);
+
+                    await Message.create({
+                        ticketId, sender: 'client', clientEmail: fromEmail, clientName: fromName,
+                        content: parsed.text, type: fileType, fileUrl: fileUrl, isRead: false
+                    });
+
+                    await Contact.updateOne(
+                        { email: fromEmail }, { $set: { lastActive: new Date(), name: fromName } }, { upsert: true }
+                    );
+                }
+                shouldMarkAsSeen = true; 
             }
 
-            // =========================================================
-            // תרחיש ב': הודעת מערכת רגילה (Tickets / CRM)
-            // =========================================================
-            const ticketMatch = subject.match(/#(\d+)/);
-            if (!ticketMatch) continue; 
-
-            const ticketId = ticketMatch[1];
-            let fileUrl = null;
-            let fileType = 'text';
-
-            if (parsed.attachments && parsed.attachments.length > 0) {
-                const attachment = parsed.attachments[0]; 
-                const fileName = `${Date.now()}-${attachment.filename.replace(/\s+/g, '_')}`;
-                const savePath = path.join(UPLOADS_DIR, fileName);
-                fs.writeFileSync(savePath, attachment.content);
-                fileUrl = `/uploads/${fileName}`;
-
-                if (attachment.contentType.startsWith('image/')) fileType = 'image';
-                else if (attachment.contentType.startsWith('video/')) fileType = 'video';
-                else fileType = 'file';
+            if (shouldMarkAsSeen) {
+                await connection.addFlags(item.attributes.uid, ['\\Seen'], (err) => {
+                    if (err) console.error('Error marking as seen:', err);
+                });
             }
-
-            console.log(`📥 הודעה חדשה לטיקט ${ticketId}.`);
-
-            // הערה: ב-CRM אנחנו בדרך כלל שומרים את המקור (parsed.text)
-            // אבל אם גם שם אתה רוצה נקי, תחליף ל-cleanContent
-            await Message.create({
-                ticketId,
-                sender: 'client',
-                clientEmail: fromEmail,
-                clientName: fromName,
-                content: parsed.text, 
-                type: fileType,
-                fileUrl: fileUrl,
-                isRead: false
-            });
-
-            await Contact.updateOne(
-                { email: fromEmail }, 
-                { $set: { lastActive: new Date(), name: fromName } }, 
-                { upsert: true }
-            );
         }
     } catch (err) {
         console.error("❌ שגיאה ב-Listener:", err.message);

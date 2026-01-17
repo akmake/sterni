@@ -528,7 +528,7 @@ const PaymentRequestGenerator = () => {
                                 </div>
                             </div>
                             <div className="text-left w-[45%] flex flex-col items-end">
-                                <img src="/opo.png" alt="Logo" className="h-32 object-contain mb-3" />
+                                <img src="/pop.png" alt="Logo" className="h-32 object-contain mb-3" />
                             </div>
                         </div>
                         <div className="text-center mt-4">

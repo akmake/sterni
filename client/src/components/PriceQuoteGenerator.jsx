@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Save, Printer, Trash2, Table as TableIcon, Type, FileDown, LoaderCircle, Bold, Italic, Underline, AlignRight, AlignCenter, AlignLeft, List, ListOrdered, MousePointerClick } from 'lucide-react';
+import { Save, Printer, Trash2, Table as TableIcon, Type, FileDown, LoaderCircle, Bold, Italic, Underline, AlignRight, AlignCenter, AlignLeft, List, ListOrdered, MousePointerClick, Send, Mail } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
-import QuoteManager from './QuoteManager'; // <--- וודא שקובץ זה קיים בתיקייה
+import axios from 'axios';
+import QuoteManager from './QuoteManager'; // וודא שקובץ זה קיים
 
 // --- הגדרות A4 ---
 const A4_HEIGHT_PX = 1123;
@@ -68,7 +69,7 @@ const toGematria = (num) => {
 const formatEventDateDayHebrew = (dateInput) => {
     if (!dateInput) return '-';
     const date = new Date(dateInput);
-    if (isNaN(date.getTime())) return dateInput; // אם זה כבר טקסט חופשי
+    if (isNaN(date.getTime())) return dateInput; 
     
     const dayName = date.toLocaleDateString('he-IL', { weekday: 'long' });
     const parts = new Intl.DateTimeFormat('he-IL', { calendar: 'hebrew', day: 'numeric', month: 'long' }).formatToParts(date);
@@ -92,7 +93,7 @@ const Inserter = ({ onAddText, onAddTable }) => (
     </div>
 );
 
-// --- תפריט קליק ימני (Context Menu) ---
+// --- תפריט קליק ימני ---
 const RichTextMenu = ({ position, onClose, onAction, type }) => {
     if (!position) return null;
     return (
@@ -100,7 +101,6 @@ const RichTextMenu = ({ position, onClose, onAction, type }) => {
             className="fixed z-[9999] bg-white rounded-lg shadow-xl border border-gray-200 p-2 flex flex-col gap-1 w-56 text-sm text-right"
             style={{ top: position.y, left: position.x, direction: 'rtl' }}
         >
-            {/* כלי טקסט */}
             <div className="flex justify-between border-b pb-2 mb-1 gap-1">
                 <button onClick={() => onAction('bold')} className="p-1 hover:bg-gray-100 rounded" title="הדגשה"><Bold size={16}/></button>
                 <button onClick={() => onAction('italic')} className="p-1 hover:bg-gray-100 rounded" title="נטוי"><Italic size={16}/></button>
@@ -116,7 +116,6 @@ const RichTextMenu = ({ position, onClose, onAction, type }) => {
                 <button onClick={() => onAction('insertOrderedList')} className="p-1 hover:bg-gray-100 rounded w-full text-center flex justify-center"><ListOrdered size={16}/></button>
             </div>
    
-            {/* כלי טבלה */}
             {type === 'table' && (
                 <>
                     <div className="text-[10px] font-bold text-gray-400 mt-1">שורות</div>
@@ -135,7 +134,6 @@ const RichTextMenu = ({ position, onClose, onAction, type }) => {
 };
 
 const PriceQuoteGenerator = () => {
-  // ניהול State ידני לכל השדות
   const [clientName, setClientName] = useState('שם הלקוח / הקבוצה');
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
@@ -150,24 +148,24 @@ const PriceQuoteGenerator = () => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [contextMenu, setContextMenu] = useState(null);
   
+  // --- תוספות לשליחת מייל ---
+  const [targetEmail, setTargetEmail] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  
   const blockRefs = useRef({});
   const containerRef = useRef(null);
 
-  // סגירת תפריט קליק ימני בלחיצה בחוץ
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
     window.addEventListener('click', handleClick);
     return () => window.removeEventListener('click', handleClick);
   }, []);
 
-  // אתחול נתונים ראשוני
   useEffect(() => {
-    // אתחול תאריכים להיום
     const today = new Date();
     setArrivalDate(formatEventDateDayHebrew(today));
     setDepartureDate(formatEventDateDayHebrew(today));
 
-    // תוכן ברירת מחדל אם אין בלוקים
     const defaultTopNotes = `<b>תנאי האירוח:</b><br>
     • קפה / תה רץ ושתייה קרה (מים ותפוזים) לאורך היום - בכל זמן הנופש סמוך לאולם הפעילות.<br>
     • כיבוד קל בהגעה, עוגות ומאפים.<br>
@@ -209,13 +207,12 @@ const PriceQuoteGenerator = () => {
     ]);
   }, []);
 
-  // חישוב עמודים (Pagination)
   useLayoutEffect(() => {
     if (!blocks.length) return;
 
     const newPages = [];
     let currentPage = [];
-    let currentHeight = 350; // מקום לכותרת בעמוד הראשון
+    let currentHeight = 350; 
 
     blocks.forEach((block) => {
         const element = blockRefs.current[block.id];
@@ -224,7 +221,7 @@ const PriceQuoteGenerator = () => {
         if (currentHeight + blockHeight > CONTENT_HEIGHT) {
             newPages.push(currentPage);
             currentPage = [block];
-            currentHeight = 150 + blockHeight; // שוליים בעמוד חדש
+            currentHeight = 150 + blockHeight; 
         } else {
             currentPage.push(block);
             currentHeight += blockHeight;
@@ -233,7 +230,6 @@ const PriceQuoteGenerator = () => {
 
     if (currentPage.length > 0) newPages.push(currentPage);
 
-    // בדיקה אם יש מקום לחתימה בעמוד האחרון
     const signatureHeight = 200;
     if (newPages.length > 0 && currentHeight + signatureHeight > A4_HEIGHT_PX) {
         newPages.push([]);
@@ -244,7 +240,6 @@ const PriceQuoteGenerator = () => {
     }
   }, [blocks, paginatedPages.length]);
 
-  // --- ניהול הבלוקים ---
   const addBlock = (index, type) => {
     const newBlock = type === 'text'
         ? { id: crypto.randomUUID(), type: 'text', content: 'הקלד טקסט כאן...' }
@@ -357,10 +352,8 @@ const PriceQuoteGenerator = () => {
       }
   };
 
-// --- אינטגרציה למערכת שמירה ---
-
-// איסוף כל הנתונים לשמירה
-const dataToSave = {
+  // איסוף כל הנתונים לשמירה
+  const dataToSave = {
     clientName,
     contactName,
     contactPhone,
@@ -370,15 +363,17 @@ const dataToSave = {
     departureDate,
     minPax,
     blocks
-};
+  };
 
-// פונקציה לטעינת נתונים חזרה למסך
-const handleLoadData = (data) => {
+  const handleLoadData = (data) => {
     if (!data) return;
     if (data.clientName) setClientName(data.clientName);
     if (data.contactName) setContactName(data.contactName);
     if (data.contactPhone) setContactPhone(data.contactPhone);
-    if (data.contactEmail) setContactEmail(data.contactEmail);
+    if (data.contactEmail) {
+        setContactEmail(data.contactEmail);
+        setTargetEmail(data.contactEmail); // עדכון אוטומטי גם של שדה השליחה
+    }
     if (data.eventType) setEventType(data.eventType);
     if (data.arrivalDate) setArrivalDate(data.arrivalDate);
     if (data.departureDate) setDepartureDate(data.departureDate);
@@ -386,46 +381,54 @@ const handleLoadData = (data) => {
     if (data.blocks) setBlocks(data.blocks);
     
     toast.success('הצעה נטענה בהצלחה!');
-};
+  };
 
+  // --- פונקציה מרכזית ליצירת PDF (משמשת גם להורדה וגם לשליחה) ---
+  const createPDFDocument = async () => {
+    if (!containerRef.current) return null;
+    
+    const pdf = new jsPDF('p', 'mm', 'a4', true);
+    const pdfWidth = 210;
+    const pdfHeight = 297;
+    
+    const pageElements = containerRef.current.querySelectorAll('.quote-page');
 
-const handleGeneratePDF = async () => {
-    if (!containerRef.current || isDownloading) return;
+    for (let i = 0; i < pageElements.length; i++) {
+        const element = pageElements[i];
+
+        const dataUrl = await htmlToImage.toJpeg(element, {
+            quality: 0.75,
+            pixelRatio: 2, 
+            backgroundColor: '#ffffff',
+            width: 794, 
+            height: 1123, 
+            style: {
+                margin: 0,
+                transform: 'none', 
+                display: 'flex',
+                flexDirection: 'column'
+            },
+            filter: (node) => !node.classList?.contains('no-print')
+        });
+
+        if (i > 0) pdf.addPage();
+        pdf.addImage(dataUrl, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+    }
+    return pdf;
+  };
+
+  // --- הורדת PDF למחשב ---
+  const handleDownloadPDF = async () => {
+    if (isDownloading) return;
     setIsDownloading(true);
-    const toastId = toast.loading('מייצר PDF קליל...');
+    const toastId = toast.loading('מייצר PDF להורדה...');
 
     try {
-        const pdf = new jsPDF('p', 'mm', 'a4', true);
-        const pdfWidth = 210;
-        const pdfHeight = 297;
-        
-        const pageElements = containerRef.current.querySelectorAll('.quote-page');
-
-        for (let i = 0; i < pageElements.length; i++) {
-            const element = pageElements[i];
-
-            const dataUrl = await htmlToImage.toJpeg(element, {
-                quality: 0.75,
-                pixelRatio: 2, 
-                backgroundColor: '#ffffff',
-                width: 794, 
-                height: 1123, 
-                style: {
-                    margin: 0,
-                    transform: 'none', 
-                    display: 'flex',
-                    flexDirection: 'column'
-                },
-                filter: (node) => !node.classList?.contains('no-print')
-            });
-
-            if (i > 0) pdf.addPage();
-            pdf.addImage(dataUrl, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+        const pdf = await createPDFDocument();
+        if (pdf) {
+            pdf.save(`הצעת_מחיר_${clientName.replace(/[^a-zA-Z0-9א-ת]/g, '_')}.pdf`);
+            toast.success('הקובץ נוצר!', { id: toastId });
         }
-
-        pdf.save(`הצעת_מחיר_${clientName.replace(/[^a-zA-Z0-9א-ת]/g, '_')}.pdf`);
-        toast.success('הקובץ נוצר!', { id: toastId });
-
     } catch (err) {
         console.error("PDF Error:", err);
         toast.error('שגיאה ביצירת הקובץ', { id: toastId });
@@ -433,6 +436,42 @@ const handleGeneratePDF = async () => {
         setIsDownloading(false);
     }
   };
+
+  // --- שליחת PDF במייל ---
+  const handleSendEmail = async () => {
+    if (!targetEmail) {
+        toast.error('נא להזין כתובת מייל לשליחה');
+        return;
+    }
+    if (isSending) return;
+    
+    setIsSending(true);
+    const toastId = toast.loading('מייצר PDF ושולח למייל...');
+
+    try {
+        const pdf = await createPDFDocument();
+        const pdfBlob = pdf.output('blob');
+
+        const formData = new FormData();
+        formData.append('file', pdfBlob, `quote_${clientName.replace(/[^a-zA-Z0-9א-ת]/g, '_')}.pdf`);
+        formData.append('email', targetEmail);
+        formData.append('subject', `הצעת מחיר - ${clientName}`);
+        formData.append('body', `מצורפת הצעת מחיר עבור ${clientName}.\n\nבברכה,\nצוות ציפורי.`);
+
+        await axios.post('/api/emails/send-attachment', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            withCredentials: true
+        });
+        toast.success('המייל נשלח בהצלחה!', { id: toastId });
+
+    } catch (err) {
+        console.error(err);
+        toast.error('שגיאה בשליחה: ' + (err.response?.data?.message || err.message), { id: toastId });
+    } finally {
+        setIsSending(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 py-10 font-sans text-slate-800">
       <style>{printStyles}</style>
@@ -453,8 +492,27 @@ const handleGeneratePDF = async () => {
             <FileDown className="text-amber-500"/> מחולל הצעות
          </div>
          
+         {/* אזור שליחת מייל */}
+         <div className="flex items-center gap-2 bg-blue-50 px-3 py-1 rounded-md border border-blue-100 mx-4">
+            <Mail size={16} className="text-blue-500"/>
+            <input 
+                type="email" 
+                value={targetEmail}
+                onChange={(e) => setTargetEmail(e.target.value)}
+                placeholder="מייל לשליחה..."
+                className="bg-transparent text-sm outline-none w-48 text-blue-900 placeholder:text-blue-300"
+            />
+            <button 
+                onClick={handleSendEmail} 
+                disabled={isSending}
+                className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded hover:bg-blue-700 flex items-center gap-1 disabled:opacity-50"
+            >
+                {isSending ? <LoaderCircle className="animate-spin" size={14}/> : <Send size={14}/>}
+                שלח
+            </button>
+         </div>
+
          <div className="flex gap-3 items-center">
-             {/* --- רכיב השמירה והטעינה --- */}
              <QuoteManager 
                 currentData={dataToSave} 
                 onLoadData={handleLoadData} 
@@ -462,7 +520,7 @@ const handleGeneratePDF = async () => {
              
              <div className="h-6 w-[1px] bg-gray-300 mx-2"></div>
 
-             <button onClick={handleGeneratePDF} disabled={isDownloading} className="flex items-center gap-2 bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 font-bold text-sm shadow-sm">
+             <button onClick={handleDownloadPDF} disabled={isDownloading} className="flex items-center gap-2 bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 font-bold text-sm shadow-sm">
                  {isDownloading ? <LoaderCircle className="animate-spin" size={16}/> : <FileDown size={16}/>} הורד PDF
              </button>
              <button onClick={() => window.print()} className="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded hover:bg-slate-900 font-bold text-sm shadow-sm"><Printer size={16}/> הדפס</button>
@@ -477,7 +535,7 @@ const handleGeneratePDF = async () => {
                 {pageIndex === 0 ? (
                     <header className="border-b-[3px] pb-4 mb-6" style={{ borderColor: GOLD }}>
                         <div className="flex justify-between items-start">
-                            {/* פרטי הקבוצה מימין - עריכה ידנית מלאה */}
+                            {/* פרטי הקבוצה מימין */}
                             <div className="text-right pt-2 w-[55%]">
                                 <div className="text-sm font-bold mb-2 text-gray-500">בס"ד</div>
                                 
@@ -499,7 +557,6 @@ const handleGeneratePDF = async () => {
                                 {/* פרטי הגעה/עזיבה */}
                                 <div className="mt-4 text-sm space-y-1">
                                     <div className="text-slate-900 flex">
-                                        {/* הוספתי min-w-[100px] כדי לקבע את רוחב הכותרת */}
                                         <span className="font-bold ml-1 min-w-[65px]">סוג פעילות:</span>
                                         <TransparentInput value={eventType} onChange={setEventType} />
                                     </div>
@@ -527,7 +584,7 @@ const handleGeneratePDF = async () => {
                                 הצעת מחיר
                             </h1>
 
-                            {/* שורת המינימום - ממורכזת בתוך הרוחב המלא */}
+                            {/* שורת המינימום */}
                             <div className="flex items-center justify-center gap-2 w-full relative right-[15px]">
                                 <span className="text-lg font-bold text-slate-900">מינימום משתתפים:</span>
                                 <input 
@@ -598,7 +655,6 @@ const handleGeneratePDF = async () => {
                                                             >
                                                                 {h.title}
                                                             </div>
-                                                            {/* התיקון לידית הגרירה: bottom-full ו-mb-1 */}
                                                             <div className="flex items-center justify-center gap-1 no-print opacity-0 group-hover/th:opacity-100 transition-opacity bg-white absolute bottom-full left-0 w-full z-10 shadow border p-1 rounded mb-1">
                                                                 <input type="number" value={h.width} onChange={(e) => tableActions.updateHeaderWidth(block.id, idx, e.target.value)} className="w-8 text-[10px] text-center border rounded bg-gray-50"/>
                                                                 <span className="text-[10px]">%</span>
@@ -641,17 +697,17 @@ const handleGeneratePDF = async () => {
                 {/* אזור חתימה */}
                 {pageIndex === paginatedPages.length - 1 && (
                     <div className="mt-auto pt-10 px-4 flex justify-between items-end pb-8 text-slate-800">
-                       <div className="text-right text-sm leading-relaxed">
-                           <div className="font-bold text-base" style={{ color: GOLD, borderColor: GOLD }}>בברכה,</div>
-                           <div className="font-bold text-base">שטערני דהאן</div>
-                           <div className="text-slate-600">08-8593775</div>
-                           <div className="font-bold text-slate-800 mt-1">ציפורי אירוח ואירועים בע"מ</div>
-                       </div>
+                        <div className="text-right text-sm leading-relaxed">
+                            <div className="font-bold text-base" style={{ color: GOLD, borderColor: GOLD }}>בברכה,</div>
+                            <div className="font-bold text-base">שטערני דהאן</div>
+                            <div className="text-slate-600">08-8593775</div>
+                            <div className="font-bold text-slate-800 mt-1">ציפורי אירוח ואירועים בע"מ</div>
+                        </div>
 
-                       <div className="text-center">
-                           <div className="border-b border-black w-60 mb-2"></div>
-                           <div className="font-bold text-base" style={{ color: GOLD, borderColor: GOLD }}>חתימה וחותמת</div>
-                       </div>
+                        <div className="text-center">
+                            <div className="border-b border-black w-60 mb-2"></div>
+                            <div className="font-bold text-base" style={{ color: GOLD, borderColor: GOLD }}>חתימה וחותמת</div>
+                        </div>
                     </div>
                 )}
             </div>

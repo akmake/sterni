@@ -64,11 +64,11 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // =================================================================
 app.use('/api/chat', chatRoutes); 
 app.use('/api/auth', authRoutes);
-
+app.use('/api/emails', emailRoutes); // 2. שימוש
 // ✅ התיקון: הזזתי את זה לפה והורדתי את requireAuth זמנית
 // עכשיו זה פתוח וזמין לשמירה בלי חסימות
 app.use('/api/quotes', quoteRouter); 
-app.use('/api/emails', emailRoutes);
+
 // =================================================================
 
 

@@ -5,16 +5,11 @@ import { Contact } from '../models/Contact.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-// ייבוא הסוקט בצורה שתתעדכן בזמן אמת
 import { sock } from './whatsappService.js';
-
-// --- תוספות חובה למערכת החדשה ---
 import SystemConfig from '../models/SystemConfig.js';
 import EmailAccount from '../models/EmailAccount.js';
 import { decrypt } from '../utils/encryption.js';
-// -------------------------------
 
-// --- הגדרת נתיב השמירה בתוך ה-CLIENT ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const UPLOADS_DIR = path.join(__dirname, '../../client/public/uploads');
@@ -25,11 +20,10 @@ if (!fs.existsSync(UPLOADS_DIR)){
 
 let connection = null;
 
-// פונקציית עזר לשליפת הגדרות החיבור מה-DB
 const getImapConfig = async () => {
     const sysConfig = await SystemConfig.findOne();
-    if (!sysConfig || !sysConfig.opsEmailId) throw new Error("לא הוגדר חשבון תפעול (Ops)");
-
+    if (!sysConfig?.opsEmailId) throw new Error("לא הוגדר מייל תפעול ב-DB");
+    
     const account = await EmailAccount.findById(sysConfig.opsEmailId);
     if (!account) throw new Error("חשבון המייל לא נמצא");
 
@@ -46,12 +40,12 @@ const getImapConfig = async () => {
             authTimeout: 10000,
             tlsOptions: { rejectUnauthorized: false }
         },
-        systemEmail: account.user
+        systemEmail: account.user 
     };
 };
 
 // ==========================================
-// === 🧹 המטאטא: ניקוי כירורגי ===
+// === 🧹 המטאטא המשופר: מנקה זבל ביסודיות ===
 // ==========================================
 const cleanEmailBody = (text) => {
     if (!text) return "";
@@ -60,16 +54,32 @@ const cleanEmailBody = (text) => {
     const cleanLines = [];
 
     for (let line of lines) {
-        const trimmed = line.trim(); 
+        let trimmed = line.trim(); 
 
-        if (/[‫\u200f\u202a-\u202e]*בתאריך.+מאת.+/.test(trimmed)) break;
-        if (/^On .* wrote:$/i.test(trimmed)) break;
+        // דילוג על שורות ריקות בהתחלה
+        if (cleanLines.length === 0 && trimmed === '') continue;
+
+        // --- זיהוי כותרות תגובה של ג'ימייל (החלק הבעייתי) ---
+        
+        // 1. אנגלית: מזהה "On ... wrote:" גם אם יש תווים שקופים לפני ה-On
+        // [\s\u200e\u200f\u202a-\u202e]* -> תופס רווחים ותווי כיוון נסתרים
+        if (/^[\s\u200e\u200f\u202a-\u202e]*On\s.+wrote:?$/i.test(trimmed)) break;
+
+        // 2. עברית: "בתאריך ... מאת ..."
+        if (/^[\s\u200e\u200f\u202a-\u202e]*בתאריך.+מאת.+/.test(trimmed)) break;
+
+        // 3. פורמטים נוספים (Outlook וכו')
         if (/^From:\s/i.test(trimmed)) break;
-        if (/^_{3,}/.test(trimmed)) break;
-        if (/^-{3,}/.test(trimmed)) break;
+        if (/^_{3,}/.test(trimmed)) break; // ____________
+        if (/^-{3,}/.test(trimmed)) break; // ------------
+
+        // 4. ציטוטים (שורות שמתחילות ב->)
         if (trimmed.startsWith('>')) break;
+
+        // 5. חתימות נפוצות (אופציונלי, אפשר להסיר אם רוצים חתימות)
         if (/^Sent from my iPhone/i.test(trimmed)) continue;
         if (/^נשלח מה-iPhone שלי/.test(trimmed)) continue;
+        if (/^Get Outlook for/i.test(trimmed)) continue;
 
         cleanLines.push(line);
     }
@@ -77,21 +87,18 @@ const cleanEmailBody = (text) => {
     return cleanLines.join('\n').trim();
 };
 
-// ==========================================
-// === 🔌 חיבור והאזנה ===
-// ==========================================
-
 export const startEmailListener = async () => {
     try {
         console.log("🔌 טוען הגדרות ומתחבר ל-IMAP...");
         const config = await getImapConfig(); 
         
-        connection = await imap.connect({ imap: config.imap });
+        connection = await imap.connect(config);
         console.log("✅ מחובר! מאזין למיילים...");
 
         await connection.openBox('INBOX');
         
         await checkForNewEmails(config.systemEmail);
+        
         setInterval(() => checkForNewEmails(config.systemEmail), 10000);
 
         connection.on('error', (err) => {
@@ -109,13 +116,13 @@ const checkForNewEmails = async (systemEmail) => {
     try {
         if (!connection) return;
 
+        // markSeen: false -> קריטי כדי לא לאבד הודעות אם הוואצאפ מנותק
         const searchCriteria = ['UNSEEN'];
-        const fetchOptions = { bodies: ['HEADER', 'TEXT', ''], markSeen: true, struct: true };
+        const fetchOptions = { bodies: ['HEADER', 'TEXT', ''], markSeen: false, struct: true };
 
         const messages = await connection.search(searchCriteria, fetchOptions);
         if (messages.length === 0) return;
 
-        // שליפת ה-TARGET EMAIL מה-DB
         const sysConfig = await SystemConfig.findOne();
         const TARGET_EMAIL = sysConfig?.targetWhatsAppEmail;
 
@@ -128,33 +135,31 @@ const checkForNewEmails = async (systemEmail) => {
             const fromEmail = parsed.from.value[0].address;
             const fromName = parsed.from.value[0].name || fromEmail.split('@')[0];
             const subject = parsed.subject || '';
-
+            
+            // --- הניקוי מתבצע כאן ---
             const cleanContent = cleanEmailBody(parsed.text);
+
+            let shouldMarkAsSeen = false;
 
             // =========================================================
             // תרחיש א': גשר מייל -> וואטסאפ (Bridge Logic)
             // =========================================================
-            
             if ((fromEmail === TARGET_EMAIL || fromEmail === systemEmail) && subject.includes('WA_MSG:')) {
                 
-                console.log(`🔄 BRIDGE: זוהה מייל להעברה לוואצפ: ${subject}`);
+                console.log(`🔄 BRIDGE: מנסה להעביר לוואצפ: ${subject}`);
                 
+                if (!sock || !sock.user) {
+                    console.warn(`⏳ וואצאפ לא מחובר, מדלג...`);
+                    continue; 
+                }
+
                 const match = subject.match(/WA_MSG:\s*([0-9\-\+]+)/);
-                
                 if (match && match[1]) {
                     const phoneNumber = match[1].trim();
                     const remoteJid = `${phoneNumber}@s.whatsapp.net`;
 
-                    // --- תיקון: בדיקה קפדנית יותר לחיבור וואצאפ ---
-                    // אם sock.user חסר, סימן שהוואצאפ לא התחבר עד הסוף
-                    if (!sock || !sock.user) {
-                        console.error('❌ שגיאה: הוואצאפ לא מחובר או לא מאומת (סרוק QR בטרמינל/לוגים)');
-                        continue; 
-                    }
-                    // ------------------------------------------------
-
                     try {
-                        // 1. שליחת טקסט נקי
+                        // 1. שליחת הטקסט (הנקי בלבד!)
                         if (cleanContent) {
                             await sock.sendMessage(remoteJid, { text: cleanContent });
                             console.log(`📤 נשלחה תשובה נקייה ל-${phoneNumber}`);
@@ -164,70 +169,66 @@ const checkForNewEmails = async (systemEmail) => {
                         if (parsed.attachments && parsed.attachments.length > 0) {
                             for (const attachment of parsed.attachments) {
                                 let msgPayload = {};
-                                
-                                if (attachment.contentType.startsWith('image/')) {
-                                    msgPayload = { image: attachment.content, caption: attachment.filename };
-                                } else if (attachment.contentType.startsWith('video/')) {
-                                    msgPayload = { video: attachment.content, caption: attachment.filename };
-                                } else if (attachment.contentType.startsWith('audio/')) {
-                                    msgPayload = { audio: attachment.content, mimetype: 'audio/mp4', ptt: true };
-                                } else {
-                                    msgPayload = { 
-                                        document: attachment.content,
-                                        mimetype: attachment.contentType,
-                                        fileName: attachment.filename
-                                    };
-                                }
+                                if (attachment.contentType.startsWith('image/')) msgPayload = { image: attachment.content, caption: attachment.filename };
+                                else if (attachment.contentType.startsWith('video/')) msgPayload = { video: attachment.content, caption: attachment.filename };
+                                else if (attachment.contentType.startsWith('audio/')) msgPayload = { audio: attachment.content, mimetype: 'audio/mp4', ptt: true };
+                                else msgPayload = { document: attachment.content, mimetype: attachment.contentType, fileName: attachment.filename };
                                 await sock.sendMessage(remoteJid, msgPayload);
                             }
                         }
-                    } catch (waError) {
-                        console.error(`❌ שגיאה בשליחה לוואצאפ (${phoneNumber}):`, waError.message);
-                    }
-                }
-                continue; // מדלגים כדי לא ליצור טיקט כפול
-            }
+                        
+                        shouldMarkAsSeen = true;
 
+                    } catch (waError) {
+                        console.error(`❌ שגיאה בשליחה לוואצאפ:`, waError.message);
+                    }
+                } else {
+                     shouldMarkAsSeen = true;
+                }
+            } 
+            
             // =========================================================
             // תרחיש ב': הודעת מערכת רגילה (Tickets / CRM)
             // =========================================================
-            const ticketMatch = subject.match(/#(\d+)/);
-            if (!ticketMatch) continue; 
+            else {
+                const ticketMatch = subject.match(/#(\d+)/);
+                if (ticketMatch) {
+                    const ticketId = ticketMatch[1];
+                    let fileUrl = null;
+                    let fileType = 'text';
 
-            const ticketId = ticketMatch[1];
-            let fileUrl = null;
-            let fileType = 'text';
+                    if (parsed.attachments && parsed.attachments.length > 0) {
+                        const attachment = parsed.attachments[0]; 
+                        const fileName = `${Date.now()}-${attachment.filename.replace(/\s+/g, '_')}`;
+                        const savePath = path.join(UPLOADS_DIR, fileName);
+                        fs.writeFileSync(savePath, attachment.content);
+                        fileUrl = `/uploads/${fileName}`;
 
-            if (parsed.attachments && parsed.attachments.length > 0) {
-                const attachment = parsed.attachments[0]; 
-                const fileName = `${Date.now()}-${attachment.filename.replace(/\s+/g, '_')}`;
-                const savePath = path.join(UPLOADS_DIR, fileName);
-                fs.writeFileSync(savePath, attachment.content);
-                fileUrl = `/uploads/${fileName}`;
+                        if (attachment.contentType.startsWith('image/')) fileType = 'image';
+                        else if (attachment.contentType.startsWith('video/')) fileType = 'video';
+                        else fileType = 'file';
+                    }
 
-                if (attachment.contentType.startsWith('image/')) fileType = 'image';
-                else if (attachment.contentType.startsWith('video/')) fileType = 'video';
-                else fileType = 'file';
+                    console.log(`📥 הודעה חדשה לטיקט ${ticketId}.`);
+
+                    await Message.create({
+                        ticketId, sender: 'client', clientEmail: fromEmail, clientName: fromName,
+                        content: parsed.text, type: fileType, fileUrl: fileUrl, isRead: false
+                    });
+
+                    await Contact.updateOne(
+                        { email: fromEmail }, { $set: { lastActive: new Date(), name: fromName } }, { upsert: true }
+                    );
+                }
+                shouldMarkAsSeen = true; 
             }
 
-            console.log(`📥 הודעה חדשה לטיקט ${ticketId}.`);
-
-            await Message.create({
-                ticketId,
-                sender: 'client',
-                clientEmail: fromEmail,
-                clientName: fromName,
-                content: parsed.text, 
-                type: fileType,
-                fileUrl: fileUrl,
-                isRead: false
-            });
-
-            await Contact.updateOne(
-                { email: fromEmail }, 
-                { $set: { lastActive: new Date(), name: fromName } }, 
-                { upsert: true }
-            );
+            // סימון כנקרא בשרת
+            if (shouldMarkAsSeen) {
+                await connection.addFlags(item.attributes.uid, ['\\Seen'], (err) => {
+                    if (err) console.error('Error marking as seen:', err);
+                });
+            }
         }
     } catch (err) {
         console.error("❌ שגיאה ב-Listener:", err.message);

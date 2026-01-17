@@ -24,6 +24,7 @@ import ChatPage from './pages/ChatPage';
 import WhatsAppPage from './pages/WhatsAppPage'; 
 import PriceQuoteGenerator from './components/PriceQuoteGenerator'; 
 import PaymentRequestGenerator from './components/PaymentRequestGenerator';
+import SystemSettings from './pages/SystemSettings';
 
 export default function App() {
   return (
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="register" element={<RegisterPage />} />
 
         <Route element={<ProtectedRoute />}>
+          <Route path="/settings" element={<SystemSettings />} />
           <Route path="price-quote" element={<PriceQuoteGenerator />} />
           <Route path="projects"       element={<ProjectsPage />}   />
           <Route path="projects/new"   element={<NewProjectPage />} />

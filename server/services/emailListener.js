@@ -8,6 +8,12 @@ import { fileURLToPath } from 'url';
 // ייבוא הסוקט בצורה שתתעדכן בזמן אמת
 import { sock } from './whatsappService.js';
 
+// --- תוספות חובה למערכת החדשה ---
+import SystemConfig from '../models/SystemConfig.js';
+import EmailAccount from '../models/EmailAccount.js';
+import { decrypt } from '../utils/encryption.js';
+// -------------------------------
+
 // --- הגדרת נתיב השמירה בתוך ה-CLIENT ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,16 +25,29 @@ if (!fs.existsSync(UPLOADS_DIR)){
 
 let connection = null;
 
-const config = {
-    imap: {
-        user: process.env.EMAIL_USER,
-        password: process.env.EMAIL_PASS,
-        host: 'imap.gmail.com',
-        port: 993,
-        tls: true,
-        authTimeout: 10000,
-        tlsOptions: { rejectUnauthorized: false }
-    }
+// פונקציית עזר לשליפת הגדרות החיבור מה-DB
+const getImapConfig = async () => {
+    const sysConfig = await SystemConfig.findOne();
+    if (!sysConfig || !sysConfig.opsEmailId) throw new Error("לא הוגדר חשבון תפעול (Ops)");
+
+    const account = await EmailAccount.findById(sysConfig.opsEmailId);
+    if (!account) throw new Error("חשבון המייל לא נמצא");
+
+    const password = decrypt({ content: account.encryptedPassword, iv: account.iv });
+    const host = account.host === 'smtp.gmail.com' ? 'imap.gmail.com' : account.host;
+
+    return {
+        imap: {
+            user: account.user,
+            password: password,
+            host: host,
+            port: 993,
+            tls: true,
+            authTimeout: 10000,
+            tlsOptions: { rejectUnauthorized: false }
+        },
+        systemEmail: account.user
+    };
 };
 
 // ==========================================
@@ -37,33 +56,18 @@ const config = {
 const cleanEmailBody = (text) => {
     if (!text) return "";
     
-    const lines = text.split(/\r?\n/); // מפצל שורות (כולל תמיכה ב-Windows/Linux)
+    const lines = text.split(/\r?\n/);
     const cleanLines = [];
 
     for (let line of lines) {
-        // מנקה רווחים לבדיקה, אבל שומר על המקורי להדפסה
         const trimmed = line.trim(); 
 
-        // 1. זיהוי שורת "בתאריך ... מאת ..." (כולל תווים נסתרים!)
-        // ה-Regex הזה תופס גם אם יש תווי כיוון (‫) לפני המילה "בתאריך"
-        if (/[‫\u200f\u202a-\u202e]*בתאריך.+מאת.+/.test(trimmed)) {
-            break; // עוצר הכל ברגע שמצאנו את השורה הזאת
-        }
-
-        // 2. זיהוי אנגלית (On ... wrote:)
+        if (/[‫\u200f\u202a-\u202e]*בתאריך.+מאת.+/.test(trimmed)) break;
         if (/^On .* wrote:$/i.test(trimmed)) break;
-
-        // 3. זיהוי Outlook/אחרים (From: ...)
         if (/^From:\s/i.test(trimmed)) break;
-
-        // 4. קווים מפרידים (___ או ---)
         if (/^_{3,}/.test(trimmed)) break;
         if (/^-{3,}/.test(trimmed)) break;
-
-        // 5. ציטוטים (שורות שמתחילות ב->)
         if (trimmed.startsWith('>')) break;
-
-        // 6. חתימות נפוצות באייפון
         if (/^Sent from my iPhone/i.test(trimmed)) continue;
         if (/^נשלח מה-iPhone שלי/.test(trimmed)) continue;
 
@@ -79,17 +83,20 @@ const cleanEmailBody = (text) => {
 
 export const startEmailListener = async () => {
     try {
-        console.log("🔌 מתחבר ל-Gmail IMAP...");
-        connection = await imap.connect(config);
+        console.log("🔌 טוען הגדרות ומתחבר ל-IMAP...");
+        const config = await getImapConfig(); 
+        
+        connection = await imap.connect({ imap: config.imap });
         console.log("✅ מחובר! מאזין למיילים...");
 
         await connection.openBox('INBOX');
         
-        await checkForNewEmails();
-        setInterval(checkForNewEmails, 10000);
+        await checkForNewEmails(config.systemEmail);
+        setInterval(() => checkForNewEmails(config.systemEmail), 10000);
 
         connection.on('error', (err) => {
             console.error('IMAP Connection Error:', err);
+            setTimeout(startEmailListener, 10000);
         });
 
     } catch (err) {
@@ -98,7 +105,7 @@ export const startEmailListener = async () => {
     }
 };
 
-const checkForNewEmails = async () => {
+const checkForNewEmails = async (systemEmail) => {
     try {
         if (!connection) return;
 
@@ -107,6 +114,10 @@ const checkForNewEmails = async () => {
 
         const messages = await connection.search(searchCriteria, fetchOptions);
         if (messages.length === 0) return;
+
+        // שליפת ה-TARGET EMAIL מה-DB
+        const sysConfig = await SystemConfig.findOne();
+        const TARGET_EMAIL = sysConfig?.targetWhatsAppEmail;
 
         for (const item of messages) {
             const all = item.parts.find(part => part.which === '');
@@ -118,15 +129,13 @@ const checkForNewEmails = async () => {
             const fromName = parsed.from.value[0].name || fromEmail.split('@')[0];
             const subject = parsed.subject || '';
 
-            // --- כאן אנחנו מנקים את המייל ---
             const cleanContent = cleanEmailBody(parsed.text);
 
             // =========================================================
             // תרחיש א': גשר מייל -> וואטסאפ (Bridge Logic)
             // =========================================================
-            const TARGET_EMAIL = process.env.TARGET_EMAIL_FOR_WHATSAPP; 
             
-            if ((fromEmail === TARGET_EMAIL || fromEmail === process.env.EMAIL_USER) && subject.includes('WA_MSG:')) {
+            if ((fromEmail === TARGET_EMAIL || fromEmail === systemEmail) && subject.includes('WA_MSG:')) {
                 
                 console.log(`🔄 BRIDGE: זוהה מייל להעברה לוואצפ: ${subject}`);
                 
@@ -136,40 +145,47 @@ const checkForNewEmails = async () => {
                     const phoneNumber = match[1].trim();
                     const remoteJid = `${phoneNumber}@s.whatsapp.net`;
 
-                    if (!sock) {
-                        console.error('❌ שגיאה: מנסה לשלוח לוואטסאפ אך אין חיבור פעיל');
+                    // --- תיקון: בדיקה קפדנית יותר לחיבור וואצאפ ---
+                    // אם sock.user חסר, סימן שהוואצאפ לא התחבר עד הסוף
+                    if (!sock || !sock.user) {
+                        console.error('❌ שגיאה: הוואצאפ לא מחובר או לא מאומת (סרוק QR בטרמינל/לוגים)');
                         continue; 
                     }
+                    // ------------------------------------------------
 
-                    // 1. שליחת טקסט נקי בלבד!
-                    if (cleanContent) {
-                        await sock.sendMessage(remoteJid, { text: cleanContent });
-                        console.log(`📤 נשלחה תשובה נקייה ל-${phoneNumber}`);
-                    }
-
-                    // 2. שליחת קבצים
-                    if (parsed.attachments && parsed.attachments.length > 0) {
-                        for (const attachment of parsed.attachments) {
-                            let msgPayload = {};
-
-                            if (attachment.contentType.startsWith('image/')) {
-                                msgPayload = { image: attachment.content, caption: attachment.filename };
-                            } else if (attachment.contentType.startsWith('video/')) {
-                                msgPayload = { video: attachment.content, caption: attachment.filename };
-                            } else if (attachment.contentType.startsWith('audio/')) {
-                                msgPayload = { audio: attachment.content, mimetype: 'audio/mp4', ptt: true };
-                            } else {
-                                msgPayload = { 
-                                    document: attachment.content,
-                                    mimetype: attachment.contentType,
-                                    fileName: attachment.filename
-                                };
-                            }
-                            await sock.sendMessage(remoteJid, msgPayload);
+                    try {
+                        // 1. שליחת טקסט נקי
+                        if (cleanContent) {
+                            await sock.sendMessage(remoteJid, { text: cleanContent });
+                            console.log(`📤 נשלחה תשובה נקייה ל-${phoneNumber}`);
                         }
+
+                        // 2. שליחת קבצים
+                        if (parsed.attachments && parsed.attachments.length > 0) {
+                            for (const attachment of parsed.attachments) {
+                                let msgPayload = {};
+                                
+                                if (attachment.contentType.startsWith('image/')) {
+                                    msgPayload = { image: attachment.content, caption: attachment.filename };
+                                } else if (attachment.contentType.startsWith('video/')) {
+                                    msgPayload = { video: attachment.content, caption: attachment.filename };
+                                } else if (attachment.contentType.startsWith('audio/')) {
+                                    msgPayload = { audio: attachment.content, mimetype: 'audio/mp4', ptt: true };
+                                } else {
+                                    msgPayload = { 
+                                        document: attachment.content,
+                                        mimetype: attachment.contentType,
+                                        fileName: attachment.filename
+                                    };
+                                }
+                                await sock.sendMessage(remoteJid, msgPayload);
+                            }
+                        }
+                    } catch (waError) {
+                        console.error(`❌ שגיאה בשליחה לוואצאפ (${phoneNumber}):`, waError.message);
                     }
                 }
-                continue; 
+                continue; // מדלגים כדי לא ליצור טיקט כפול
             }
 
             // =========================================================
@@ -196,8 +212,6 @@ const checkForNewEmails = async () => {
 
             console.log(`📥 הודעה חדשה לטיקט ${ticketId}.`);
 
-            // הערה: ב-CRM אנחנו בדרך כלל שומרים את המקור (parsed.text)
-            // אבל אם גם שם אתה רוצה נקי, תחליף ל-cleanContent
             await Message.create({
                 ticketId,
                 sender: 'client',

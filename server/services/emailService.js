@@ -1,25 +1,91 @@
 import nodemailer from 'nodemailer';
-import dotenv from 'dotenv';
+import SystemConfig from '../models/SystemConfig.js';
+import EmailAccount from '../models/EmailAccount.js';
+import { decrypt } from '../utils/encryption.js';
 
-dotenv.config();
+// --- פונקציה פנימית ליצירת Transporter לפי סוג ---
+const createDynamicTransporter = async (type) => {
+  // 1. טעינת הגדרות הניתוב
+  const config = await SystemConfig.findOne();
+  if (!config) throw new Error('הגדרות מערכת לא נמצאו! יש להגדיר מיילים בממשק הניהול.');
 
-// הגדרת ה-Transporter (למשל Gmail, SendGrid, AWS SES)
-export const transporter = nodemailer.createTransport({
-  service: 'gmail', // או host/port עבור שירותים מקצועיים
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+  // 2. בחירת ה-ID המתאים
+  let accountId;
+  if (type === 'finance') accountId = config.financeEmailId;
+  else if (type === 'ops') accountId = config.opsEmailId;
+  else throw new Error('סוג ערוץ מייל לא חוקי');
 
-// פונקציית עזר לפרמוט HTML של המייל שייראה טוב
+  if (!accountId) throw new Error(`לא הוגדר חשבון מייל עבור ערוץ ${type}`);
+
+  // 3. שליפת פרטי החשבון מה-DB
+  const account = await EmailAccount.findById(accountId);
+  if (!account) throw new Error('חשבון המייל המוגדר לא נמצא בבסיס הנתונים');
+
+  // 4. פענוח הסיסמה ויצירת Transporter
+  const decryptedPass = decrypt({ content: account.encryptedPassword, iv: account.iv });
+
+  return nodemailer.createTransport({
+    host: account.host,
+    port: account.port,
+    secure: account.secure, // true for 465
+    auth: {
+      user: account.user,
+      pass: decryptedPass
+    }
+  });
+};
+
+// --- פונקציות השליחה ---
+
+// דוגמה 1: שליחת הצעת מחיר / דרישת תשלום (כספים)
+export const sendFinanceEmail = async (to, subject, html, attachments = []) => {
+  const transporter = await createDynamicTransporter('finance');
+  
+  // שליפת כתובת השולח כדי להציג אותה ב-From
+  const config = await SystemConfig.findOne().populate('financeEmailId');
+  // הגנה למקרה שהחשבון נמחק אך ההגדרה נשארה
+  const fromAddress = config?.financeEmailId?.user || 'noreply@system.com';
+
+  return transporter.sendMail({
+    from: `"מחלקת כספים" <${fromAddress}>`,
+    to,
+    subject,
+    html,
+    attachments
+  });
+};
+
+// דוגמה 2: התראות מערכת / וואצאפ (תפעול)
+export const sendOpsEmail = async (to, subject, htmlContent) => {
+  const transporter = await createDynamicTransporter('ops');
+  
+  const config = await SystemConfig.findOne().populate('opsEmailId');
+  const fromAddress = config?.opsEmailId?.user || 'noreply@system.com';
+
+  // הגנה מקריסה אם התוכן ריק
+  const safeHtml = htmlContent || '';
+
+  return transporter.sendMail({
+    from: `"מערכת תפעול" <${fromAddress}>`,
+    to,
+    subject,
+    html: safeHtml,
+    text: safeHtml.replace(/<[^>]*>?/gm, '') // המרה אוטומטית לטקסט רגיל
+  });
+};
+
+// --- פונקציות עזר (חובה עבור chatController) ---
 export const formatEmailHtml = (content) => {
   return `
-    <div dir="rtl" style="font-family: Arial, sans-serif; font-size: 16px; color: #333;">
-      <p>${content.replace(/\n/g, '<br>')}</p>
-      <br>
-      <hr>
-      <p style="font-size: 12px; color: #888;">הודעה זו נשלחה דרך מערכת הצ'אט. נא להשיב למייל זה כדי להמשיך את השיחה.</p>
+    <div dir="rtl" style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+      <div style="background-color: #f4f4f4; padding: 20px;">
+        <div style="background-color: #ffffff; border-radius: 8px; padding: 30px; max-width: 600px; margin: 0 auto; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          ${content}
+        </div>
+        <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #888;">
+          נשלח אוטומטית ממערכת הניהול
+        </div>
+      </div>
     </div>
   `;
 };

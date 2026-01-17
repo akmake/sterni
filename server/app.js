@@ -19,6 +19,7 @@ import emailRoutes from './routes/emailRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import { connectToWhatsApp } from './services/whatsappService.js';
 import quoteRouter from './routes/quoteRoutes.js'; // <--- זה כבר קיים, מצוין
+import settingsRoutes from './routes/settingsRoutes.js';
 
 import rateLimiter from './middlewares/rateLimiter.js';
 import { requireAuth } from './middlewares/authMiddleware.js';
@@ -67,6 +68,7 @@ app.use('/api/auth', authRoutes);
 // ✅ התיקון: הזזתי את זה לפה והורדתי את requireAuth זמנית
 // עכשיו זה פתוח וזמין לשמירה בלי חסימות
 app.use('/api/quotes', quoteRouter); 
+app.use('/api/emails', emailRoutes);
 // =================================================================
 
 
@@ -82,7 +84,6 @@ const csrfProtection = csurf({
 app.get('/api/csrf-token', rateLimiter, csrfProtection, (req, res) => {
   res.json({ csrfToken: req.csrfToken() });
 });
-app.use('/api/emails', emailRoutes);
 
 // --- Protected Routes (מכאן והלאה הכל חסום ללא טוקן) ---
 app.use(csrfProtection); 
@@ -91,6 +92,7 @@ app.use('/api/projects', requireAuth, projectRoutes);
 app.use('/api/halls', requireAuth, hallRoutes);
 app.use('/api/groups', requireAuth, groupRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/settings', settingsRoutes);
 // שימי לב: מחקתי מפה את quotes כי העברתי אותו למעלה!
 
 // Error Handling

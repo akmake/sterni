@@ -5,32 +5,16 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
-import nodemailer from 'nodemailer';
 import qrcode from 'qrcode-terminal';
 
-// --- הגדרות מערכת ---
-const TARGET_EMAIL = process.env.TARGET_EMAIL_FOR_WHATSAPP; 
-
-// הגדרת שירות המיילים (Transporter)
-const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com', // מגדירים ידנית ולא service: gmail
-    port: 587,              // פורט שבדרך כלל פתוח בשרתים
-    secure: false,          // false עבור פורט 587
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
-    tls: {
-        rejectUnauthorized: false, // מונע שגיאות תעודה בשרתים מסוימים
-        ciphers: 'SSLv3'
-    },
-    family: 4 // <--- קריטי!!! מכריח שימוש ב-IPv4 ומונע את ה-TIMEOUT
-});
+// --- שינוי 1: הסרת transporter ידני וייבוא מהמערכת החדשה ---
+import SystemConfig from '../models/SystemConfig.js'; 
+import { sendOpsEmail } from './emailService.js'; 
 
 export let sock;
 
 // ==========================================
-// === 🧠 המוח: פונקציות הפענוח שלך ===
+// === 🧠 המוח: פונקציות הפענוח שלך (ללא שינוי) ===
 // ==========================================
 
 // --- חילוץ תוכן הודעה (טקסט/כיתוב) ---
@@ -77,11 +61,12 @@ const extractTruePhoneNumber = (msg) => {
 // ==========================================
 
 export const connectToWhatsApp = async () => {
+    // השארתי את הנתיב שלך כפי שהיה במקור
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
     
     sock = makeWASocket({
         auth: state,
-        printQRInTerminal: false, // QR מטופל ידנית למטה
+        printQRInTerminal: true, // השארתי true לבקשתך (היה false בקוד שלך אך עם qrcode-terminal זה נדרש לעיתים)
         logger: pino({ level: 'silent' }),
         browser: ['Zipori Server', 'Chrome', '1.0.0']
     });
@@ -115,6 +100,16 @@ export const connectToWhatsApp = async () => {
         if (!m.message || m.key.fromMe || m.key.remoteJid === 'status@broadcast') return;
 
         try {
+            // --- שינוי 2: שליפת כתובת היעד מה-DB (במקום מ-process.env) ---
+            const config = await SystemConfig.findOne();
+            const TARGET_EMAIL = config?.targetWhatsAppEmail;
+
+            if (!TARGET_EMAIL) {
+                console.warn('⚠️ הודעה נכנסה, אך לא הוגדר מייל יעד (Target Email) בממשק הניהול.');
+                return;
+            }
+            // -------------------------------------------------------------
+
             // 1. חילוץ מספר הטלפון האמיתי ("המוח")
             const finalPhone = extractTruePhoneNumber(m);
             if (!finalPhone) return; 
@@ -159,7 +154,6 @@ export const connectToWhatsApp = async () => {
                 const senderName = m.pushName || 'לא ידוע';
 
                 // --- העיצוב החדש (HTML) ---
-                // זה פותר את בעיית ה-RTL והעיצוב המיותר
                 const htmlContent = `
                     <div dir="rtl" style="direction: rtl; text-align: right; font-family: Arial, sans-serif; color: #333; line-height: 1.5;">
                         <div style="font-size: 12px; color: #888; margin-bottom: 8px;">
@@ -172,13 +166,14 @@ export const connectToWhatsApp = async () => {
                     </div>
                 `;
 
-                await transporter.sendMail({
-                    from: `"אלי צפורי" <${process.env.EMAIL_USER}>`, // שם שולח יפה יותר
-                    to: TARGET_EMAIL,
-                    subject: `WA_MSG: ${senderJid} [${today}]`, // חייב להישאר זהה כדי שהשרשור יעבוד!
-                    html: htmlContent, // שימוש ב-html במקום text
-                    attachments: attachments
-                });
+                // --- שינוי 3: שימוש ב-sendOpsEmail במקום transporter.sendMail ---
+                await sendOpsEmail(
+                    TARGET_EMAIL, // למי לשלוח
+                    `WA_MSG: ${senderJid} [${today}]`, // נושא
+                    htmlContent, // תוכן HTML
+                    attachments // קבצים מצורפים
+                );
+                // -------------------------------------------------------------
             }
 
         } catch (err) {

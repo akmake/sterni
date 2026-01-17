@@ -18,7 +18,8 @@ const navItems = [
     { to: '/reports/kitchen', label: 'דוח מטבח', icon: Utensils, type: 'link', auth: true },
     { to: '/full-schedule', label: 'לו"ז מפורט', icon: CalendarDays, type: 'link', auth: true },
     { to: '/halls', label: 'ניהול אולמות', icon: MapPin, type: 'link', auth: true },
-    { to: '/whatsapp', label: 'מערכת צ׳אט', icon: MessageSquare, type: 'link', auth: true }, // <--- זה הלינק הנכון
+    { to: '/whatsapp', label: 'מערכת צ׳אט', icon: MessageSquare, type: 'link', auth: true }, 
+    { to: '/settings', label: 'הגדרות מערכת', icon: Settings, type: 'link', auth: true },// <--- זה הלינק הנכון
 ];
 
 const getVisibleItems = (isAuthenticated, user) => {

@@ -56,13 +56,13 @@ export const sendFinanceEmail = async (to, subject, html, attachments = []) => {
 };
 
 // דוגמה 2: התראות מערכת / וואצאפ (תפעול)
-export const sendOpsEmail = async (to, subject, htmlContent) => {
+// 🚨 כאן היה התיקון הקריטי: הוספתי את attachments כפרמטר
+export const sendOpsEmail = async (to, subject, htmlContent, attachments = []) => {
   const transporter = await createDynamicTransporter('ops');
   
   const config = await SystemConfig.findOne().populate('opsEmailId');
   const fromAddress = config?.opsEmailId?.user || 'noreply@system.com';
 
-  // הגנה מקריסה אם התוכן ריק
   const safeHtml = htmlContent || '';
 
   return transporter.sendMail({
@@ -70,7 +70,8 @@ export const sendOpsEmail = async (to, subject, htmlContent) => {
     to,
     subject,
     html: safeHtml,
-    text: safeHtml.replace(/<[^>]*>?/gm, '') // המרה אוטומטית לטקסט רגיל
+    text: safeHtml.replace(/<[^>]*>?/gm, ''), // המרה אוטומטית לטקסט רגיל
+    attachments: attachments // <--- הוספנו את זה! עכשיו הקבצים יישלחו
   });
 };
 

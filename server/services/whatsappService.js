@@ -6,174 +6,169 @@ import makeWASocket, {
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import qrcode from 'qrcode-terminal';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// --- שינוי 1: הסרת transporter ידני וייבוא מהמערכת החדשה ---
 import SystemConfig from '../models/SystemConfig.js'; 
 import { sendOpsEmail } from './emailService.js'; 
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const AUTH_FOLDER = path.join(__dirname, '../auth_info_baileys');
+
 export let sock;
 
-// ==========================================
-// === 🧠 המוח: פונקציות הפענוח שלך (ללא שינוי) ===
-// ==========================================
+// === פונקציות עזר לחילוץ תוכן ===
 
-// --- חילוץ תוכן הודעה (טקסט/כיתוב) ---
+// 1. חילוץ הטקסט של ההודעה הנוכחית
 const getMessageContent = (msg) => {
     if (!msg.message) return '';
     const m = msg.message;
-
-    // 1. טקסט רגיל
     if (m.conversation) return m.conversation;
-    
-    // 2. הודעות מורחבות (תשובות/לינקים)
     if (m.extendedTextMessage && m.extendedTextMessage.text) return m.extendedTextMessage.text;
-
-    // 3. מדיה עם כיתוב (תמונה/וידאו/מסמך)
     if (m.imageMessage && m.imageMessage.caption) return m.imageMessage.caption;
     if (m.videoMessage && m.videoMessage.caption) return m.videoMessage.caption;
     if (m.documentMessage && m.documentMessage.caption) return m.documentMessage.caption;
-
     return ''; 
 };
 
-// --- חילוץ מספר טלפון אמיתי (השיטה המדויקת) ---
+// 2. חילוץ הטקסט של ההודעה *שצוטטה* (החדש!)
+const getQuotedText = (msg) => {
+    // בדיקה אם יש בכלל הקשר (Context)
+    const context = msg.message?.extendedTextMessage?.contextInfo || 
+                    msg.message?.imageMessage?.contextInfo || 
+                    msg.message?.videoMessage?.contextInfo ||
+                    msg.message?.audioMessage?.contextInfo;
+
+    if (!context || !context.quotedMessage) return null;
+
+    const q = context.quotedMessage;
+    
+    // מנסים לחלץ טקסט מתוך הציטוט (יכול להיות טקסט, או כיתוב על תמונה)
+    if (q.conversation) return q.conversation;
+    if (q.extendedTextMessage?.text) return q.extendedTextMessage.text;
+    if (q.imageMessage?.caption) return q.imageMessage.caption;
+    if (q.videoMessage?.caption) return q.videoMessage.caption;
+    
+    // אם צוטטה תמונה/הודעה קולית בלי טקסט
+    if (q.imageMessage) return '[תמונה]';
+    if (q.audioMessage) return '[הודעה קולית]';
+    if (q.videoMessage) return '[סרטון]';
+    if (q.documentMessage) return '[קובץ]';
+
+    return null;
+};
+
 const extractTruePhoneNumber = (msg) => {
     const key = msg.key;
-    
-    // 1. בדיקת מזהה אלטרנטיבי (לפעמים המספר מסתתר שם)
-    if (key.remoteJidAlt && key.remoteJidAlt.includes('@s.whatsapp.net')) {
-        return key.remoteJidAlt.replace(/\D/g, '');
-    }
-    // 2. בדיקת מזהה רגיל (תוך התעלמות מזהה LID טכני)
-    if (key.remoteJid && !key.remoteJid.includes('@lid')) {
-        return key.remoteJid.replace(/\D/g, '');
-    }
-    // 3. בדיקת משתתף בתוך קבוצה
-    if (key.participant && key.participant.includes('@s.whatsapp.net')) {
-        return key.participant.replace(/\D/g, '');
-    }
-    
+    if (key.remoteJidAlt && key.remoteJidAlt.includes('@s.whatsapp.net')) return key.remoteJidAlt.replace(/\D/g, '');
+    if (key.remoteJid && !key.remoteJid.includes('@lid')) return key.remoteJid.replace(/\D/g, '');
+    if (key.participant && key.participant.includes('@s.whatsapp.net')) return key.participant.replace(/\D/g, '');
     return ''; 
 };
 
-// ==========================================
-// === 🔌 חיבור והאזנה (Baileys Logic) ===
-// ==========================================
-
 export const connectToWhatsApp = async () => {
-    // השארתי את הנתיב שלך כפי שהיה במקור
-    const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
+    if (!fs.existsSync(AUTH_FOLDER)) fs.mkdirSync(AUTH_FOLDER, { recursive: true });
+    
+    const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
     
     sock = makeWASocket({
         auth: state,
-        printQRInTerminal: true, // השארתי true לבקשתך (היה false בקוד שלך אך עם qrcode-terminal זה נדרש לעיתים)
+        printQRInTerminal: true,
         logger: pino({ level: 'silent' }),
         browser: ['Zipori Server', 'Chrome', '1.0.0']
     });
 
-    // שמירת אישורים (Tokens)
     sock.ev.on('creds.update', saveCreds);
 
-    // ניהול מצב החיבור
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
-        
-        if (qr) {
-            console.log('QR RECEIVED - סרוק להתחברות:');
-            qrcode.generate(qr, { small: true });
-        }
-
+        if (qr) qrcode.generate(qr, { small: true });
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect?.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('Connection closed, reconnecting:', shouldReconnect);
             if (shouldReconnect) connectToWhatsApp();
         } else if (connection === 'open') {
             console.log('✅ WhatsApp connected successfully!');
         }
     });
 
-    // --- טיפול בהודעות נכנסות ---
     sock.ev.on('messages.upsert', async ({ messages }) => {
         const m = messages[0];
-        
-        // סינון: התעלמות מהודעות שלי, הודעות ריקות, וסטטוסים
         if (!m.message || m.key.fromMe || m.key.remoteJid === 'status@broadcast') return;
 
         try {
-            // --- שינוי 2: שליפת כתובת היעד מה-DB (במקום מ-process.env) ---
-            const config = await SystemConfig.findOne();
+            // שולפים את המייל המעודכן ביותר
+            const config = await SystemConfig.findOne().sort({ createdAt: -1 }); 
             const TARGET_EMAIL = config?.targetWhatsAppEmail;
 
-            if (!TARGET_EMAIL) {
-                console.warn('⚠️ הודעה נכנסה, אך לא הוגדר מייל יעד (Target Email) בממשק הניהול.');
-                return;
-            }
-            // -------------------------------------------------------------
+            if (!TARGET_EMAIL) return;
 
-            // 1. חילוץ מספר הטלפון האמיתי ("המוח")
             const finalPhone = extractTruePhoneNumber(m);
             if (!finalPhone) return; 
 
-            // 2. חילוץ תוכן הטקסט
             const textContent = getMessageContent(m);
-            const senderJid = finalPhone; // המספר הנקי לשימוש בנושא המייל
+            const quotedContent = getQuotedText(m); // <--- שולפים את הציטוט כאן
 
-            // 3. טיפול במדיה (כולל הקלטות)
+            const senderJid = finalPhone; 
+            const senderName = m.pushName || 'לא ידוע';
+
             const messageType = Object.keys(m.message)[0];
             let attachments = [];
 
             if (['imageMessage', 'videoMessage', 'documentMessage', 'audioMessage'].includes(messageType)) {
-                
-                const buffer = await downloadMediaMessage(
-                    m, 
-                    'buffer', 
-                    {}, 
-                    { logger: pino({ level: 'silent' }) }
-                );
-
+                const buffer = await downloadMediaMessage(m, 'buffer', {}, { logger: pino({ level: 'silent' }) });
                 let filename = 'file';
                 if (messageType === 'imageMessage') filename = 'image.jpg';
                 else if (messageType === 'videoMessage') filename = 'video.mp4';
-                else if (messageType === 'audioMessage') filename = 'voice_note.ogg'; // הקלטה
+                else if (messageType === 'audioMessage') filename = 'voice_note.ogg';
                 else if (messageType === 'documentMessage') filename = m.message.documentMessage.fileName || 'document.pdf';
-
                 attachments.push({ filename, content: buffer });
             }
 
-            // 4. שליחת המייל ללקוח
+            // שולחים מייל אם יש טקסט, קובץ, או ציטוט
             if (textContent || attachments.length > 0) {
-                
-                // הוספת תאריך לנושא המייל -> יוצר שרשור יומי בג'ימייל
                 const today = new Date().toLocaleDateString('he-IL').replace(/\./g, '/');
                 
-                // התאמת טקסט להקלטות קוליות
-                const finalBodyText = textContent || (messageType === 'audioMessage' ? '[הודעה קולית]' : '');
+                let finalBodyText = textContent || (messageType === 'audioMessage' ? '[הודעה קולית]' : '');
 
-                console.log(`📩 הודעה מ-${senderJid} (${messageType}). מעביר למייל...`);
+                console.log(`📩 מעביר מייל מ-${senderName} (${finalPhone})`);
 
-                const senderName = m.pushName || 'לא ידוע';
-
-                // --- העיצוב החדש (HTML) ---
-                const htmlContent = `
-                    <div dir="rtl" style="direction: rtl; text-align: right; font-family: Arial, sans-serif; color: #333; line-height: 1.5;">
-                        <div style="font-size: 12px; color: #888; margin-bottom: 8px;">
-                            ${senderName} (${senderJid})
+                // --- בניית ה-HTML המעוצב ---
+                let htmlContent = `<div dir="rtl" style="font-family: Arial; text-align: right;">`;
+                
+                // הוספת בלוק ציטוט אם קיים
+                if (quotedContent) {
+                    htmlContent += `
+                        <div style="
+                            background-color: #f0f0f0; 
+                            border-right: 5px solid #25D366; 
+                            padding: 8px 12px; 
+                            margin-bottom: 12px; 
+                            color: #555; 
+                            border-radius: 4px;
+                            font-size: 0.9em;">
+                            <strong>הודעה שצוטטה:</strong><br>
+                            ${quotedContent.replace(/\n/g, '<br>')}
                         </div>
+                    `;
+                }
 
-                        <div style="font-size: 16px; white-space: pre-wrap; color: #000;">
+                // הוספת ההודעה החדשה
+                htmlContent += `
+                        <p style="font-size: 1.1em; color: #000;">
+                            <strong>${senderName}:</strong><br>
                             ${finalBodyText.replace(/\n/g, '<br>')}
-                        </div>
+                        </p>
                     </div>
                 `;
 
-                // --- שינוי 3: שימוש ב-sendOpsEmail במקום transporter.sendMail ---
                 await sendOpsEmail(
-                    TARGET_EMAIL, // למי לשלוח
-                    `WA_MSG: ${senderJid} [${today}]`, // נושא
-                    htmlContent, // תוכן HTML
-                    attachments // קבצים מצורפים
+                    TARGET_EMAIL, 
+                    `WA_MSG: ${senderJid} [${today}]`,
+                    htmlContent, // שולחים את ה-HTML המעוצב
+                    attachments 
                 );
-                // -------------------------------------------------------------
             }
 
         } catch (err) {

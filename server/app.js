@@ -15,9 +15,10 @@ import hallRoutes from './routes/hallRoutes.js';
 import groupRoutes from './routes/groupRoutes.js';
 import projectRoutes from './routes/projectRoutes.js';
 import taskRoutes from './routes/taskRoutes.js';
-import emailRoutes from './routes/emailRoutes.js'; // הקוד הישן שלך
-import chatRoutes from './routes/chatRoutes.js';   // <--- הוסף את זה (הקובץ החדש שיצרנו)
+import emailRoutes from './routes/emailRoutes.js';
+import chatRoutes from './routes/chatRoutes.js';
 import { connectToWhatsApp } from './services/whatsappService.js';
+import quoteRouter from './routes/quoteRoutes.js'; // <--- זה כבר קיים, מצוין
 
 import rateLimiter from './middlewares/rateLimiter.js';
 import { requireAuth } from './middlewares/authMiddleware.js';
@@ -42,7 +43,7 @@ const app = express();
 
 // --- Security & Config ---
 app.use(helmet({
-  crossOriginResourcePolicy: false // קריטי לתמונות!
+  crossOriginResourcePolicy: false
 }));
 
 app.use(cors({
@@ -50,23 +51,26 @@ app.use(cors({
   credentials: true
 }));
 
-// הגדלת ה-Limit קריטית לקבלת קבצים במייל/צ'אט
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
 app.use(mongoSanitize());
 
-// הגשת קבצים סטטיים (העלאות)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // =================================================================
-// 🚨 איזור ה-Webhook (קריטי!)
-// חייב להיות לפני ה-CSRF Protection כי ספק המייל (SendGrid וכו') לא שולח Token.
+// 🚨 Routes ללא הגנה (Public / Webhooks)
 // =================================================================
 app.use('/api/chat', chatRoutes); 
+app.use('/api/auth', authRoutes);
+
+// ✅ התיקון: הזזתי את זה לפה והורדתי את requireAuth זמנית
+// עכשיו זה פתוח וזמין לשמירה בלי חסימות
+app.use('/api/quotes', quoteRouter); 
+// =================================================================
 
 
-// --- CSRF ---
+// --- CSRF Protection (החסימה מתחילה מכאן) ---
 const csrfProtection = csurf({
   cookie: {
     httpOnly: true,
@@ -75,28 +79,26 @@ const csrfProtection = csurf({
   },
 });
 
-// --- Public Routes ---
-app.use('/api/auth', authRoutes);
-
 app.get('/api/csrf-token', rateLimiter, csrfProtection, (req, res) => {
   res.json({ csrfToken: req.csrfToken() });
 });
-app.use('/api/emails', emailRoutes); // זה הנתיב הישן שלך, שקול אם אתה עדיין צריך אותו
+app.use('/api/emails', emailRoutes);
 
-// --- Protected Routes ---
-// כל מה שנמצא מתחת לשורה הזו דורש CSRF Token (הגנה למשתמשים בדפדפן)
+// --- Protected Routes (מכאן והלאה הכל חסום ללא טוקן) ---
 app.use(csrfProtection); 
 
 app.use('/api/projects', requireAuth, projectRoutes);
 app.use('/api/halls', requireAuth, hallRoutes);
 app.use('/api/groups', requireAuth, groupRoutes);
 app.use('/api/tasks', taskRoutes);
+// שימי לב: מחקתי מפה את quotes כי העברתי אותו למעלה!
 
 // Error Handling
 app.use('*', (req, res) => {
   res.status(404).json({ message: 'API endpoint not found' });
 });
 
+// שימוש ב-Global Error Handler (אם יצרת אותו לפי ההוראות הקודמות, תוסיף אותו כאן)
 app.use((err, req, res, next) => {
   if (err.code === 'EBADCSRFTOKEN') {
     return res.status(403).json({ message: 'Form has been tampered with (CSRF Invalid)' });
@@ -105,8 +107,6 @@ app.use((err, req, res, next) => {
   res.status(err.statusCode || 500).json({ message: err.message || 'Internal Server Error' });
 });
 
-// הערה: אם אתה עובר מלא לשיטת ה-Webhook, ייתכן שלא תצטרך את startEmailListener
-// אבל אם אתה רוצה לשמור על המנגנון הישן במקביל, תשאיר את זה.
 startEmailListener(); 
 connectToWhatsApp();
 

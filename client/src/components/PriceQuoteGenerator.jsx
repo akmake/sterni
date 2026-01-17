@@ -3,6 +3,7 @@ import { Save, Printer, Trash2, Table as TableIcon, Type, FileDown, LoaderCircle
 import { toast } from 'react-hot-toast';
 import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
+import QuoteManager from './QuoteManager'; // <--- וודא שקובץ זה קיים בתיקייה
 
 // --- הגדרות A4 ---
 const A4_HEIGHT_PX = 1123;
@@ -356,7 +357,37 @@ const PriceQuoteGenerator = () => {
       }
   };
 
-// npm install html2canvas@latest
+// --- אינטגרציה למערכת שמירה ---
+
+// איסוף כל הנתונים לשמירה
+const dataToSave = {
+    clientName,
+    contactName,
+    contactPhone,
+    contactEmail,
+    eventType,
+    arrivalDate,
+    departureDate,
+    minPax,
+    blocks
+};
+
+// פונקציה לטעינת נתונים חזרה למסך
+const handleLoadData = (data) => {
+    if (!data) return;
+    if (data.clientName) setClientName(data.clientName);
+    if (data.contactName) setContactName(data.contactName);
+    if (data.contactPhone) setContactPhone(data.contactPhone);
+    if (data.contactEmail) setContactEmail(data.contactEmail);
+    if (data.eventType) setEventType(data.eventType);
+    if (data.arrivalDate) setArrivalDate(data.arrivalDate);
+    if (data.departureDate) setDepartureDate(data.departureDate);
+    if (data.minPax) setMinPax(data.minPax);
+    if (data.blocks) setBlocks(data.blocks);
+    
+    toast.success('הצעה נטענה בהצלחה!');
+};
+
 
 const handleGeneratePDF = async () => {
     if (!containerRef.current || isDownloading) return;
@@ -364,7 +395,6 @@ const handleGeneratePDF = async () => {
     const toastId = toast.loading('מייצר PDF קליל...');
 
     try {
-        // שינוי 1: הפעלת דחיסה מובנית ב-jsPDF (הפרמטר האחרון 'true')
         const pdf = new jsPDF('p', 'mm', 'a4', true);
         const pdfWidth = 210;
         const pdfHeight = 297;
@@ -374,12 +404,10 @@ const handleGeneratePDF = async () => {
         for (let i = 0; i < pageElements.length; i++) {
             const element = pageElements[i];
 
-            // שינוי 2: שימוש ב-toJpeg במקום toPng
-            // שינוי 3: הגדרת איכות ו-PixelRatio חסכוניים
             const dataUrl = await htmlToImage.toJpeg(element, {
-                quality: 3, // איכות 75% - מעולה למסמכים וחוסך המון מקום
-                pixelRatio: 4, // רזולוציה טיפה נמוכה יותר (עדיין חדה להדפסה)
-                backgroundColor: '#ffffff', // חובה ב-JPEG כדי שהרקע לא יהיה שחור
+                quality: 0.75,
+                pixelRatio: 2, 
+                backgroundColor: '#ffffff',
                 width: 794, 
                 height: 1123, 
                 style: {
@@ -392,7 +420,6 @@ const handleGeneratePDF = async () => {
             });
 
             if (i > 0) pdf.addPage();
-            // פרמטרים נוספים ('FAST') לטעינה מהירה יותר ב-PDF
             pdf.addImage(dataUrl, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
         }
 
@@ -425,8 +452,16 @@ const handleGeneratePDF = async () => {
          <div className="font-bold text-gray-700 text-lg flex items-center gap-2">
             <FileDown className="text-amber-500"/> מחולל הצעות
          </div>
-         <div className="flex gap-3">
-             {/* כפתור שמירה לשרת הוסר כי אין שיוך לקבוצה */}
+         
+         <div className="flex gap-3 items-center">
+             {/* --- רכיב השמירה והטעינה --- */}
+             <QuoteManager 
+                currentData={dataToSave} 
+                onLoadData={handleLoadData} 
+             />
+             
+             <div className="h-6 w-[1px] bg-gray-300 mx-2"></div>
+
              <button onClick={handleGeneratePDF} disabled={isDownloading} className="flex items-center gap-2 bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 font-bold text-sm shadow-sm">
                  {isDownloading ? <LoaderCircle className="animate-spin" size={16}/> : <FileDown size={16}/>} הורד PDF
              </button>
@@ -481,7 +516,7 @@ const handleGeneratePDF = async () => {
 
                             {/* לוגו משמאל */}
                             <div className="text-left w-[45%] flex flex-col items-end">
-                                <img src="/opo.png" alt="Logo" className="h-32 object-contain mb-3" />
+                                <img src="/pop.png" alt="Logo" className="h-32 object-contain mb-3" />
                             </div>
                         </div>
 

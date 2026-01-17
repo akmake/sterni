@@ -45,7 +45,7 @@ const getImapConfig = async () => {
 };
 
 // ==========================================
-// === 🧹 המטאטא המשופר: מנקה זבל ביסודיות ===
+// === 🧹 המטאטא: הגרסה שאתה רוצה ===
 // ==========================================
 const cleanEmailBody = (text) => {
     if (!text) return "";
@@ -56,30 +56,25 @@ const cleanEmailBody = (text) => {
     for (let line of lines) {
         let trimmed = line.trim(); 
 
-        // דילוג על שורות ריקות בהתחלה
-        if (cleanLines.length === 0 && trimmed === '') continue;
+        // 1. זיהוי השורה הספציפית שהראית לי (אנגלית עם תאריך ושעה)
+        // פורמט: On Sun, Jan 18, 2026 at 12:14 AM ... <email>
+        if (trimmed.startsWith("On ") && trimmed.includes(" at ") && (trimmed.includes("<") || trimmed.includes("wrote"))) {
+            break; 
+        }
 
-        // --- זיהוי כותרות תגובה של ג'ימייל (החלק הבעייתי) ---
-        
-        // 1. אנגלית: מזהה "On ... wrote:" גם אם יש תווים שקופים לפני ה-On
-        // [\s\u200e\u200f\u202a-\u202e]* -> תופס רווחים ותווי כיוון נסתרים
-        if (/^[\s\u200e\u200f\u202a-\u202e]*On\s.+wrote:?$/i.test(trimmed)) break;
+        // 2. זיהוי רגיל (אנגלית)
+        if (/^On .* wrote:$/i.test(trimmed)) break;
 
-        // 2. עברית: "בתאריך ... מאת ..."
-        if (/^[\s\u200e\u200f\u202a-\u202e]*בתאריך.+מאת.+/.test(trimmed)) break;
+        // 3. זיהוי עברית
+        if (trimmed.includes("בתאריך") && trimmed.includes("מאת")) break;
 
-        // 3. פורמטים נוספים (Outlook וכו')
+        // 4. ניקויים נוספים
         if (/^From:\s/i.test(trimmed)) break;
-        if (/^_{3,}/.test(trimmed)) break; // ____________
-        if (/^-{3,}/.test(trimmed)) break; // ------------
-
-        // 4. ציטוטים (שורות שמתחילות ב->)
+        if (/^_{3,}/.test(trimmed)) break;
+        if (/^-{3,}/.test(trimmed)) break;
         if (trimmed.startsWith('>')) break;
-
-        // 5. חתימות נפוצות (אופציונלי, אפשר להסיר אם רוצים חתימות)
-        if (/^Sent from my iPhone/i.test(trimmed)) continue;
-        if (/^נשלח מה-iPhone שלי/.test(trimmed)) continue;
-        if (/^Get Outlook for/i.test(trimmed)) continue;
+        if (trimmed.includes("Sent from my iPhone")) continue;
+        if (trimmed.includes("נשלח מה-iPhone שלי")) continue;
 
         cleanLines.push(line);
     }
@@ -116,7 +111,7 @@ const checkForNewEmails = async (systemEmail) => {
     try {
         if (!connection) return;
 
-        // markSeen: false -> קריטי כדי לא לאבד הודעות אם הוואצאפ מנותק
+        // לא מסמנים כנקרא אוטומטית כדי לא לאבד מידע
         const searchCriteria = ['UNSEEN'];
         const fetchOptions = { bodies: ['HEADER', 'TEXT', ''], markSeen: false, struct: true };
 
@@ -138,7 +133,6 @@ const checkForNewEmails = async (systemEmail) => {
             
             // --- הניקוי מתבצע כאן ---
             const cleanContent = cleanEmailBody(parsed.text);
-
             let shouldMarkAsSeen = false;
 
             // =========================================================
@@ -159,8 +153,10 @@ const checkForNewEmails = async (systemEmail) => {
                     const remoteJid = `${phoneNumber}@s.whatsapp.net`;
 
                     try {
-                        // 1. שליחת הטקסט (הנקי בלבד!)
-                        if (cleanContent) {
+                        // 1. שליחת טקסט - רק אם נשאר משהו אחרי הניקוי!
+                        // אם הניקוי מחק את כל ה-"On Sun... wrote", אז cleanContent יהיה ריק
+                        // וההודעה הזו לא תישלח!
+                        if (cleanContent && cleanContent.length > 0) {
                             await sock.sendMessage(remoteJid, { text: cleanContent });
                             console.log(`📤 נשלחה תשובה נקייה ל-${phoneNumber}`);
                         }

@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Save, Printer, Trash2, Table as TableIcon, Type, FileDown, LoaderCircle, Bold, Italic, Underline, AlignRight, AlignCenter, AlignLeft, List, ListOrdered, MousePointerClick, Plus, Send, Mail } from 'lucide-react';
+import { Save, Printer, Trash2, Table as TableIcon, Type, FileDown, LoaderCircle, Bold, Italic, Underline, AlignRight, AlignCenter, AlignLeft, MousePointerClick, Plus, Send, Mail } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import useGroupsStore from '@/stores/groupsStore';
 import { toast } from 'react-hot-toast';
-import html2canvas from 'html2canvas';
+import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
-import axios from 'axios'; 
+import axios from 'axios';
 
 // --- הגדרות A4 ---
 const A4_HEIGHT_PX = 1123;
@@ -111,7 +111,6 @@ const PaymentRequestGenerator = () => {
   const [orderNumber, setOrderNumber] = useState('');
   const [targetEmail, setTargetEmail] = useState(''); 
   
-  // *** State חדש לפרטי הכותרת (עריכה) ***
   const [headerDetails, setHeaderDetails] = useState({
       groupName: '',
       contactName: '',
@@ -135,7 +134,7 @@ const PaymentRequestGenerator = () => {
     return () => window.removeEventListener('click', handleClick);
   }, []);
 
-  // --- טעינת נתונים וטיוטות ---
+  // --- טעינת נתונים ---
   useEffect(() => {
     if (!group) { 
         fetchGroups(); 
@@ -148,17 +147,14 @@ const PaymentRequestGenerator = () => {
                 const draftData = JSON.parse(savedDraft);
                 const serverTime = group.paymentRequest?.lastUpdated ? new Date(group.paymentRequest.lastUpdated).getTime() : 0;
                 
-                // אם הטיוטה חדשה יותר או שאין נתונים בשרת
                 if (draftData.timestamp > serverTime) {
                     setBlocks(draftData.blocks);
                     setOrderNumber(draftData.orderNumber);
                     setTargetEmail(draftData.targetEmail || group.contactPerson?.email || '');
                     
-                    // טעינת פרטי כותרת מהטיוטה (אם קיימים)
                     if (draftData.headerDetails) {
                         setHeaderDetails(draftData.headerDetails);
                     } else {
-                        // Fallback למקרה של טיוטה ישנה
                         setHeaderDetails({
                             groupName: group.name,
                             contactName: group.contactPerson?.name || '',
@@ -176,11 +172,9 @@ const PaymentRequestGenerator = () => {
         }
 
         if (!loadedFromDraft) {
-            // טעינה רגילה מהשרת/דאטה
             if (group.paymentRequest?.blocks && group.paymentRequest.blocks.length > 0) {
                 setBlocks(group.paymentRequest.blocks);
                 setOrderNumber(group.paymentRequest.orderNumber || '');
-                // אם נשמר בעבר headerDetails בשרת - נטען, אחרת ברירת מחדל
                 if (group.paymentRequest.headerDetails) {
                     setHeaderDetails(group.paymentRequest.headerDetails);
                 } else {
@@ -193,7 +187,6 @@ const PaymentRequestGenerator = () => {
                 }
             } else {
                 initializeDefaultPaymentRequest(group);
-                // אתחול כותרת
                 setHeaderDetails({
                     groupName: group.name,
                     contactName: group.contactPerson?.name || '',
@@ -206,21 +199,21 @@ const PaymentRequestGenerator = () => {
     }
   }, [group, DRAFT_KEY]);
 
-  // --- שמירת טיוטה אוטומטית (Auto-Save) ---
+  // --- שמירה אוטומטית ---
   useEffect(() => {
       if (blocks.length > 0 && groupId) {
           const draftData = {
               blocks,
               orderNumber,
               targetEmail,
-              headerDetails, // שומרים גם את פרטי הכותרת
+              headerDetails,
               timestamp: Date.now()
           };
           localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
       }
   }, [blocks, orderNumber, targetEmail, headerDetails, groupId, DRAFT_KEY]);
 
-  // --- פגינציה (לוגיקה קיימת) ---
+  // --- פגינציה ---
   useLayoutEffect(() => {
     if (!blocks.length) return;
     const newPages = [];
@@ -425,15 +418,37 @@ const PaymentRequestGenerator = () => {
       }
   };
 
-  // --- פונקציה ראשית ליצירת PDF (גם להורדה וגם לשליחה) ---
+  // --- ייצור PDF - העתק מדויק מהקוד שעובד ב-PriceQuoteGenerator ---
   const generatePDFBlob = async () => {
     if (!containerRef.current) return null;
-    const pdf = new jsPDF('p', 'mm', 'a4');
+    
+    const pdf = new jsPDF('p', 'mm', 'a4', true);
+    const pdfWidth = 210;
+    const pdfHeight = 297;
+    
     const pageElements = containerRef.current.querySelectorAll('.quote-page');
+
     for (let i = 0; i < pageElements.length; i++) {
-        const canvas = await html2canvas(pageElements[i], { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false, ignoreElements: (el) => el.classList.contains('no-print') });
+        const element = pageElements[i];
+
+        // *** שימוש בקונפיגורציה המדויקת מהקוד התקין ***
+        const dataUrl = await htmlToImage.toJpeg(element, {
+            quality: 0.75,
+            pixelRatio: 2, 
+            backgroundColor: '#ffffff',
+            width: 794, 
+            height: 1123, 
+            style: {
+                margin: 0,
+                transform: 'none', 
+                display: 'flex',
+                flexDirection: 'column'
+            },
+            filter: (node) => !node.classList?.contains('no-print')
+        });
+
         if (i > 0) pdf.addPage();
-        pdf.addImage(canvas.toDataURL('image/jpeg', 1.0), 'JPEG', 0, 0, 210, 297);
+        pdf.addImage(dataUrl, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
     }
     return pdf;
   };
@@ -444,7 +459,7 @@ const PaymentRequestGenerator = () => {
     const toastId = toast.loading('מייצר PDF להורדה...');
     try {
         const pdf = await generatePDFBlob();
-        pdf.save(`דרישת_תשלום_${headerDetails.groupName}.pdf`);
+        pdf.save(`דרישת_תשלום_${headerDetails.groupName.replace(/[^a-zA-Z0-9א-ת]/g, '_')}.pdf`);
         toast.success('הקובץ נוצר!', { id: toastId });
     } catch (err) {
         console.error(err);
@@ -471,7 +486,7 @@ const PaymentRequestGenerator = () => {
         const pdfBlob = pdf.output('blob');
 
         const formData = new FormData();
-        formData.append('file', pdfBlob, `payment_request_${headerDetails.groupName}.pdf`);
+        formData.append('file', pdfBlob, `payment_request_${headerDetails.groupName.replace(/[^a-zA-Z0-9א-ת]/g, '_')}.pdf`);
         formData.append('email', targetEmail);
         formData.append('subject', `דרישת תשלום - ${headerDetails.groupName}`);
         formData.append('body', `מצורפת דרישת תשלום עבור ${headerDetails.groupName}.\n\nבברכה,\nצוות ציפורי.`);
@@ -494,7 +509,6 @@ const PaymentRequestGenerator = () => {
 
   const handleSave = async (showToast = true) => {
       if(!group) return;
-      // שומרים גם את ה-headerDetails לשרת
       await updateGroup(group._id, { paymentRequest: { blocks, orderNumber, headerDetails, lastUpdated: new Date() }});
       if(showToast) toast.success("נשמר בשרת");
       localStorage.removeItem(DRAFT_KEY);
@@ -522,7 +536,6 @@ const PaymentRequestGenerator = () => {
              <span className="text-xs font-normal text-gray-400 mr-2 bg-gray-100 px-2 py-0.5 rounded-full">נשמר בטיוטה אוטומטית</span>
          </div>
          
-         {/* אזור שליחת מייל */}
          <div className="flex items-center gap-2 bg-blue-50 px-3 py-1 rounded-md border border-blue-100 mx-4">
             <Mail size={16} className="text-blue-500"/>
             <input 
@@ -561,7 +574,6 @@ const PaymentRequestGenerator = () => {
                                 <div className="text-sm font-serif mb-2 text-gray-500">בס"ד</div>
                                 <div className="flex items-center gap-1 mb-2">
                                     <span className="text-2xl font-bold text-slate-900 ml-1">לכבוד:</span>
-                                    {/* --- שדות עריכה לשם הקבוצה --- */}
                                     <input 
                                         type="text"
                                         value={headerDetails.groupName}
@@ -572,7 +584,6 @@ const PaymentRequestGenerator = () => {
                                 </div>
                                 
                                 <div className="text-slate-700 text-base space-y-1 mb-4 flex flex-col">
-                                    {/* --- שדות עריכה לאיש קשר --- */}
                                     <input 
                                         type="text"
                                         value={headerDetails.contactName}

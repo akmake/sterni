@@ -5,7 +5,7 @@ import useGroupsStore from '@/stores/groupsStore';
 import { toast } from 'react-hot-toast';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import axios from 'axios'; // וודא שמותקן axios
+import axios from 'axios'; 
 
 // --- הגדרות A4 ---
 const A4_HEIGHT_PX = 1123;
@@ -31,6 +31,7 @@ const printStyles = `
     button { display: none !important; }
     .inserter-bar { display: none !important; }
     [contenteditable] { outline: none !important; }
+    input { border: none !important; background: transparent !important; outline: none !important; } 
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   }
 `;
@@ -108,16 +109,25 @@ const PaymentRequestGenerator = () => {
 
   const [blocks, setBlocks] = useState([]);
   const [orderNumber, setOrderNumber] = useState('');
-  const [targetEmail, setTargetEmail] = useState(''); // מייל יעד
+  const [targetEmail, setTargetEmail] = useState(''); 
+  
+  // *** State חדש לפרטי הכותרת (עריכה) ***
+  const [headerDetails, setHeaderDetails] = useState({
+      groupName: '',
+      contactName: '',
+      contactPhone: '',
+      contactEmail: ''
+  });
+
   const [paginatedPages, setPaginatedPages] = useState([]);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [isSending, setIsSending] = useState(false); // סטטוס שליחה
+  const [isSending, setIsSending] = useState(false); 
   
   const [contextMenu, setContextMenu] = useState(null);
 
   const blockRefs = useRef({});
   const containerRef = useRef(null);
-  const DRAFT_KEY = `draft_payment_${groupId}`; // מפתח ייחודי לטיוטה
+  const DRAFT_KEY = `draft_payment_${groupId}`; 
 
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
@@ -130,19 +140,33 @@ const PaymentRequestGenerator = () => {
     if (!group) { 
         fetchGroups(); 
     } else {
-        // בדיקה אם יש טיוטה שמורה בלוקאל
         const savedDraft = localStorage.getItem(DRAFT_KEY);
         let loadedFromDraft = false;
 
         if (savedDraft) {
             try {
                 const draftData = JSON.parse(savedDraft);
-                // אם הטיוטה חדשה יותר מהעדכון האחרון בשרת (או שאין נתונים בשרת)
                 const serverTime = group.paymentRequest?.lastUpdated ? new Date(group.paymentRequest.lastUpdated).getTime() : 0;
+                
+                // אם הטיוטה חדשה יותר או שאין נתונים בשרת
                 if (draftData.timestamp > serverTime) {
                     setBlocks(draftData.blocks);
                     setOrderNumber(draftData.orderNumber);
                     setTargetEmail(draftData.targetEmail || group.contactPerson?.email || '');
+                    
+                    // טעינת פרטי כותרת מהטיוטה (אם קיימים)
+                    if (draftData.headerDetails) {
+                        setHeaderDetails(draftData.headerDetails);
+                    } else {
+                        // Fallback למקרה של טיוטה ישנה
+                        setHeaderDetails({
+                            groupName: group.name,
+                            contactName: group.contactPerson?.name || '',
+                            contactPhone: group.contactPerson?.phone || '',
+                            contactEmail: group.contactPerson?.email || ''
+                        });
+                    }
+
                     toast.success('טיוטה שלא נשמרה שוחזרה', { position: 'bottom-center', icon: '📝' });
                     loadedFromDraft = true;
                 }
@@ -152,11 +176,30 @@ const PaymentRequestGenerator = () => {
         }
 
         if (!loadedFromDraft) {
+            // טעינה רגילה מהשרת/דאטה
             if (group.paymentRequest?.blocks && group.paymentRequest.blocks.length > 0) {
                 setBlocks(group.paymentRequest.blocks);
                 setOrderNumber(group.paymentRequest.orderNumber || '');
+                // אם נשמר בעבר headerDetails בשרת - נטען, אחרת ברירת מחדל
+                if (group.paymentRequest.headerDetails) {
+                    setHeaderDetails(group.paymentRequest.headerDetails);
+                } else {
+                    setHeaderDetails({
+                        groupName: group.name,
+                        contactName: group.contactPerson?.name || '',
+                        contactPhone: group.contactPerson?.phone || '',
+                        contactEmail: group.contactPerson?.email || ''
+                    });
+                }
             } else {
                 initializeDefaultPaymentRequest(group);
+                // אתחול כותרת
+                setHeaderDetails({
+                    groupName: group.name,
+                    contactName: group.contactPerson?.name || '',
+                    contactPhone: group.contactPerson?.phone || '',
+                    contactEmail: group.contactPerson?.email || ''
+                });
             }
             setTargetEmail(group.contactPerson?.email || '');
         }
@@ -170,11 +213,12 @@ const PaymentRequestGenerator = () => {
               blocks,
               orderNumber,
               targetEmail,
+              headerDetails, // שומרים גם את פרטי הכותרת
               timestamp: Date.now()
           };
           localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
       }
-  }, [blocks, orderNumber, targetEmail, groupId, DRAFT_KEY]);
+  }, [blocks, orderNumber, targetEmail, headerDetails, groupId, DRAFT_KEY]);
 
   // --- פגינציה (לוגיקה קיימת) ---
   useLayoutEffect(() => {
@@ -400,7 +444,7 @@ const PaymentRequestGenerator = () => {
     const toastId = toast.loading('מייצר PDF להורדה...');
     try {
         const pdf = await generatePDFBlob();
-        pdf.save(`דרישת_תשלום_${group.name}.pdf`);
+        pdf.save(`דרישת_תשלום_${headerDetails.groupName}.pdf`);
         toast.success('הקובץ נוצר!', { id: toastId });
     } catch (err) {
         console.error(err);
@@ -421,28 +465,23 @@ const PaymentRequestGenerator = () => {
     const toastId = toast.loading('מייצר PDF ושולח למייל...');
 
     try {
-        // 1. שמירה לשרת קודם כל (כדי שיהיה גיבוי)
         await handleSave(false); 
 
-        // 2. יצירת ה-PDF
         const pdf = await generatePDFBlob();
         const pdfBlob = pdf.output('blob');
 
-        // 3. הכנת הטופס לשליחה
         const formData = new FormData();
-        formData.append('file', pdfBlob, `payment_request_${group.name}.pdf`);
+        formData.append('file', pdfBlob, `payment_request_${headerDetails.groupName}.pdf`);
         formData.append('email', targetEmail);
-        formData.append('subject', `דרישת תשלום - ${group.name}`);
-        formData.append('body', `מצורפת דרישת תשלום עבור ${group.name}.\n\nבברכה,\nצוות ציפורי.`);
+        formData.append('subject', `דרישת תשלום - ${headerDetails.groupName}`);
+        formData.append('body', `מצורפת דרישת תשלום עבור ${headerDetails.groupName}.\n\nבברכה,\nצוות ציפורי.`);
 
-        // 4. שליחה לשרת (יש ליצור את ה-Route הזה בצד שרת!)
         await axios.post('/api/emails/send-attachment', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
-            withCredentials: true // <--- הנה התיקון! זה אומר לו לשלוח את הקוקי של החיבור
+            withCredentials: true 
         });
         toast.success('המייל נשלח בהצלחה!', { id: toastId });
         
-        // אופציונלי: מחיקת הטיוטה לאחר שליחה מוצלחת
         localStorage.removeItem(DRAFT_KEY);
 
     } catch (err) {
@@ -455,9 +494,9 @@ const PaymentRequestGenerator = () => {
 
   const handleSave = async (showToast = true) => {
       if(!group) return;
-      await updateGroup(group._id, { paymentRequest: { blocks, orderNumber, lastUpdated: new Date() }});
+      // שומרים גם את ה-headerDetails לשרת
+      await updateGroup(group._id, { paymentRequest: { blocks, orderNumber, headerDetails, lastUpdated: new Date() }});
       if(showToast) toast.success("נשמר בשרת");
-      // אחרי שמירה מוצלחת בשרת, אפשר למחוק את הטיוטה המקומית כדי למנוע קונפליקטים עתידיים
       localStorage.removeItem(DRAFT_KEY);
   };
 
@@ -520,11 +559,41 @@ const PaymentRequestGenerator = () => {
                         <div className="flex justify-between items-start">
                             <div className="text-right pt-2 w-[55%]">
                                 <div className="text-sm font-serif mb-2 text-gray-500">בס"ד</div>
-                                <h2 className="text-2xl font-bold mb-2 text-slate-900">לכבוד: {group.name}</h2>
-                                <div className="text-slate-700 text-base space-y-1 mb-4">
-                                    <div className="font-medium">{group.contactPerson?.name}</div>
-                                    <div>{group.contactPerson?.phone}</div>
-                                    <div>{group.contactPerson?.email}</div>
+                                <div className="flex items-center gap-1 mb-2">
+                                    <span className="text-2xl font-bold text-slate-900 ml-1">לכבוד:</span>
+                                    {/* --- שדות עריכה לשם הקבוצה --- */}
+                                    <input 
+                                        type="text"
+                                        value={headerDetails.groupName}
+                                        onChange={(e) => setHeaderDetails({ ...headerDetails, groupName: e.target.value })}
+                                        className="text-2xl font-bold text-slate-900 bg-transparent outline-none w-full placeholder:text-gray-300"
+                                        placeholder="שם הלקוח/קבוצה"
+                                    />
+                                </div>
+                                
+                                <div className="text-slate-700 text-base space-y-1 mb-4 flex flex-col">
+                                    {/* --- שדות עריכה לאיש קשר --- */}
+                                    <input 
+                                        type="text"
+                                        value={headerDetails.contactName}
+                                        onChange={(e) => setHeaderDetails({ ...headerDetails, contactName: e.target.value })}
+                                        className="font-medium bg-transparent outline-none w-full placeholder:text-gray-300"
+                                        placeholder="שם איש קשר"
+                                    />
+                                    <input 
+                                        type="text"
+                                        value={headerDetails.contactPhone}
+                                        onChange={(e) => setHeaderDetails({ ...headerDetails, contactPhone: e.target.value })}
+                                        className="bg-transparent outline-none w-full placeholder:text-gray-300"
+                                        placeholder="טלפון"
+                                    />
+                                    <input 
+                                        type="text"
+                                        value={headerDetails.contactEmail}
+                                        onChange={(e) => setHeaderDetails({ ...headerDetails, contactEmail: e.target.value })}
+                                        className="bg-transparent outline-none w-full placeholder:text-gray-300"
+                                        placeholder="מייל"
+                                    />
                                 </div>
                             </div>
                             <div className="text-left w-[45%] flex flex-col items-end">
@@ -547,7 +616,7 @@ const PaymentRequestGenerator = () => {
                     </header>
                 ) : (
                     <div className="border-b mb-6 pb-2 flex justify-between text-gray-400 text-xs uppercase tracking-wider">
-                        <span>המשך דרישת תשלום: {group.name}</span>
+                        <span>המשך דרישת תשלום: {headerDetails.groupName}</span>
                         <span>עמוד {pageIndex + 1}</span>
                     </div>
                 )}
@@ -560,7 +629,7 @@ const PaymentRequestGenerator = () => {
                     {pageBlocks.map((block) => {
                         const realIndex = blocks.findIndex(b => b.id === block.id);
                         return (
-                            <div key={block.id} ref={el => blockRefs.current[block.id] = el} className="relative group/block mb-1"> {/* מרווח חיצוני 0 */}
+                            <div key={block.id} ref={el => blockRefs.current[block.id] = el} className="relative group/block mb-1"> 
                                 <button onClick={() => removeBlock(block.id)} className="absolute -right-10 top-0 text-gray-300 hover:text-red-500 no-print opacity-0 group-hover/block:opacity-100 transition-opacity p-2 z-30"><Trash2 size={16}/></button>
 
                                 {block.type === 'text' ? (
@@ -569,7 +638,6 @@ const PaymentRequestGenerator = () => {
                                         onContextMenu={(e) => handleContextMenu(e, 'text', block.id)}
                                         dangerouslySetInnerHTML={{ __html: block.content }}
                                         onBlur={(e) => updateBlock(block.id, { content: e.target.innerHTML })}
-                                        // חזרנו ל-p-2 (המקורי). לא נוגעים בפנים!
                                         className="w-full min-h-[1.5em] outline-none border border-transparent hover:border-blue-200 focus:border-blue-400 p-2 rounded transition-colors text-sm leading-relaxed whitespace-pre-wrap relative z-20"
                                     />
                                 ) : (
@@ -581,7 +649,6 @@ const PaymentRequestGenerator = () => {
                                         <input
                                             value={block.title || ''}
                                             onChange={(e) => updateBlock(block.id, { title: e.target.value })}
-                                            // הקטנת רווח רק בין הכותרת לטבלה שלה
                                             className="font-bold text-slate-700 text-base bg-transparent border-b border-transparent hover:border-gray-300 focus:border-amber-500 outline-none px-1 w-full mb-1"
                                             placeholder="כותרת טבלה..."
                                         />
@@ -615,9 +682,8 @@ const PaymentRequestGenerator = () => {
                                     </div>
                                 )}
                                 
-                                {/* כאן התיקון הקריטי: הגובה הוא 0, כדי ששורת ההוספה לא תתפוס מקום פיזי בין האלמנטים */}
                                 <div className="w-full flex justify-center h-0 overflow-visible relative z-50 no-print">
-                                    <div className="absolute top-[-14px]"> {/* ממוקם בדיוק על התפר */}
+                                    <div className="absolute top-[-14px]"> 
                                         <Inserter onAddText={() => addBlock(realIndex, 'text')} onAddTable={() => addBlock(realIndex, 'table')} />
                                     </div>
                                 </div>

@@ -67,7 +67,6 @@ app.use('/api/auth', authRoutes);
 app.use('/api/emails', emailRoutes); // 2. שימוש
 // ✅ התיקון: הזזתי את זה לפה והורדתי את requireAuth זמנית
 // עכשיו זה פתוח וזמין לשמירה בלי חסימות
-app.use('/api/quotes', quoteRouter); 
 
 // =================================================================
 
@@ -93,6 +92,7 @@ app.use('/api/halls', requireAuth, hallRoutes);
 app.use('/api/groups', requireAuth, groupRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/quotes', requireAuth, quoteRouter);
 // שימי לב: מחקתי מפה את quotes כי העברתי אותו למעלה!
 
 // Error Handling

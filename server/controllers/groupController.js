@@ -39,6 +39,49 @@ export const createGroup = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+export const duplicateEvents = async (req, res, next) => {
+  try {
+    const { groupId } = req.params;
+    const { eventIds, targetDate } = req.body; // eventIds = מערך של מזהים, targetDate = התאריך שאליו מעתיקים
+
+    const group = await Group.findById(groupId);
+    if (!group) return res.status(404).json({ message: 'קבוצה לא נמצאה' });
+
+    // המרה לתאריך יעד (מאפסים שעות כדי למנוע בעיות)
+    const newDateObj = new Date(targetDate);
+    newDateObj.setHours(0, 0, 0, 0);
+
+    // סינון: לוקחים רק את האירועים שביקשת לשכפל
+    const eventsToDuplicate = group.schedule.filter(evt => eventIds.includes(evt._id.toString()));
+
+    if (eventsToDuplicate.length === 0) {
+      return res.status(400).json({ message: 'לא נבחרו אירועים לשכפול' });
+    }
+
+    // יצירת העותקים
+    const newEvents = eventsToDuplicate.map(evt => {
+      return {
+        title: evt.title,       // מעתיק שם
+        startTime: evt.startTime, // מעתיק שעה
+        endTime: evt.endTime,     // מעתיק שעת סיום
+        hall: evt.hall,           // מעתיק אולם
+        isMeal: evt.isMeal,       // מעתיק האם ארוחה
+        notes: evt.notes,         // מעתיק הערות
+        date: newDateObj,         // ✅ התאריך החדש
+        eventType: evt.eventType  // מעתיק סוג
+      };
+    });
+
+    // הוספה ללו"ז ושמירה
+    group.schedule.push(...newEvents);
+    await group.save();
+
+    res.status(200).json(group); // מחזיר את הקבוצה המעודכנת
+  } catch (error) {
+    next(error);
+  }
+};
+
 // --- עדכון פרטי קבוצה ---
 export const updateGroupDetails = async (req, res, next) => {
     try {

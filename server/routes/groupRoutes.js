@@ -8,6 +8,7 @@ import {
     addEventToGroup, 
     removeEventFromGroup, 
     updateGroupDetails,
+    duplicateEvents,
     deleteGroup // <-- 1. הוספנו את הייבוא של הפונקציה
 } from '../controllers/groupController.js';
 
@@ -29,5 +30,6 @@ router.delete('/:groupId', deleteGroup); // <-- 2. הנה התיקון! זה מ�
 router.post('/:groupId/events', addEventToGroup);
 router.patch('/:groupId/events/:eventId', updateGroupEvent);
 router.delete('/:groupId/events/:eventId', removeEventFromGroup);
+router.post('/:groupId/duplicate-events', duplicateEvents);
 
 export default router;

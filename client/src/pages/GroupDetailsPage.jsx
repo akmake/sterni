@@ -14,7 +14,7 @@ import {
   FileText, // Icon added
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-
+import DayDuplicator from '@/components/DayDuplicator';
 // Imports from split files
 import { SegmentedControl, AppleInput, AppleSelect } from './GroupPageComponents';
 import GroupPageHeader from './GroupPageHeader';
@@ -356,8 +356,15 @@ export default function GroupDetailsPage() {
         />
 
         {/* --- כפתור הצעת מחיר (חדש!) --- */}
-        <div className="flex justify-end px-1">
-          <Link to={`/groups/${group._id}/payment-request`} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition shadow-sm font-medium ml-2">
+        <div className="flex justify-end px-1 items-center gap-3">
+          {/* הכפתור החדש לשכפול ימים */}
+          <DayDuplicator group={group} />
+
+          {/* הכפתור הקיים לדרישת תשלום */}
+          <Link 
+            to={`/groups/${group._id}/payment-request`} 
+            className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition shadow-sm font-medium"
+          >
               <Receipt size={18} /> יצירת דרישת תשלום
           </Link>
         </div>

@@ -92,6 +92,26 @@ const useGroupsStore = create((set, get) => ({
       throw error;
     }
   },
+  duplicateEvents: async (groupId, eventIds, targetDate) => {
+    try {
+      const res = await api.post(`/groups/${groupId}/duplicate-events`, {
+        eventIds,
+        targetDate
+      });
+      
+      // עדכון המצב המקומי עם הקבוצה המעודכנת שחזרה מהשרת
+      set((state) => ({
+        groups: state.groups.map((g) => (g._id === groupId ? res.data : g)),
+      }));
+      
+      toast.success('האירועים שוכפלו בהצלחה!');
+      return res.data;
+    } catch (error) {
+      console.error('Failed to duplicate events:', error);
+      toast.error('שגיאה בשכפול אירועים');
+      throw error;
+    }
+  },
 
   updateEvent: async (groupId, eventId, eventData) => {
     try {

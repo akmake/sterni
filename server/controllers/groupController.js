@@ -84,21 +84,72 @@ export const duplicateEvents = async (req, res, next) => {
 
 // --- עדכון פרטי קבוצה ---
 export const updateGroupDetails = async (req, res, next) => {
-    try {
-        const { groupId } = req.params;
-        // תמיכה גם ב-id רגיל אם הראוט מוגדר אחרת
-        const idToUpdate = groupId || req.params.id;
-        const updates = req.body; 
+  try {
+    // 1. זיהוי ה-ID והנתונים לעדכון
+    const { groupId } = req.params;
+    const idToUpdate = groupId || req.params.id;
+    const updates = req.body;
 
-        const group = await Group.findByIdAndUpdate(
-            idToUpdate,
-            { $set: updates },
-            { new: true, runValidators: true }
-        ).populate('schedule.hall');
+    // 2. שליפת הקבוצה המקורית (כדי לדעת איפה היא הייתה קודם)
+    const group = await Group.findById(idToUpdate);
+    if (!group) return next(new AppError('Group not found', 404));
 
-        if (!group) return next(new AppError('Group not found', 404));
-        res.json(group);
-    } catch (err) { next(err); }
+    // 3. מנגנון "הזזה חכמה" של הלו"ז
+    // פועל רק אם הוזנו תאריכי התחלה וסיום חדשים
+    if (updates.startDate && updates.endDate) {
+      const oldStart = new Date(group.startDate);
+      const newStart = new Date(updates.startDate);
+      const oldEnd = new Date(group.endDate);
+      const newEnd = new Date(updates.endDate);
+
+      // האם התאריך השתנה?
+      if (oldStart.getTime() !== newStart.getTime()) {
+        
+        // חישוב משך הזמן (בימים) של הקבוצה הישנה והחדשה
+        const oldDuration = oldEnd.getTime() - oldStart.getTime();
+        const newDuration = newEnd.getTime() - newStart.getTime();
+
+        // בדיקה קריטית: האם מספר הימים זהה? (סטייה קטנה מותרת לטובת שעון קיץ/חורף)
+        // אם שינית את אורך הקבוצה (למשל מ-3 ימים ל-5 ימים), המערכת לא תזיז אוטומטית את האירועים כדי לא ליצור בלאגן
+        const isSameDuration = Math.abs(oldDuration - newDuration) < 1000 * 60 * 60 * 2; 
+
+        if (isSameDuration) {
+          console.log(`Moving group schedule...`);
+          
+          // חישוב ה"דלתא" - כמה להזיז את השעון (למשל: +1209600000 מילישניות לשבועיים)
+          const timeDiff = newStart.getTime() - oldStart.getTime();
+
+          // לולאה על כל האירועים בלו"ז ועדכון התאריך שלהם
+          if (group.schedule && group.schedule.length > 0) {
+            group.schedule.forEach(event => {
+              if (event.date) {
+                const originalEventDate = new Date(event.date);
+                // הזזת האירוע בדיוק באותו הפרש זמן שהקבוצה זזה
+                event.date = new Date(originalEventDate.getTime() + timeDiff);
+              }
+            });
+          }
+        }
+      }
+    }
+
+    // 4. עדכון שאר הפרטים היבשים (שם, הערות וכו')
+    Object.keys(updates).forEach((key) => {
+      // אם זה תאריכים, הם כבר טופלו למעלה, אבל נעדכן אותם שוב כדי לוודא סנכרון מלא
+      group[key] = updates[key];
+    });
+
+    // 5. שמירה ומחיקת הישן
+    // הפעולה הזו דורסת את המסמך הקיים ב-MongoDB. התאריכים הישנים נעלמים.
+    await group.save();
+    
+    // 6. החזרת הקבוצה המעודכנת ללקוח
+    const populatedGroup = await Group.findById(idToUpdate).populate('schedule.hall');
+    res.json(populatedGroup);
+
+  } catch (err) {
+    next(err);
+  }
 };
 
 // --- מחיקת קבוצה ---

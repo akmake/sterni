@@ -309,6 +309,12 @@ export default function GroupDetailsPage() {
       name: editFormData.name,
       pax: parseInt(editFormData.pax, 10),
       minPax: parseInt(editFormData.minPax, 10),
+
+      // --- הוספתי את השורות האלו כדי שהתאריכים יישלחו לשרת ---
+      startDate: editFormData.startDate,
+      endDate: editFormData.endDate,
+      // --------------------------------------------------------
+
       contactPerson: {
         ...group.contactPerson,
         name: editFormData.contactName,

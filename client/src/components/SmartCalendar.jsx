@@ -14,6 +14,14 @@ export default function SmartCalendar({ existingGroups = [], onSelectRange }) {
     return new Intl.DateTimeFormat('he-u-ca-hebrew', { day: 'numeric', month: 'numeric' }).format(date);
   };
 
+  // --- פונקציה מתוקנת למעבר חודשים בטוח ---
+  const changeMonth = (increment) => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(1); // מאפסים לראשון לחודש כדי למנוע דילוגים (כמו מ-31 ינואר למרץ)
+    newDate.setMonth(newDate.getMonth() + increment);
+    setCurrentDate(newDate);
+  };
+
   const handleDayClick = (day) => {
     const clickedDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
     
@@ -97,13 +105,13 @@ export default function SmartCalendar({ existingGroups = [], onSelectRange }) {
   return (
     <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm select-none">
       <div className="flex justify-between items-center mb-4 px-2">
-        <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)))} className="p-2 hover:bg-slate-100 rounded-full">
+        <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-slate-100 rounded-full">
             <ChevronRight size={20} />
         </button>
         <span className="font-bold text-lg">
             {currentDate.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' })}
         </span>
-        <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)))} className="p-2 hover:bg-slate-100 rounded-full">
+        <button onClick={() => changeMonth(1)} className="p-2 hover:bg-slate-100 rounded-full">
             <ChevronLeft size={20} />
         </button>
       </div>

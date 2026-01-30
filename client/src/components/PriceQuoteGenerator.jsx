@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Save, Printer, Trash2, Table as TableIcon, Type, FileDown, LoaderCircle, Bold, Italic, Underline, AlignRight, AlignCenter, AlignLeft, List, ListOrdered, MousePointerClick, Send, Mail } from 'lucide-react';
+import { Save, Printer, Trash2, Table as TableIcon, Type, FileDown, LoaderCircle, Bold, Italic, Underline, AlignRight, AlignCenter, AlignLeft, List, ListOrdered, MousePointerClick, Send, Mail, User, Phone, Calendar, Users, FileText } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
 import axios from 'axios';
-import QuoteManager from './QuoteManager'; // וודא שקובץ זה קיים
+import QuoteManager from './QuoteManager';
 
 // --- הגדרות A4 ---
 const A4_HEIGHT_PX = 1123;
@@ -139,16 +139,21 @@ const PriceQuoteGenerator = () => {
   const [contactPhone, setContactPhone] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [eventType, setEventType] = useState('יום עיון'); 
+  
+  // התיקון: ניהול כפול של תאריכים
+  // 1. תאריך לתצוגה על הנייר (טקסט עברי)
   const [arrivalDate, setArrivalDate] = useState('');
   const [departureDate, setDepartureDate] = useState('');
-  const [minPax, setMinPax] = useState('0');
+  
+  // 2. תאריך גולמי למסד נתונים וליומן (YYYY-MM-DD)
+  const [rawArrivalDate, setRawArrivalDate] = useState('');
+  const [rawDepartureDate, setRawDepartureDate] = useState('');
 
+  const [minPax, setMinPax] = useState('0');
   const [blocks, setBlocks] = useState([]);
   const [paginatedPages, setPaginatedPages] = useState([]);
   const [isDownloading, setIsDownloading] = useState(false);
   const [contextMenu, setContextMenu] = useState(null);
-  
-  // --- תוספות לשליחת מייל ---
   const [targetEmail, setTargetEmail] = useState('');
   const [isSending, setIsSending] = useState(false);
   
@@ -162,9 +167,17 @@ const PriceQuoteGenerator = () => {
   }, []);
 
   useEffect(() => {
+    // אתחול ראשוני - תאריך נוכחי
     const today = new Date();
-    setArrivalDate(formatEventDateDayHebrew(today));
-    setDepartureDate(formatEventDateDayHebrew(today));
+    const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
+    
+    // מעדכן את הגולמי
+    setRawArrivalDate(todayStr);
+    setRawDepartureDate(todayStr);
+    
+    // מעדכן את המעוצב
+    setArrivalDate(formatEventDateDayHebrew(todayStr));
+    setDepartureDate(formatEventDateDayHebrew(todayStr));
 
     const defaultTopNotes = `<b>תנאי האירוח:</b><br>
     • קפה / תה רץ ושתייה קרה (מים ותפוזים) לאורך היום - בכל זמן הנופש סמוך לאולם הפעילות.<br>
@@ -352,15 +365,16 @@ const PriceQuoteGenerator = () => {
       }
   };
 
-  // איסוף כל הנתונים לשמירה
+  // איסוף כל הנתונים לשמירה (כולל הכנה למבנה השרת החדש)
   const dataToSave = {
     clientName,
     contactName,
     contactPhone,
     contactEmail,
     eventType,
-    arrivalDate,
-    departureDate,
+    // אנו שומרים את התאריכים הגולמיים למסד הנתונים! זה התיקון הקריטי.
+    arrivalDate: rawArrivalDate, 
+    departureDate: rawDepartureDate,
     minPax,
     blocks
   };
@@ -372,18 +386,48 @@ const PriceQuoteGenerator = () => {
     if (data.contactPhone) setContactPhone(data.contactPhone);
     if (data.contactEmail) {
         setContactEmail(data.contactEmail);
-        setTargetEmail(data.contactEmail); // עדכון אוטומטי גם של שדה השליחה
+        setTargetEmail(data.contactEmail);
     }
     if (data.eventType) setEventType(data.eventType);
-    if (data.arrivalDate) setArrivalDate(data.arrivalDate);
-    if (data.departureDate) setDepartureDate(data.departureDate);
+    
+    // טעינת תאריכים חכמה
+    if (data.dates) {
+        // אם זה נטען מה-DB החדש (כאובייקט תאריך)
+        const fromDate = data.dates.from ? new Date(data.dates.from).toISOString().split('T')[0] : '';
+        const toDate = data.dates.to ? new Date(data.dates.to).toISOString().split('T')[0] : '';
+        
+        setRawArrivalDate(fromDate);
+        setRawDepartureDate(toDate);
+        
+        setArrivalDate(formatEventDateDayHebrew(fromDate));
+        setDepartureDate(formatEventDateDayHebrew(toDate));
+    } else {
+        // תמיכה לאחור או אם המידע נשמר שטוח
+        if (data.arrivalDate) {
+             // בדיקה אם זה תאריך גולמי או עברי
+             if (data.arrivalDate.includes('-')) { // YYYY-MM-DD
+                 setRawArrivalDate(data.arrivalDate);
+                 setArrivalDate(formatEventDateDayHebrew(data.arrivalDate));
+             } else {
+                 setArrivalDate(data.arrivalDate); // זה כבר טקסט
+             }
+        }
+        if (data.departureDate) {
+             if (data.departureDate.includes('-')) {
+                 setRawDepartureDate(data.departureDate);
+                 setDepartureDate(formatEventDateDayHebrew(data.departureDate));
+             } else {
+                 setDepartureDate(data.departureDate);
+             }
+        }
+    }
+
     if (data.minPax) setMinPax(data.minPax);
     if (data.blocks) setBlocks(data.blocks);
     
     toast.success('הצעה נטענה בהצלחה!');
   };
 
-  // --- פונקציה מרכזית ליצירת PDF (משמשת גם להורדה וגם לשליחה) ---
   const createPDFDocument = async () => {
     if (!containerRef.current) return null;
     
@@ -402,6 +446,7 @@ const PriceQuoteGenerator = () => {
             backgroundColor: '#ffffff',
             width: 794, 
             height: 1123, 
+            fontEmbedCSS: '', // מונע שגיאת פונטים
             style: {
                 margin: 0,
                 transform: 'none', 
@@ -417,7 +462,6 @@ const PriceQuoteGenerator = () => {
     return pdf;
   };
 
-  // --- הורדת PDF למחשב ---
   const handleDownloadPDF = async () => {
     if (isDownloading) return;
     setIsDownloading(true);
@@ -437,7 +481,6 @@ const PriceQuoteGenerator = () => {
     }
   };
 
-  // --- שליחת PDF במייל ---
   const handleSendEmail = async () => {
     if (!targetEmail) {
         toast.error('נא להזין כתובת מייל לשליחה');
@@ -473,10 +516,9 @@ const PriceQuoteGenerator = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 py-10 font-sans text-slate-800">
+    <div className="h-screen bg-slate-100 flex flex-col overflow-hidden font-sans text-slate-800">
       <style>{printStyles}</style>
 
-      {/* תפריט הקשר */}
       {contextMenu && (
           <RichTextMenu
             position={contextMenu}
@@ -486,13 +528,11 @@ const PriceQuoteGenerator = () => {
           />
       )}
 
-      {/* סרגל כלים עליון */}
-      <div className="fixed top-0 left-0 w-full bg-white z-50 shadow-sm border-b h-16 flex items-center justify-between px-8 no-print">
+      <div className="shrink-0 bg-white z-50 shadow-sm border-b h-16 flex items-center justify-between px-8 no-print">
          <div className="font-bold text-gray-700 text-lg flex items-center gap-2">
             <FileDown className="text-amber-500"/> מחולל הצעות
          </div>
          
-         {/* אזור שליחת מייל */}
          <div className="flex items-center gap-2 bg-blue-50 px-3 py-1 rounded-md border border-blue-100 mx-4">
             <Mail size={16} className="text-blue-500"/>
             <input 
@@ -527,193 +567,324 @@ const PriceQuoteGenerator = () => {
          </div>
       </div>
 
-      <div className="flex flex-col items-center gap-8 mt-10" ref={containerRef}>
+      <div className="flex flex-1 overflow-hidden relative">
+      
+        <div className="w-80 bg-white border-l border-gray-200 shadow-xl overflow-y-auto shrink-0 flex flex-col no-print z-40">
+            <div className="p-5 space-y-6">
+                <h2 className="text-xl font-bold text-gray-800 border-b pb-2 flex items-center gap-2">
+                    <User size={20} className="text-blue-600"/>
+                    פרטי ההזמנה
+                </h2>
 
-        {paginatedPages.map((pageBlocks, pageIndex) => (
-            <div key={pageIndex} className="quote-page bg-white w-[210mm] h-[297mm] relative shadow-2xl p-[15mm] flex flex-col mx-auto">
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-bold text-gray-600 mb-1">שם הלקוח / הקבוצה</label>
+                        <input 
+                            type="text" 
+                            className="w-full border border-gray-300 rounded p-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                            value={clientName === 'שם הלקוח / הקבוצה' ? '' : clientName}
+                            onChange={(e) => setClientName(e.target.value)}
+                            placeholder="הזן שם לקוח..."
+                        />
+                    </div>
 
-                {pageIndex === 0 ? (
-                    <header className="border-b-[3px] pb-4 mb-6" style={{ borderColor: GOLD }}>
-                        <div className="flex justify-between items-start">
-                            {/* פרטי הקבוצה מימין */}
-                            <div className="text-right pt-2 w-[55%]">
-                                <div className="text-sm font-bold mb-2 text-gray-500">בס"ד</div>
-                                
-                                <div className="text-2xl font-bold mb-2 text-slate-900 flex items-center gap-1">
-                                    <span>לכבוד:</span>
-                                    <TransparentInput 
-                                        value={clientName} 
-                                        onChange={setClientName} 
-                                        className="font-bold text-slate-900" 
-                                    />
-                                </div>
+                    <div className="bg-gray-50 p-3 rounded-lg border space-y-3">
+                        <label className="text-xs font-bold text-gray-500 uppercase">איש קשר</label>
+                        <div className="flex items-center bg-white border rounded px-2">
+                            <User size={14} className="text-gray-400 ml-2"/>
+                            <input 
+                                type="text"
+                                className="w-full p-2 outline-none text-sm"
+                                placeholder="שם מלא"
+                                value={contactName}
+                                onChange={(e) => setContactName(e.target.value)}
+                            />
+                        </div>
+                        <div className="flex items-center bg-white border rounded px-2">
+                            <Phone size={14} className="text-gray-400 ml-2"/>
+                            <input 
+                                type="text"
+                                className="w-full p-2 outline-none text-sm"
+                                placeholder="טלפון"
+                                value={contactPhone}
+                                onChange={(e) => setContactPhone(e.target.value)}
+                            />
+                        </div>
+                        <div className="flex items-center bg-white border rounded px-2">
+                            <Mail size={14} className="text-gray-400 ml-2"/>
+                            <input 
+                                type="text"
+                                className="w-full p-2 outline-none text-sm"
+                                placeholder="אימייל"
+                                value={contactEmail}
+                                onChange={(e) => {
+                                    setContactEmail(e.target.value);
+                                    setTargetEmail(e.target.value);
+                                }}
+                            />
+                        </div>
+                    </div>
 
-                                <div className="text-slate-700 text-base space-y-1 mb-4">
-                                    <TransparentInput value={contactName} onChange={setContactName} className="font-medium" placeholder="שם איש קשר" />
-                                    <TransparentInput value={contactPhone} onChange={setContactPhone} placeholder="טלפון" />
-                                    <TransparentInput value={contactEmail} onChange={setContactEmail} placeholder="מייל" />
-                                </div>
-
-                                {/* פרטי הגעה/עזיבה */}
-                                <div className="mt-4 text-sm space-y-1">
-                                    <div className="text-slate-900 flex">
-                                        <span className="font-bold ml-1 min-w-[65px]">סוג פעילות:</span>
-                                        <TransparentInput value={eventType} onChange={setEventType} />
-                                    </div>
-                                    <div className="text-slate-900 flex">
-                                        <span className="font-bold ml-1">הגעה:</span>
-                                        <TransparentInput value={arrivalDate} onChange={setArrivalDate} />
-                                    </div>
-                                    <div className="text-slate-900 flex">
-                                        <span className="font-bold ml-1">עזיבה:</span>
-                                        <TransparentInput value={departureDate} onChange={setDepartureDate} />
-                                    </div>
+                    <div className="space-y-3 pt-2 border-t">
+                        <label className="block text-sm font-bold text-gray-600 mb-1 flex items-center gap-2">
+                            <Calendar size={16}/> תאריכי אירוע
+                        </label>
+                        
+                        <div className="grid grid-cols-1 gap-2">
+                            <div>
+                                <span className="text-xs text-gray-500 block mb-1">הגעה (בחר תאריך לעדכון):</span>
+                                <input 
+                                    type="date"
+                                    className="w-full border rounded p-2 text-sm"
+                                    // כאן אנו משתמשים ב-rawArrivalDate
+                                    value={rawArrivalDate}
+                                    onChange={(e) => {
+                                        setRawArrivalDate(e.target.value);
+                                        // ומעדכנים גם את הטקסט המעוצב לתצוגה
+                                        setArrivalDate(formatEventDateDayHebrew(e.target.value));
+                                    }}
+                                />
+                                <div className="text-xs text-blue-600 mt-1 truncate font-medium bg-blue-50 p-1 rounded">
+                                    {arrivalDate}
                                 </div>
                             </div>
-
-                            {/* לוגו משמאל */}
-                            <div className="text-left w-[45%] flex flex-col items-end">
-                                <img src="/pop.png" alt="Logo" className="h-32 object-contain mb-3" />
+                            <div>
+                                <span className="text-xs text-gray-500 block mb-1">עזיבה (בחר תאריך לעדכון):</span>
+                                <input 
+                                    type="date"
+                                    className="w-full border rounded p-2 text-sm"
+                                    value={rawDepartureDate}
+                                    onChange={(e) => {
+                                        setRawDepartureDate(e.target.value);
+                                        setDepartureDate(formatEventDateDayHebrew(e.target.value));
+                                    }}
+                                />
+                                <div className="text-xs text-blue-600 mt-1 truncate font-medium bg-blue-50 p-1 rounded">
+                                    {departureDate}
+                                </div>
                             </div>
                         </div>
+                    </div>
 
-                        <div className="w-full flex flex-col items-center justify-center mt-6">
-                            
-                            {/* כותרת ראשית */}
-                            <h1 className="text-5xl font-bold mb-1 pb-1 text-center" style={{ color: GOLD, borderColor: GOLD }}>
-                                הצעת מחיר
-                            </h1>
-
-                            {/* שורת המינימום */}
-                            <div className="flex items-center justify-center gap-2 w-full relative right-[15px]">
-                                <span className="text-lg font-bold text-slate-900">מינימום משתתפים:</span>
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-600 mb-1">סוג פעילות</label>
+                            <div className="flex items-center bg-white border rounded px-1">
+                                <FileText size={14} className="text-gray-400 ml-1"/>
                                 <input 
-                                    type="text"
-                                    value={minPax} 
-                                    onChange={(e) => setMinPax(e.target.value)} 
-                                    className="w-16 text-lg font-bold text-right bg-transparent border-none outline-none p-0 focus:ring-0"
+                                    type="text" 
+                                    className="w-full p-1.5 outline-none text-sm"
+                                    value={eventType}
+                                    onChange={(e) => setEventType(e.target.value)}
                                 />
                             </div>
                         </div>
-                    </header>
-                ) : (
-                    <div className="border-b mb-6 pb-2 flex justify-between text-gray-400 text-xs uppercase tracking-wider">
-                        <span>המשך הצעה: {clientName}</span>
-                        <span>עמוד {pageIndex + 1}</span>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-600 mb-1">כמות משתתפים</label>
+                            <div className="flex items-center bg-white border rounded px-1">
+                                <Users size={14} className="text-gray-400 ml-1"/>
+                                <input 
+                                    type="number" 
+                                    className="w-full p-1.5 outline-none text-sm"
+                                    value={minPax}
+                                    onChange={(e) => setMinPax(e.target.value)}
+                                />
+                            </div>
+                        </div>
                     </div>
-                )}
+                </div>
+                
+                <div className="mt-8 bg-amber-50 p-3 rounded text-xs text-amber-800 border border-amber-200">
+                    <p><strong>שים לב:</strong> הנתונים שמוזנים כאן נכנסים אוטומטית לתוך המסמך משמאל ונשמרים במערכת בעת שמירת ההצעה.</p>
+                </div>
+            </div>
+        </div>
 
-                <div className="flex-grow flex flex-col">
-                    {pageIndex === 0 && pageBlocks.length === 0 && (
-                        <Inserter onAddText={() => addBlock(-1, 'text')} onAddTable={() => addBlock(-1, 'table')} />
+        <div className="flex-1 overflow-y-auto p-10 flex justify-center bg-slate-100" ref={containerRef}>
+
+            <div className="flex flex-col items-center gap-8 w-fit">
+
+            {paginatedPages.map((pageBlocks, pageIndex) => (
+                <div key={pageIndex} className="quote-page bg-white w-[210mm] h-[297mm] relative shadow-2xl p-[15mm] flex flex-col mx-auto transition-transform">
+
+                    {pageIndex === 0 ? (
+                        <header className="border-b-[3px] pb-4 mb-6" style={{ borderColor: GOLD }}>
+                            <div className="flex justify-between items-start">
+                                <div className="text-right pt-2 w-[55%]">
+                                    <div className="text-sm font-bold mb-2 text-gray-500">בס"ד</div>
+                                    
+                                    <div className="text-2xl font-bold mb-2 text-slate-900 flex items-center gap-1">
+                                        <span>לכבוד:</span>
+                                        <TransparentInput 
+                                            value={clientName} 
+                                            onChange={setClientName} 
+                                            className="font-bold text-slate-900" 
+                                        />
+                                    </div>
+
+                                    <div className="text-slate-700 text-base space-y-1 mb-4">
+                                        <TransparentInput value={contactName} onChange={setContactName} className="font-medium" placeholder="שם איש קשר" />
+                                        <TransparentInput value={contactPhone} onChange={setContactPhone} placeholder="טלפון" />
+                                        <TransparentInput value={contactEmail} onChange={setContactEmail} placeholder="מייל" />
+                                    </div>
+
+                                    <div className="mt-4 text-sm space-y-1">
+                                        <div className="text-slate-900 flex">
+                                            <span className="font-bold ml-1 min-w-[65px]">סוג פעילות:</span>
+                                            <TransparentInput value={eventType} onChange={setEventType} />
+                                        </div>
+                                        <div className="text-slate-900 flex">
+                                            <span className="font-bold ml-1">הגעה:</span>
+                                            <TransparentInput value={arrivalDate} onChange={setArrivalDate} />
+                                        </div>
+                                        <div className="text-slate-900 flex">
+                                            <span className="font-bold ml-1">עזיבה:</span>
+                                            <TransparentInput value={departureDate} onChange={setDepartureDate} />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="text-left w-[45%] flex flex-col items-end">
+                                    <img src="/pop.png" alt="Logo" className="h-32 object-contain mb-3" />
+                                </div>
+                            </div>
+
+                            <div className="w-full flex flex-col items-center justify-center mt-6">
+                                
+                                <h1 className="text-5xl font-bold mb-1 pb-1 text-center" style={{ color: GOLD, borderColor: GOLD }}>
+                                    הצעת מחיר
+                                </h1>
+
+                                <div className="flex items-center justify-center gap-2 w-full relative right-[15px]">
+                                    <span className="text-lg font-bold text-slate-900">מינימום:</span>
+                                    <input 
+                                        type="text"
+                                        value={minPax} 
+                                        onChange={(e) => setMinPax(e.target.value)} 
+                                        className="w-16 text-lg font-bold text-right bg-transparent border-none outline-none p-0 focus:ring-0"
+                                    />
+                                </div>
+                            </div>
+                        </header>
+                    ) : (
+                        <div className="border-b mb-6 pb-2 flex justify-between text-gray-400 text-xs uppercase tracking-wider">
+                            <span>המשך הצעה: {clientName}</span>
+                            <span>עמוד {pageIndex + 1}</span>
+                        </div>
                     )}
 
-                    {pageBlocks.map((block) => {
-                        const realIndex = blocks.findIndex(b => b.id === block.id);
-                        return (
-                            <div key={block.id} ref={el => blockRefs.current[block.id] = el} className="relative group/block mb-4 transition-all">
-                                <button onClick={() => removeBlock(block.id)} className="absolute -right-10 top-0 text-gray-300 hover:text-red-500 no-print opacity-0 group-hover/block:opacity-100 transition-opacity p-2"><Trash2 size={16}/></button>
+                    <div className="flex-grow flex flex-col">
+                        {pageIndex === 0 && pageBlocks.length === 0 && (
+                            <Inserter onAddText={() => addBlock(-1, 'text')} onAddTable={() => addBlock(-1, 'table')} />
+                        )}
 
-                                {block.type === 'text' ? (
-                                    <div
-                                        contentEditable
-                                        onContextMenu={(e) => handleContextMenu(e, 'text', block.id)}
-                                        dangerouslySetInnerHTML={{ __html: block.content }}
-                                        onBlur={(e) => updateBlock(block.id, { content: e.target.innerHTML })}
-                                        className="w-full min-h-[2em] outline-none border border-transparent hover:border-blue-200 focus:border-blue-400 p-2 rounded transition-colors text-sm leading-relaxed whitespace-pre-wrap"
-                                    />
-                                ) : (
-                                    <div className="w-full border border-transparent hover:border-amber-200 rounded p-1 transition-colors relative group/table">
-                                        <div className="no-print absolute -top-5 left-0 text-[10px] text-gray-400 bg-white border px-2 rounded opacity-0 group-hover/table:opacity-100 transition-opacity flex items-center gap-1">
-                                            <MousePointerClick size={10}/> לחיצה ימנית לעריכה מתקדמת
-                                        </div>
+                        {pageBlocks.map((block) => {
+                            const realIndex = blocks.findIndex(b => b.id === block.id);
+                            return (
+                                <div key={block.id} ref={el => blockRefs.current[block.id] = el} className="relative group/block mb-4 transition-all">
+                                    <button onClick={() => removeBlock(block.id)} className="absolute -right-10 top-0 text-gray-300 hover:text-red-500 no-print opacity-0 group-hover/block:opacity-100 transition-opacity p-2"><Trash2 size={16}/></button>
 
-                                        <div className="flex justify-between items-end mb-2">
-                                            <input
-                                                value={block.title || ''}
-                                                onChange={(e) => updateBlock(block.id, { title: e.target.value })}
-                                                className="font-bold text-slate-700 text-base bg-transparent border-b border-transparent hover:border-gray-300 focus:border-amber-500 outline-none px-1 w-full"
-                                                placeholder="כותרת טבלה..."
-                                            />
-                                        </div>
+                                    {block.type === 'text' ? (
+                                        <div
+                                            contentEditable
+                                            onContextMenu={(e) => handleContextMenu(e, 'text', block.id)}
+                                            dangerouslySetInnerHTML={{ __html: block.content }}
+                                            onBlur={(e) => updateBlock(block.id, { content: e.target.innerHTML })}
+                                            className="w-full min-h-[2em] outline-none border border-transparent hover:border-blue-200 focus:border-blue-400 p-2 rounded transition-colors text-sm leading-relaxed whitespace-pre-wrap"
+                                        />
+                                    ) : (
+                                        <div className="w-full border border-transparent hover:border-amber-200 rounded p-1 transition-colors relative group/table">
+                                            <div className="no-print absolute -top-5 left-0 text-[10px] text-gray-400 bg-white border px-2 rounded opacity-0 group-hover/table:opacity-100 transition-opacity flex items-center gap-1">
+                                                <MousePointerClick size={10}/> לחיצה ימנית לעריכה מתקדמת
+                                            </div>
 
-                                        <table className="w-full border-collapse table-fixed">
-                                            <thead>
-                                                <tr className="bg-white text-slate-700 border-b border-t border-slate-300" style={{ borderTopColor: GOLD, borderTopWidth: '2px' }}>
-                                                    {block.headers.map((h, idx) => (
-                                                        <th
-                                                            key={idx}
-                                                            className="border-l border-slate-200 p-2 align-bottom relative group/th bg-gray-50"
-                                                            style={{ width: `${h.width}%` }}
-                                                            onContextMenu={(e) => handleContextMenu(e, 'table', block.id, -1, idx)}
-                                                        >
-                                                            <div
-                                                                contentEditable
-                                                                suppressContentEditableWarning
-                                                                onBlur={(e) => tableActions.updateHeaderTitle(block.id, idx, e.target.innerText)}
-                                                                className="w-full bg-transparent text-center font-bold text-sm outline-none whitespace-normal break-words min-h-[1.5em]"
-                                                            >
-                                                                {h.title}
-                                                            </div>
-                                                            <div className="flex items-center justify-center gap-1 no-print opacity-0 group-hover/th:opacity-100 transition-opacity bg-white absolute bottom-full left-0 w-full z-10 shadow border p-1 rounded mb-1">
-                                                                <input type="number" value={h.width} onChange={(e) => tableActions.updateHeaderWidth(block.id, idx, e.target.value)} className="w-8 text-[10px] text-center border rounded bg-gray-50"/>
-                                                                <span className="text-[10px]">%</span>
-                                                            </div>
-                                                        </th>
-                                                    ))}
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {block.rows.map((row, rIdx) => (
-                                                    <tr key={rIdx} className="border-b border-slate-200 hover:bg-slate-50">
-                                                        {row.map((cell, cIdx) => (
-                                                            <td
-                                                                key={cIdx}
-                                                                className="border-l border-slate-200 p-2 align-top relative"
-                                                                onContextMenu={(e) => handleContextMenu(e, 'table', block.id, rIdx, cIdx)}
+                                            <div className="flex justify-between items-end mb-2">
+                                                <input
+                                                    value={block.title || ''}
+                                                    onChange={(e) => updateBlock(block.id, { title: e.target.value })}
+                                                    className="font-bold text-slate-700 text-base bg-transparent border-b border-transparent hover:border-gray-300 focus:border-amber-500 outline-none px-1 w-full"
+                                                    placeholder="כותרת טבלה..."
+                                                />
+                                            </div>
+
+                                            <table className="w-full border-collapse table-fixed">
+                                                <thead>
+                                                    <tr className="bg-white text-slate-700 border-b border-t border-slate-300" style={{ borderTopColor: GOLD, borderTopWidth: '2px' }}>
+                                                        {block.headers.map((h, idx) => (
+                                                            <th
+                                                                key={idx}
+                                                                className="border-l border-slate-200 p-2 align-bottom relative group/th bg-gray-50"
+                                                                style={{ width: `${h.width}%` }}
+                                                                onContextMenu={(e) => handleContextMenu(e, 'table', block.id, -1, idx)}
                                                             >
                                                                 <div
                                                                     contentEditable
                                                                     suppressContentEditableWarning
-                                                                    onBlur={(e) => tableActions.updateCell(block.id, rIdx, cIdx, e.target.innerText)}
-                                                                    className="w-full min-h-[1.5em] outline-none whitespace-pre-wrap text-sm"
-                                                                >{cell}</div>
-                                                            </td>
+                                                                    onBlur={(e) => tableActions.updateHeaderTitle(block.id, idx, e.target.innerText)}
+                                                                    className="w-full bg-transparent text-center font-bold text-sm outline-none whitespace-normal break-words min-h-[1.5em]"
+                                                                >
+                                                                    {h.title}
+                                                                </div>
+                                                                <div className="flex items-center justify-center gap-1 no-print opacity-0 group-hover/th:opacity-100 transition-opacity bg-white absolute bottom-full left-0 w-full z-10 shadow border p-1 rounded mb-1">
+                                                                    <input type="number" value={h.width} onChange={(e) => tableActions.updateHeaderWidth(block.id, idx, e.target.value)} className="w-8 text-[10px] text-center border rounded bg-gray-50"/>
+                                                                    <span className="text-[10px]">%</span>
+                                                                </div>
+                                                            </th>
                                                         ))}
                                                     </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                                                </thead>
+                                                <tbody>
+                                                    {block.rows.map((row, rIdx) => (
+                                                        <tr key={rIdx} className="border-b border-slate-200 hover:bg-slate-50">
+                                                            {row.map((cell, cIdx) => (
+                                                                <td
+                                                                    key={cIdx}
+                                                                    className="border-l border-slate-200 p-2 align-top relative"
+                                                                    onContextMenu={(e) => handleContextMenu(e, 'table', block.id, rIdx, cIdx)}
+                                                                >
+                                                                    <div
+                                                                        contentEditable
+                                                                        suppressContentEditableWarning
+                                                                        onBlur={(e) => tableActions.updateCell(block.id, rIdx, cIdx, e.target.innerText)}
+                                                                        className="w-full min-h-[1.5em] outline-none whitespace-pre-wrap text-sm"
+                                                                    >{cell}</div>
+                                                                </td>
+                                                            ))}
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                    <div className="absolute -bottom-4 left-0 w-full flex justify-center opacity-0 group-hover/block:opacity-100 transition-opacity z-20">
+                                         <Inserter onAddText={() => addBlock(realIndex, 'text')} onAddTable={() => addBlock(realIndex, 'table')} />
                                     </div>
-                                )}
-                                <div className="absolute -bottom-4 left-0 w-full flex justify-center opacity-0 group-hover/block:opacity-100 transition-opacity z-20">
-                                     <Inserter onAddText={() => addBlock(realIndex, 'text')} onAddTable={() => addBlock(realIndex, 'table')} />
                                 </div>
-                            </div>
-                        );
-                    })}
-                </div>
-
-                {/* אזור חתימה */}
-                {pageIndex === paginatedPages.length - 1 && (
-                    <div className="mt-auto pt-10 px-4 flex justify-between items-end pb-8 text-slate-800">
-                        <div className="text-right text-sm leading-relaxed">
-                            <div className="font-bold text-base" style={{ color: GOLD, borderColor: GOLD }}>בברכה,</div>
-                            <div className="font-bold text-base">שטערני דהאן</div>
-                            <div className="text-slate-600">08-8593775</div>
-                            <div className="font-bold text-slate-800 mt-1">ציפורי אירוח ואירועים בע"מ</div>
-                        </div>
-
-                        <div className="text-center">
-                            <div className="border-b border-black w-60 mb-2"></div>
-                            <div className="font-bold text-base" style={{ color: GOLD, borderColor: GOLD }}>חתימה וחותמת</div>
-                        </div>
+                            );
+                        })}
                     </div>
-                )}
-            </div>
-        ))}
 
-        <div className="h-20"></div>
+                    {pageIndex === paginatedPages.length - 1 && (
+                        <div className="mt-auto pt-10 px-4 flex justify-between items-end pb-8 text-slate-800">
+                            <div className="text-right text-sm leading-relaxed">
+                                <div className="font-bold text-base" style={{ color: GOLD, borderColor: GOLD }}>בברכה,</div>
+                                <div className="font-bold text-base">שטערני דהאן</div>
+                                <div className="text-slate-600">08-8593775</div>
+                                <div className="font-bold text-slate-800 mt-1">ציפורי אירוח ואירועים בע"מ</div>
+                            </div>
+
+                            <div className="text-center">
+                                <div className="border-b border-black w-60 mb-2"></div>
+                                <div className="font-bold text-base" style={{ color: GOLD, borderColor: GOLD }}>חתימה וחותמת</div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            ))}
+
+            <div className="h-20"></div>
+            </div>
+        </div>
       </div>
     </div>
   );

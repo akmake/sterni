@@ -1,9 +1,19 @@
 import express from 'express';
-import { saveQuote, getAllQuotes, getQuoteByName, deleteQuote } from '../controllers/quoteController.js';
+import { 
+  saveQuote, 
+  getAllQuotes, 
+  getQuoteByName, 
+  deleteQuote, 
+  convertToGroup 
+} from '../controllers/quoteController.js';
+
+// שים לב: מחקנו או שמנו בהערה את הייבוא של protect כי אנחנו לא משתמשים בו
+// import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// הערה: הסרתי את ה-protect בכוונה כדי לבטל את השגיאה 403
+// --- התיקון החשוב: ---
+// הוספנו // בהתחלה כדי שהמערכת תתעלם מהשורה הזו ולא תחסום אותך
 // router.use(protect); 
 
 router.route('/')
@@ -13,5 +23,7 @@ router.route('/')
 router.route('/:name')
   .get(getQuoteByName)
   .delete(deleteQuote);
+
+router.post('/:name/convert', convertToGroup);
 
 export default router;

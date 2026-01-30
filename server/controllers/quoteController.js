@@ -1,56 +1,100 @@
 import Quote from '../models/Quote.js';
-import AppError from '../utils/AppError.js'; // בהנחה שזה קיים אצלך לפי הניתוח
-import catchAsync from '../utils/catchAsync.js'; // או איך שאתה עוטף שגיאות
+import Group from '../models/Group.js';
+import AppError from '../utils/AppError.js';
+import catchAsync from '../utils/catchAsync.js';
 
+// --- שמירת הצעה ---
 export const saveQuote = catchAsync(async (req, res, next) => {
-  const { name, content } = req.body;
+  const { 
+    name, 
+    content, 
+    clientName, 
+    contactPerson, // מגיע כאובייקט { name, phone, email } מהקליינט
+    dates, 
+    pax, 
+    eventType 
+  } = req.body;
 
   if (!name || !content) {
     return next(new AppError('יש לספק שם ותוכן להצעה', 400));
   }
 
-  // שימוש ב-upsert: אם קיים מעדכן, אם לא קיים יוצר חדש
   const quote = await Quote.findOneAndUpdate(
     { name },
-    { content, name, updatedAt: Date.now() },
+    { 
+      name,
+      content,
+      clientName,
+      contactPerson, // נשמר כאובייקט בתוך ה-Quote
+      dates,
+      pax,
+      eventType,
+      updatedAt: Date.now() 
+    },
     { new: true, upsert: true, runValidators: true }
   );
 
-  res.status(200).json({
-    status: 'success',
-    data: { quote }
-  });
+  res.status(200).json({ status: 'success', data: { quote } });
 });
 
 export const getAllQuotes = catchAsync(async (req, res, next) => {
-  // מחזיר רק שמות ותאריכים כדי לא להעמיס (בלי התוכן הכבד)
-  const quotes = await Quote.find().select('name updatedAt').sort('-updatedAt');
-
-  res.status(200).json({
-    status: 'success',
-    results: quotes.length,
-    data: { quotes }
-  });
+  const quotes = await Quote.find()
+    .select('name updatedAt clientName contactPerson dates pax isConverted')
+    .sort('-updatedAt');
+  res.status(200).json({ status: 'success', results: quotes.length, data: { quotes } });
 });
 
 export const getQuoteByName = catchAsync(async (req, res, next) => {
   const quote = await Quote.findOne({ name: req.params.name });
-
-  if (!quote) {
-    return next(new AppError('לא נמצאה הצעה בשם זה', 404));
-  }
-
-  res.status(200).json({
-    status: 'success',
-    data: { quote }
-  });
+  if (!quote) return next(new AppError('לא נמצאה הצעה בשם זה', 404));
+  res.status(200).json({ status: 'success', data: { quote } });
 });
 
 export const deleteQuote = catchAsync(async (req, res, next) => {
   await Quote.findOneAndDelete({ name: req.params.name });
-  
-  res.status(204).json({
-    status: 'success',
-    data: null
+  res.status(204).json({ status: 'success', data: null });
+});
+
+// --- המרה לקבוצה (הגרסה הנכונה לפי Group Schema) ---
+export const convertToGroup = catchAsync(async (req, res, next) => {
+  const quote = await Quote.findOne({ name: req.params.name });
+  if (!quote) return next(new AppError('לא נמצאה הצעה', 404));
+  if (quote.isConverted) return next(new AppError('הצעה זו כבר הומרה לקבוצה', 400));
+
+  // 1. מיפוי סוג אירוע לערכים המותרים ב-Enum בלבד (seminar/overnight)
+  // אם סוג האירוע מכיל "שבת", "לינה" או "נופש" -> overnight. אחרת -> seminar.
+  let validHostingType = 'seminar';
+  const typeStr = (quote.eventType || '').toString();
+  if (typeStr.includes('שבת') || typeStr.includes('נופש') || typeStr.includes('לינה') || typeStr.includes('overnight')) {
+      validHostingType = 'overnight';
+  }
+
+  // 2. יצירת הקבוצה עם המבנה המקונן של contactPerson
+  const newGroup = await Group.create({
+    name: quote.clientName || quote.name,
+    
+    // כאן התיקון הקריטי: מעבירים אובייקט ולא שדות שטוחים
+    contactPerson: {
+        name: quote.contactPerson?.name || '',
+        phone: quote.contactPerson?.phone || '',
+        email: quote.contactPerson?.email || ''
+    },
+
+    startDate: quote.dates?.from,
+    endDate: quote.dates?.to,
+
+    // התיקון שביקשת: pax מההצעה הולך ל-minPax
+    minPax: quote.pax || 0,
+    pax: 0, 
+
+    hostingType: validHostingType,
+    notes: `נוצר אוטומטית מהצעת מחיר: ${quote.name}`
   });
+
+  // עדכון סטטוס ההצעה
+  quote.isConverted = true;
+  quote.convertedGroupId = newGroup._id;
+  await quote.save();
+
+  res.status(201).json({ status: 'success', data: { group: newGroup } });
 });

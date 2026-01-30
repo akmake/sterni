@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios'; 
-import { Save, FolderOpen, Trash2, X } from 'lucide-react';
+import { Save, FolderOpen, Trash2, X, CalendarPlus, CheckCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 const QuoteManager = ({ currentData, onLoadData }) => {
@@ -15,8 +15,7 @@ const QuoteManager = ({ currentData, onLoadData }) => {
   const fetchFiles = async () => {
     try {
       setLoading(true);
-      const res = await axios.get('/api/quotes', { withCredentials: true }); 
-      // טיפול גמיש בתשובה שמגיעה מהשרת
+      const res = await axios.get('http://localhost:5000/api/quotes', { withCredentials: true }); 
       const files = res.data.data?.quotes || res.data || [];
       setSavedFiles(Array.isArray(files) ? files : []);
       setLoading(false);
@@ -27,7 +26,7 @@ const QuoteManager = ({ currentData, onLoadData }) => {
     }
   };
 
-  // --- שמירה: התיקון היחיד הוא הוספת ה-Token ---
+  // --- שמירה (מבוסס על הקוד שעובד לך + הנתונים החדשים) ---
   const handleSave = async () => {
     if (!saveName) {
         toast.error('חובה לתת שם להצעה');
@@ -37,17 +36,32 @@ const QuoteManager = ({ currentData, onLoadData }) => {
     try {
       setLoading(true);
 
-      // 1. מבקש את המפתח
-      const { data: csrfData } = await axios.get('/api/csrf-token', { withCredentials: true });
+      // 1. מבקש את המפתח (תוקן ל-/api/csrf-token כפי שביקשת)
+      const { data: csrfData } = await axios.get('http://localhost:5000/api/csrf-token', { withCredentials: true });
 
-      // 2. שולח את הנתונים בדיוק כמו שהשרת שלך רגיל לקבל (Name + Content)
-      await axios.post('/api/quotes', {
+      // 2. שולח את הנתונים (הוספנו כאן את פרטי ה-CRM כדי שיישמרו)
+      await axios.post('http://localhost:5000/api/quotes', {
         name: saveName,
-        content: currentData 
+        content: currentData.blocks, // התוכן הויזואלי
+        
+        // --- הנתונים שחסרים לך כדי ליצור קבוצה אחר כך ---
+        clientName: currentData.clientName,
+        contactPerson: {
+            name: currentData.contactName,
+            phone: currentData.contactPhone,
+            email: currentData.contactEmail
+        },
+        dates: {
+            from: currentData.arrivalDate,
+            to: currentData.departureDate
+        },
+        pax: currentData.minPax,
+        eventType: currentData.eventType
+        // ------------------------------------------------
       }, { 
         withCredentials: true,
         headers: {
-            'X-CSRF-Token': csrfData.csrfToken // המפתח לדלת
+            'X-CSRF-Token': csrfData.csrfToken
         }
       });
 
@@ -67,19 +81,36 @@ const QuoteManager = ({ currentData, onLoadData }) => {
   const handleLoad = async (identifier) => {
     try {
       setLoading(true);
-      const res = await axios.get(`/api/quotes/${identifier}`, { withCredentials: true });
+      const res = await axios.get(`http://localhost:5000/api/quotes/${identifier}`, { withCredentials: true });
       
-      // חילוץ התוכן נקי
-      const loadedContent = res.data.data?.quote?.content || res.data.content;
+      const fullQuote = res.data.data?.quote || res.data;
       
-      if (loadedContent) {
-        onLoadData(loadedContent); 
-        setIsOpen(false);
-        setMode(null);
-        toast.success('ההצעה נטענה');
+      // הכנת הנתונים לטעינה (כולל השדות החדשים)
+      const dataToLoad = {
+         blocks: fullQuote.content, // במקרה ששמרנו במבנה החדש
+         // אם זה קובץ ישן, ננסה לטעון אותו ישירות, אם חדש - נפרק
+         clientName: fullQuote.clientName || fullQuote.name,
+         contactName: fullQuote.contactPerson?.name || '',
+         contactPhone: fullQuote.contactPerson?.phone || '',
+         contactEmail: fullQuote.contactPerson?.email || '',
+         arrivalDate: fullQuote.dates?.from ? fullQuote.dates.from.split('T')[0] : '',
+         departureDate: fullQuote.dates?.to ? fullQuote.dates.to.split('T')[0] : '',
+         minPax: fullQuote.pax || 0,
+         eventType: fullQuote.eventType || ''
+      };
+      
+      // תמיכה לאחור בקבצים ישנים ששמרו את הכל ב-content
+      if (!fullQuote.content && fullQuote.blocks) {
+          // מבנה ישן מאוד? ננסה להתאים
+          onLoadData(fullQuote);
       } else {
-        toast.error('הקובץ ריק');
+          // מבנה חדש או מבנה שהקוד שלך שמר
+          onLoadData(dataToLoad.blocks ? dataToLoad : fullQuote.content); 
       }
+
+      setIsOpen(false);
+      setMode(null);
+      toast.success('ההצעה נטענה');
     } catch (err) {
       console.error(err);
       toast.error('שגיאה בטעינת הקובץ');
@@ -93,10 +124,9 @@ const QuoteManager = ({ currentData, onLoadData }) => {
     e.stopPropagation();
     if(!window.confirm('למחוק את הקובץ?')) return;
     try {
-      // גם למחיקה צריך מפתח
-      const { data: csrfData } = await axios.get('/api/csrf-token', { withCredentials: true });
+      const { data: csrfData } = await axios.get('http://localhost:5000/api/csrf-token', { withCredentials: true });
 
-      await axios.delete(`/api/quotes/${identifier}`, { 
+      await axios.delete(`http://localhost:5000/api/quotes/${identifier}`, { 
         withCredentials: true,
         headers: {
             'X-CSRF-Token': csrfData.csrfToken
@@ -109,7 +139,38 @@ const QuoteManager = ({ currentData, onLoadData }) => {
     }
   };
 
-  const openSave = () => { setMode('save'); setIsOpen(true); setMessage(''); };
+  // --- הפונקציה החדשה: המרה לקבוצה ---
+  const handleConvertToGroup = async (e, quote) => {
+    e.stopPropagation();
+    if (!confirm(`האם ליצור קבוצה ביומן עבור "${quote.clientName || quote.name}"?`)) return;
+
+    try {
+      const { data: csrfData } = await axios.get('http://localhost:5000/api/csrf-token', { withCredentials: true });
+
+      await axios.post(`http://localhost:5000/api/quotes/${quote.name}/convert`, {}, { 
+          withCredentials: true,
+          headers: { 'X-CSRF-Token': csrfData.csrfToken }
+      });
+      
+      toast.success('הקבוצה נוצרה בהצלחה!');
+      fetchFiles(); // רענון כדי לראות את הסימון הירוק
+    } catch (err) {
+      console.error(err);
+      const msg = err.response?.data?.message || 'שגיאה ביצירת הקבוצה';
+      toast.error(msg);
+    }
+  };
+
+  const openSave = () => { 
+      setMode('save'); 
+      setIsOpen(true); 
+      setMessage(''); 
+      // אם יש כבר שם לקוח, נשתמש בו כשם ברירת מחדל לשמירה
+      if (currentData.clientName && currentData.clientName !== 'שם הלקוח / הקבוצה') {
+          setSaveName(currentData.clientName);
+      }
+  };
+  
   const openLoad = () => { setMode('load'); setIsOpen(true); fetchFiles(); setMessage(''); };
 
   return (
@@ -130,7 +191,7 @@ const QuoteManager = ({ currentData, onLoadData }) => {
 
       {isOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
-          <div className="bg-white p-6 rounded-lg shadow-xl w-96 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-white p-6 rounded-lg shadow-xl w-[500px] max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4 border-b pb-2">
               <h3 className="font-bold text-lg">
                 {mode === 'save' ? 'שמירת הצעה' : 'טעינת הצעה'}
@@ -142,7 +203,7 @@ const QuoteManager = ({ currentData, onLoadData }) => {
 
             {mode === 'save' ? (
               <div className="flex flex-col gap-3">
-                <label className="text-sm font-medium">שם הקובץ:</label>
+                <label className="text-sm font-medium">שם הקובץ (מזהה ייחודי):</label>
                 <input 
                   type="text" 
                   value={saveName} 
@@ -150,6 +211,9 @@ const QuoteManager = ({ currentData, onLoadData }) => {
                   className="border p-2 rounded w-full focus:ring-2 focus:ring-blue-500 outline-none"
                   placeholder="לדוגמה: חתונת משפחת כהן"
                 />
+                 <div className="text-xs text-gray-500 mt-1">
+                    * בעת השמירה, המערכת תשמור גם את פרטי אנשי הקשר והתאריכים לצורך יצירת קבוצה עתידית.
+                 </div>
                 <button 
                   onClick={handleSave} 
                   disabled={loading}
@@ -169,18 +233,39 @@ const QuoteManager = ({ currentData, onLoadData }) => {
                     onClick={() => handleLoad(file.name)}
                     className="flex justify-between items-center p-3 border rounded hover:bg-blue-50 cursor-pointer group transition"
                   >
-                    <div>
-                      <div className="font-bold text-sm">{file.name}</div>
+                    <div className="flex-1">
+                      <div className="font-bold text-sm flex items-center gap-2">
+                          {file.clientName || file.name}
+                          {file.isConverted && (
+                              <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full flex items-center gap-1 border border-green-200">
+                                  <CheckCircle size={10}/> הפך לקבוצה
+                              </span>
+                          )}
+                      </div>
                       <div className="text-xs text-gray-500">
                         {file.updatedAt ? new Date(file.updatedAt).toLocaleDateString('he-IL') : ''}
                       </div>
                     </div>
-                    <button 
-                      onClick={(e) => handleDelete(e, file._id || file.name)}
-                      className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition p-2"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    
+                    <div className="flex items-center gap-2">
+                        {/* הכפתור החדש ליצירת קבוצה */}
+                        {!file.isConverted && (
+                            <button 
+                                onClick={(e) => handleConvertToGroup(e, file)}
+                                title="צור קבוצה ביומן"
+                                className="p-2 text-purple-600 bg-purple-50 hover:bg-purple-100 rounded border border-purple-100 transition"
+                            >
+                                <CalendarPlus size={16} />
+                            </button>
+                        )}
+
+                        <button 
+                        onClick={(e) => handleDelete(e, file._id || file.name)}
+                        className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition p-2"
+                        >
+                        <Trash2 size={16} />
+                        </button>
+                    </div>
                   </div>
                 ))}
               </div>

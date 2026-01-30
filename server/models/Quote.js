@@ -7,11 +7,29 @@ const quoteSchema = new mongoose.Schema({
     trim: true,
     unique: true
   },
+  // --- שדות חדשים ל-CRM (הוספתי כאן) ---
+  clientName: { type: String }, // שם הלקוח לתצוגה ברשימה
+  contactPerson: {
+    name: String,
+    phone: String,
+    email: String
+  },
+  dates: {
+    from: Date,
+    to: Date
+  },
+  pax: { type: Number, default: 0 },
+  eventType: String,
+  
+  // שדות סטטוס להמרה
+  isConverted: { type: Boolean, default: false },
+  convertedGroupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Group' },
+  // -------------------------------------
+
   content: {
     type: mongoose.Schema.Types.Mixed,
     required: true
   },
-  // התיקון: sparse מאפשר לשמור הצעות ללא מספר, בלי שהמסד יצעק על כפילויות
   quoteNumber: {
     type: Number,
     unique: true,
@@ -32,7 +50,6 @@ const quoteSchema = new mongoose.Schema({
   }
 });
 
-// עדכון תאריך שינוי
 quoteSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();
@@ -40,10 +57,7 @@ quoteSchema.pre('save', function(next) {
 
 const Quote = mongoose.model('Quote', quoteSchema);
 
-// 🔥 שורת הקסם: מוחקת את האינדקס הישן שתוקע את המערכת 🔥
-// ברגע שהשרת יעלה מחדש, השורה הזו תרוץ, תנקה את החסימה, והשמירה תעבוד חלק.
-Quote.collection.dropIndex('quoteNumber_1').catch(() => { 
-    // מתעלם משגיאות אם האינדקס כבר נמחק או לא קיים
-});
+// שמירת התיקון שלך לאינדקס
+Quote.collection.dropIndex('quoteNumber_1').catch(() => {});
 
 export default Quote;

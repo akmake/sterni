@@ -139,7 +139,8 @@ const PriceQuoteGenerator = () => {
   const [contactPhone, setContactPhone] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [eventType, setEventType] = useState('יום עיון'); 
-  
+  const [minPaxPrefix, setMinPaxPrefix] = useState('מינימום');   // המילה "מינימום"
+  const [minPaxSuffix, setMinPaxSuffix] = useState('משתתפים');    // המילה "משתתפים"
   // התיקון: ניהול כפול של תאריכים
   // 1. תאריך לתצוגה על הנייר (טקסט עברי)
   const [arrivalDate, setArrivalDate] = useState('');
@@ -714,7 +715,7 @@ const PriceQuoteGenerator = () => {
                                     <div className="text-sm font-bold mb-2 text-gray-500">בס"ד</div>
                                     
                                     <div className="text-2xl font-bold mb-2 text-slate-900 flex items-center gap-1">
-                                        <span>לכבוד:</span>
+                                        <span>לכבוד:  </span>
                                         <TransparentInput 
                                             value={clientName} 
                                             onChange={setClientName} 
@@ -730,7 +731,7 @@ const PriceQuoteGenerator = () => {
 
                                     <div className="mt-4 text-sm space-y-1">
                                         <div className="text-slate-900 flex">
-                                            <span className="font-bold ml-1 min-w-[65px]">סוג פעילות:</span>
+                                            <span className="font-bold ml-1 min-w-[70px]">סוג פעילות:</span>
                                             <TransparentInput value={eventType} onChange={setEventType} />
                                         </div>
                                         <div className="text-slate-900 flex">
@@ -749,20 +750,42 @@ const PriceQuoteGenerator = () => {
                                 </div>
                             </div>
 
-                            <div className="w-full flex flex-col items-center justify-center mt-6">
+{/* אזור כותרת מרכזית - מיושר פלס */}
+{/* אזור כותרת מרכזית - מבנה: טקסט ימני | מספר | טקסט שמאלי */}
+                            <div className="w-full flex flex-col items-center justify-center mt-6 mx-auto">
                                 
-                                <h1 className="text-5xl font-bold mb-1 pb-1 text-center" style={{ color: GOLD, borderColor: GOLD }}>
+                                <h1 className="text-5xl font-bold mb-1 text-center whitespace-nowrap" style={{ color: GOLD }}>
                                     הצעת מחיר
                                 </h1>
 
-                                <div className="flex items-center justify-center gap-2 w-full relative right-[15px]">
-                                    <span className="text-lg font-bold text-slate-900">מינימום:</span>
+                                <div className="flex items-center justify-center gap-1.5 mt-0 w-full">
+                                    
+                                    {/* חלק 1: "מינימום" (צד ימין) */}
+                                    <TransparentInput 
+                                        value={minPaxPrefix} 
+                                        onChange={setMinPaxPrefix} 
+                                        className="text-lg font-bold text-slate-900 w-auto"
+                                        style={{ textAlign: 'left', maxWidth: '120px' }} // textAlign:left מצמיד את הטקסט למספר
+                                        placeholder="טקסט התחלה"
+                                    />
+                                    
+                                    {/* חלק 2: המספר (אמצע) */}
                                     <input 
                                         type="text"
                                         value={minPax} 
                                         onChange={(e) => setMinPax(e.target.value)} 
-                                        className="w-16 text-lg font-bold text-right bg-transparent border-none outline-none p-0 focus:ring-0"
+                                        className="w-12 text-lg font-bold text-center bg-transparent border-b border-gray-300 outline-none p-0 focus:border-amber-500"
                                     />
+
+                                    {/* חלק 3: "משתתפים" (צד שמאל) */}
+                                    <TransparentInput 
+                                        value={minPaxSuffix} 
+                                        onChange={setMinPaxSuffix} 
+                                        className="text-lg font-bold text-slate-900 w-auto"
+                                        style={{ textAlign: 'right', maxWidth: '120px' }} // textAlign:right מצמיד את הטקסט למספר
+                                        placeholder="טקסט סיום"
+                                    />
+
                                 </div>
                             </div>
                         </header>

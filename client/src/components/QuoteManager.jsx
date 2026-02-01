@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios'; 
+import api from '../api'; // השינוי הקריטי: עבודה דרך ה-API המרכזי
 import { Save, FolderOpen, Trash2, X, CalendarPlus, CheckCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -15,7 +15,8 @@ const QuoteManager = ({ currentData, onLoadData }) => {
   const fetchFiles = async () => {
     try {
       setLoading(true);
-      const res = await axios.get('http://localhost:5000/api/quotes', { withCredentials: true }); 
+      // שימוש ב-api במקום בכתובת מלאה
+      const res = await api.get('/quotes'); 
       const files = res.data.data?.quotes || res.data || [];
       setSavedFiles(Array.isArray(files) ? files : []);
       setLoading(false);
@@ -26,7 +27,7 @@ const QuoteManager = ({ currentData, onLoadData }) => {
     }
   };
 
-  // --- שמירה (מבוסס על הקוד שעובד לך + הנתונים החדשים) ---
+  // --- שמירה ---
   const handleSave = async () => {
     if (!saveName) {
         toast.error('חובה לתת שם להצעה');
@@ -36,15 +37,15 @@ const QuoteManager = ({ currentData, onLoadData }) => {
     try {
       setLoading(true);
 
-      // 1. מבקש את המפתח (תוקן ל-/api/csrf-token כפי שביקשת)
-      const { data: csrfData } = await axios.get('http://localhost:5000/api/csrf-token', { withCredentials: true });
+      // 1. מבקש את המפתח (CSRF)
+      const { data: csrfData } = await api.get('/csrf-token');
 
-      // 2. שולח את הנתונים (הוספנו כאן את פרטי ה-CRM כדי שיישמרו)
-      await axios.post('http://localhost:5000/api/quotes', {
+      // 2. שולח את הנתונים
+      await api.post('/quotes', {
         name: saveName,
         content: currentData.blocks, // התוכן הויזואלי
         
-        // --- הנתונים שחסרים לך כדי ליצור קבוצה אחר כך ---
+        // --- הנתונים ליצירת קבוצה ---
         clientName: currentData.clientName,
         contactPerson: {
             name: currentData.contactName,
@@ -57,9 +58,8 @@ const QuoteManager = ({ currentData, onLoadData }) => {
         },
         pax: currentData.minPax,
         eventType: currentData.eventType
-        // ------------------------------------------------
+        // ---------------------------
       }, { 
-        withCredentials: true,
         headers: {
             'X-CSRF-Token': csrfData.csrfToken
         }
@@ -81,14 +81,14 @@ const QuoteManager = ({ currentData, onLoadData }) => {
   const handleLoad = async (identifier) => {
     try {
       setLoading(true);
-      const res = await axios.get(`http://localhost:5000/api/quotes/${identifier}`, { withCredentials: true });
+      // שימוש ב-api ובדיקה דינמית
+      const res = await api.get(`/quotes/${identifier}`);
       
       const fullQuote = res.data.data?.quote || res.data;
       
-      // הכנת הנתונים לטעינה (כולל השדות החדשים)
+      // הכנת הנתונים לטעינה
       const dataToLoad = {
-         blocks: fullQuote.content, // במקרה ששמרנו במבנה החדש
-         // אם זה קובץ ישן, ננסה לטעון אותו ישירות, אם חדש - נפרק
+         blocks: fullQuote.content,
          clientName: fullQuote.clientName || fullQuote.name,
          contactName: fullQuote.contactPerson?.name || '',
          contactPhone: fullQuote.contactPerson?.phone || '',
@@ -99,12 +99,10 @@ const QuoteManager = ({ currentData, onLoadData }) => {
          eventType: fullQuote.eventType || ''
       };
       
-      // תמיכה לאחור בקבצים ישנים ששמרו את הכל ב-content
+      // תמיכה לאחור
       if (!fullQuote.content && fullQuote.blocks) {
-          // מבנה ישן מאוד? ננסה להתאים
           onLoadData(fullQuote);
       } else {
-          // מבנה חדש או מבנה שהקוד שלך שמר
           onLoadData(dataToLoad.blocks ? dataToLoad : fullQuote.content); 
       }
 
@@ -124,10 +122,9 @@ const QuoteManager = ({ currentData, onLoadData }) => {
     e.stopPropagation();
     if(!window.confirm('למחוק את הקובץ?')) return;
     try {
-      const { data: csrfData } = await axios.get('http://localhost:5000/api/csrf-token', { withCredentials: true });
+      const { data: csrfData } = await api.get('/csrf-token');
 
-      await axios.delete(`http://localhost:5000/api/quotes/${identifier}`, { 
-        withCredentials: true,
+      await api.delete(`/quotes/${identifier}`, { 
         headers: {
             'X-CSRF-Token': csrfData.csrfToken
         }
@@ -139,16 +136,15 @@ const QuoteManager = ({ currentData, onLoadData }) => {
     }
   };
 
-  // --- הפונקציה החדשה: המרה לקבוצה ---
+  // --- המרה לקבוצה ---
   const handleConvertToGroup = async (e, quote) => {
     e.stopPropagation();
     if (!confirm(`האם ליצור קבוצה ביומן עבור "${quote.clientName || quote.name}"?`)) return;
 
     try {
-      const { data: csrfData } = await axios.get('http://localhost:5000/api/csrf-token', { withCredentials: true });
+      const { data: csrfData } = await api.get('/csrf-token');
 
-      await axios.post(`http://localhost:5000/api/quotes/${quote.name}/convert`, {}, { 
-          withCredentials: true,
+      await api.post(`/quotes/${quote.name}/convert`, {}, { 
           headers: { 'X-CSRF-Token': csrfData.csrfToken }
       });
       
@@ -165,7 +161,6 @@ const QuoteManager = ({ currentData, onLoadData }) => {
       setMode('save'); 
       setIsOpen(true); 
       setMessage(''); 
-      // אם יש כבר שם לקוח, נשתמש בו כשם ברירת מחדל לשמירה
       if (currentData.clientName && currentData.clientName !== 'שם הלקוח / הקבוצה') {
           setSaveName(currentData.clientName);
       }

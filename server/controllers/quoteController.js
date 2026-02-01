@@ -1,3 +1,4 @@
+import mongoose from 'mongoose'; // <--- הוסף שורה זו בראש הקובץ
 import Quote from '../models/Quote.js';
 import Group from '../models/Group.js';
 import AppError from '../utils/AppError.js';
@@ -51,10 +52,27 @@ export const getQuoteByName = catchAsync(async (req, res, next) => {
 });
 
 export const deleteQuote = catchAsync(async (req, res, next) => {
-  await Quote.findOneAndDelete({ name: req.params.name });
+  const { name } = req.params; // הפרמטר שמגיע מה-URL (יכול להיות שם או ID)
+  let deletedQuote;
+
+  // בדיקה: האם זה נראה כמו ID של מונגו?
+  if (mongoose.Types.ObjectId.isValid(name)) {
+    // נסה למחוק לפי ID
+    deletedQuote = await Quote.findByIdAndDelete(name);
+  }
+
+  // אם לא נמצא (או שזה לא היה ID), נסה למחוק לפי השם
+  if (!deletedQuote) {
+    deletedQuote = await Quote.findOneAndDelete({ name: name });
+  }
+
+  // אם עדיין לא נמצא כלום - החזר שגיאה
+  if (!deletedQuote) {
+    return next(new AppError('לא נמצאה הצעה למחיקה', 404));
+  }
+
   res.status(204).json({ status: 'success', data: null });
 });
-
 // --- המרה לקבוצה (הגרסה הנכונה לפי Group Schema) ---
 export const convertToGroup = catchAsync(async (req, res, next) => {
   const quote = await Quote.findOne({ name: req.params.name });

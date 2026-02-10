@@ -27,8 +27,7 @@ import PaymentRequestGenerator from './components/PaymentRequestGenerator';
 import SystemSettings from './pages/SystemSettings';
 import KitchenStaffManager from './pages/KitchenStaffManager';
 import StaffPrintView from './pages/StaffPrintView'; // וודא נתיב
-import StaffPrintA3 from "./pages/StaffPrintA3";
-
+import StaffPrintA3 from "./pages/Staffprinta3";
 export default function App() {
   return (
     <Routes>

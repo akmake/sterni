@@ -19,7 +19,9 @@ const navItems = [
     { to: '/full-schedule', label: 'לו"ז מפורט', icon: CalendarDays, type: 'link', auth: true },
     { to: '/halls', label: 'ניהול אולמות', icon: MapPin, type: 'link', auth: true },
     { to: '/whatsapp', label: 'מערכת צ׳אט', icon: MessageSquare, type: 'link', auth: true }, 
-    { to: '/settings', label: 'הגדרות מערכת', icon: Settings, type: 'link', auth: true },// <--- זה הלינק הנכון
+    { to: '/settings', label: 'הגדרות מערכת', icon: Settings, type: 'link', auth: true },
+    { to: '/staff-manager', label: 'ניהול מטבח', icon: Utensils, type: 'link', auth: true },
+
 ];
 
 const getVisibleItems = (isAuthenticated, user) => {

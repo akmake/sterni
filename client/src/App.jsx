@@ -25,6 +25,9 @@ import WhatsAppPage from './pages/WhatsAppPage';
 import PriceQuoteGenerator from './components/PriceQuoteGenerator'; 
 import PaymentRequestGenerator from './components/PaymentRequestGenerator';
 import SystemSettings from './pages/SystemSettings';
+import KitchenStaffManager from './pages/KitchenStaffManager';
+import StaffPrintView from './pages/StaffPrintView'; // וודא נתיב
+import StaffPrintA3 from "./pages/StaffPrintA3";
 
 export default function App() {
   return (
@@ -54,6 +57,10 @@ export default function App() {
           <Route path="/chat/:ticketId" element={<ChatPage />} />
           <Route path="/whatsapp" element={<WhatsAppPage />} />
           <Route path="/groups/:groupId/payment-request" element={<PaymentRequestGenerator />} />
+          <Route path="/staff-manager" element={<KitchenStaffManager />} />
+          <Route path="/reports/staff-print-a3" element={<StaffPrintA3 />} />  
+          <Route path="/staff-print-a3" element={<StaffPrintA3 />} />
+          
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

@@ -7,8 +7,9 @@ const quoteSchema = new mongoose.Schema({
     trim: true,
     unique: true
   },
-  // --- שדות חדשים ל-CRM (הוספתי כאן) ---
-  clientName: { type: String }, // שם הלקוח לתצוגה ברשימה
+
+  // --- CRM fields ---
+  clientName: { type: String },
   contactPerson: {
     name: String,
     phone: String,
@@ -20,25 +21,32 @@ const quoteSchema = new mongoose.Schema({
   },
   pax: { type: Number, default: 0 },
   eventType: String,
-  
-  // שדות סטטוס להמרה
+
+  // Conversion status
   isConverted: { type: Boolean, default: false },
   convertedGroupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Group' },
-  // -------------------------------------
 
+  // The structured content (blocks array for editor)
   content: {
     type: mongoose.Schema.Types.Mixed,
     required: true
   },
+
+  // ★ NEW: Full rendered HTML body of the quote for future reference
+  htmlBody: {
+    type: String,
+    default: ''
+  },
+
   quoteNumber: {
     type: Number,
     unique: true,
-    sparse: true 
+    sparse: true
   },
   owner: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: false 
+    required: false
   },
   createdAt: {
     type: Date,
@@ -57,7 +65,7 @@ quoteSchema.pre('save', function(next) {
 
 const Quote = mongoose.model('Quote', quoteSchema);
 
-// שמירת התיקון שלך לאינדקס
+// Safely drop old unique index if it exists
 Quote.collection.dropIndex('quoteNumber_1').catch(() => {});
 
 export default Quote;

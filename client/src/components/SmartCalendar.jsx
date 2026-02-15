@@ -1,57 +1,106 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
+import api from '../api';
 
-export default function SmartCalendar({ existingGroups = [], onSelectRange }) {
+/**
+ * SmartCalendar v2
+ *
+ * Props:
+ *   existingGroups: [{startDate, endDate, ...}]
+ *   onSelectRange: ({start, end}) => void
+ *   showQuotes: boolean (default true) — show amber dots for quote dates
+ */
+export default function SmartCalendar({ existingGroups = [], onSelectRange, showQuotes = true }) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selection, setSelection] = useState({ start: null, end: null });
+  const [quoteDates, setQuoteDates] = useState(new Set());
 
-  // פונקציות עזר לתאריכים
+  // ─── Fetch quote dates ───
+  useEffect(() => {
+    if (!showQuotes) return;
+    const fetchQuotes = async () => {
+      try {
+        const res = await api.get('/quotes');
+        const quotes = res.data.data?.quotes || res.data || [];
+        const dates = new Set();
+
+        for (const q of quotes) {
+          if (q.isConverted) continue;
+          if (q.dates?.from) {
+            const from = new Date(q.dates.from);
+            const to = q.dates?.to ? new Date(q.dates.to) : from;
+            const cursor = new Date(from);
+            cursor.setHours(0, 0, 0, 0);
+            const end = new Date(to);
+            end.setHours(0, 0, 0, 0);
+            while (cursor <= end) {
+              dates.add(cursor.toISOString().split('T')[0]);
+              cursor.setDate(cursor.getDate() + 1);
+            }
+          }
+        }
+        setQuoteDates(dates);
+      } catch (err) {
+        console.error('Failed to fetch quote dates:', err);
+      }
+    };
+    fetchQuotes();
+  }, [showQuotes]);
+
+  // פונקציות עזר לתאריכים — זהה למקור
   const getDaysInMonth = (date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   const getFirstDayOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1).getDay();
 
-  // המרה לתאריך עברי (פשוטה באמצעות Intl API המובנה בדפדפן)
   const getHebrewDate = (date) => {
-    return new Intl.DateTimeFormat('he-u-ca-hebrew', { day: 'numeric', month: 'numeric' }).format(date);
+    try {
+      return new Intl.DateTimeFormat('he-u-ca-hebrew', { day: 'numeric', month: 'numeric' }).format(date);
+    } catch {
+      return '';
+    }
   };
 
-  // --- פונקציה מתוקנת למעבר חודשים בטוח ---
   const changeMonth = (increment) => {
     const newDate = new Date(currentDate);
-    newDate.setDate(1); // מאפסים לראשון לחודש כדי למנוע דילוגים (כמו מ-31 ינואר למרץ)
+    newDate.setDate(1);
     newDate.setMonth(newDate.getMonth() + increment);
     setCurrentDate(newDate);
   };
 
+  // לוגיקת בחירה — זהה למקור בדיוק
   const handleDayClick = (day) => {
     const clickedDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
-    
-    // לוגיקת בחירה: התחלה -> סוף -> איפוס
+
     if (!selection.start || (selection.start && selection.end)) {
       setSelection({ start: clickedDate, end: null });
       onSelectRange({ start: clickedDate, end: null });
     } else {
-      // וידוא שהסוף הוא אחרי ההתחלה
       if (clickedDate < selection.start) {
-         setSelection({ start: clickedDate, end: null });
-         onSelectRange({ start: clickedDate, end: null });
+        setSelection({ start: clickedDate, end: null });
+        onSelectRange({ start: clickedDate, end: null });
       } else {
-         setSelection({ ...selection, end: clickedDate });
-         onSelectRange({ start: selection.start, end: clickedDate });
+        setSelection({ ...selection, end: clickedDate });
+        onSelectRange({ start: selection.start, end: clickedDate });
       }
     }
   };
 
   const isDateOccupied = (day) => {
     const checkDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
-    // בודק אם התאריך נופל בטווח של קבוצה קיימת כלשהי
-    return existingGroups.some(group => {
+    checkDate.setHours(0, 0, 0, 0);
+    return (existingGroups || []).some(group => {
+      if (!group.startDate || !group.endDate) return false;
       const start = new Date(group.startDate);
       const end = new Date(group.endDate);
-      // איפוס שעות להשוואה הוגנת
-      start.setHours(0,0,0,0);
-      end.setHours(0,0,0,0);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
       return checkDate >= start && checkDate <= end;
     });
+  };
+
+  const isDateQuoted = (day) => {
+    if (!showQuotes) return false;
+    const d = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+    return quoteDates.has(d.toISOString().split('T')[0]);
   };
 
   const renderDays = () => {
@@ -59,23 +108,21 @@ export default function SmartCalendar({ existingGroups = [], onSelectRange }) {
     const firstDay = getFirstDayOfMonth(currentDate);
     const days = [];
 
-    // ריפוד ימים ריקים בהתחלה
     for (let i = 0; i < firstDay; i++) {
       days.push(<div key={`empty-${i}`} className="h-14"></div>);
     }
 
-    // הימים עצמם
     for (let day = 1; day <= daysInMonth; day++) {
       const isOccupied = isDateOccupied(day);
+      const quoted = isDateQuoted(day);
       const dateObj = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
-      
-      // בדיקה אם נבחר
+
       const isSelectedStart = selection.start?.toDateString() === dateObj.toDateString();
       const isSelectedEnd = selection.end?.toDateString() === dateObj.toDateString();
       const isInRange = selection.start && selection.end && dateObj > selection.start && dateObj < selection.end;
 
       days.push(
-        <div 
+        <div
           key={day}
           onClick={() => handleDayClick(day)}
           className={`
@@ -85,17 +132,20 @@ export default function SmartCalendar({ existingGroups = [], onSelectRange }) {
             ${isInRange ? 'bg-blue-100/50' : ''}
           `}
         >
-            {/* המספר הלועזי */}
             <span className="text-sm font-bold">{day}</span>
-            {/* התאריך העברי בקטן */}
             <span className={`text-[10px] ${isSelectedStart || isSelectedEnd ? 'text-slate-300' : 'text-slate-400'}`}>
                 {getHebrewDate(dateObj)}
             </span>
-            
-            {/* אינדיקטור לתפוסה */}
-            {isOccupied && (
-                <div className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-400 rounded-full" title="יש קבוצות בתאריך זה"></div>
-            )}
+
+            {/* Indicator dots */}
+            <div className="absolute top-1 right-1 flex gap-0.5">
+              {isOccupied && (
+                <div className="w-1.5 h-1.5 bg-red-400 rounded-full" title="קבוצה קיימת"></div>
+              )}
+              {quoted && (
+                <div className="w-1.5 h-1.5 bg-amber-400 rounded-full" title="הצעת מחיר"></div>
+              )}
+            </div>
         </div>
       );
     }
@@ -115,18 +165,27 @@ export default function SmartCalendar({ existingGroups = [], onSelectRange }) {
             <ChevronLeft size={20} />
         </button>
       </div>
-      
+
       <div className="grid grid-cols-7 gap-1 text-center mb-2 text-xs text-slate-400 font-medium">
         <div>א</div><div>ב</div><div>ג</div><div>ד</div><div>ה</div><div>ו</div><div>ש</div>
       </div>
-      
+
       <div className="grid grid-cols-7 gap-1 rounded-xl overflow-hidden">
         {renderDays()}
       </div>
-      
-      <div className="mt-4 flex items-center gap-2 text-xs text-slate-500 justify-end">
-        <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-        <span>קבוצות קיימות</span>
+
+      {/* Legend */}
+      <div className="mt-4 flex items-center gap-4 text-xs text-slate-500 justify-end">
+        <div className="flex items-center gap-1.5">
+          <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+          <span>קבוצות קיימות</span>
+        </div>
+        {showQuotes && (
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 bg-amber-400 rounded-full"></div>
+            <span>הצעות מחיר</span>
+          </div>
+        )}
       </div>
     </div>
   );

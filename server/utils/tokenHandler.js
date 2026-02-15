@@ -1,12 +1,12 @@
 import jwt from 'jsonwebtoken';
 
-// 1. שינינו כאן ל-90 יום (במקום 15 דקות)
+// ★ FIX: Access token should be SHORT-LIVED (15 minutes)
 const signAccessToken = (payload) =>
-  jwt.sign(payload, process.env.JWT_ACCESS_SECRET, { expiresIn: '90d' });
+  jwt.sign(payload, process.env.JWT_ACCESS_SECRET, { expiresIn: '15m' });
 
-// גם את ה-Refresh נגדיר ל-90 יום
+// Refresh token can be longer (30 days)
 const signRefreshToken = (payload) =>
-  jwt.sign(payload, process.env.JWT_REFRESH_SECRET, { expiresIn: '90d' });
+  jwt.sign(payload, process.env.JWT_REFRESH_SECRET, { expiresIn: '30d' });
 
 export const createAndSendTokens = (user, res) => {
   const accessToken = signAccessToken({ id: user._id, role: user.role });
@@ -14,20 +14,20 @@ export const createAndSendTokens = (user, res) => {
 
   const secure = process.env.NODE_ENV === 'production';
 
-  // חישוב של 90 יום באלפיות השנייה
-  const ninetyDaysInMs = 90 * 24 * 60 * 60 * 1000;
+  const fifteenMinMs = 15 * 60 * 1000;
+  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
 
   res
     .cookie('jwt', accessToken, {
       httpOnly: true,
       sameSite: 'strict',
       secure,
-      maxAge: ninetyDaysInMs, // 2. העוגייה תישמר בדפדפן ל-90 יום
+      maxAge: fifteenMinMs,
     })
     .cookie('refreshToken', refreshToken, {
       httpOnly: true,
       sameSite: 'strict',
       secure,
-      maxAge: ninetyDaysInMs, // כנ"ל
+      maxAge: thirtyDaysMs,
     });
 };

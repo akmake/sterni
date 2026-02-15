@@ -21,6 +21,7 @@ const navItems = [
     { to: '/whatsapp', label: 'מערכת צ׳אט', icon: MessageSquare, type: 'link', auth: true }, 
     { to: '/settings', label: 'הגדרות מערכת', icon: Settings, type: 'link', auth: true },
     { to: '/staff-manager', label: 'ניהול מטבח', icon: Utensils, type: 'link', auth: true },
+    { to: '/thai-schedule', label: 'לו"ז תאילנדי', icon: CalendarDays, type: 'link', auth: true },
 
 ];
 

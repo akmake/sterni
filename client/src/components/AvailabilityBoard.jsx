@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   Clock,
   Search,
@@ -8,16 +8,16 @@ import {
   Users,
   AlertTriangle,
   Plus,
+  ZoomIn,
+  ZoomOut,
+  Utensils,
+  MapPin,
 } from "lucide-react";
 
 /**
- * Scheduler Pro (06:00 -> 06:00 next day)
- * - Rows = halls
- * - Horizontal time axis
- * - "Scheduling mode" highlights free gaps >= requiredDuration
- * - Side drawer for event details
+ * AvailabilityBoard v2 — Clean & Readable
  *
- * Props (same as your current):
+ * Props:
  *  date: Date
  *  halls: [{_id, name, capacity?}]
  *  groups: [{_id, name, schedule: [{_id?, title, date, startTime, endTime, pax?, notes?, isMeal?, kosherType?, hall:{_id}}]}]
@@ -25,6 +25,21 @@ import {
  *  onSlotClick(hallId, hourInt)
  *  onEventClick(event)
  */
+
+// ─── Color palette for groups ───
+const GROUP_COLORS = [
+  { bg: "bg-blue-500",    border: "border-blue-600",    light: "bg-blue-50",   text: "text-blue-700",   ring: "ring-blue-200" },
+  { bg: "bg-violet-500",  border: "border-violet-600",  light: "bg-violet-50", text: "text-violet-700", ring: "ring-violet-200" },
+  { bg: "bg-emerald-500", border: "border-emerald-600", light: "bg-emerald-50",text: "text-emerald-700",ring: "ring-emerald-200" },
+  { bg: "bg-amber-500",   border: "border-amber-600",   light: "bg-amber-50",  text: "text-amber-700",  ring: "ring-amber-200" },
+  { bg: "bg-rose-500",    border: "border-rose-600",    light: "bg-rose-50",   text: "text-rose-700",   ring: "ring-rose-200" },
+  { bg: "bg-cyan-500",    border: "border-cyan-600",    light: "bg-cyan-50",   text: "text-cyan-700",   ring: "ring-cyan-200" },
+  { bg: "bg-orange-500",  border: "border-orange-600",  light: "bg-orange-50", text: "text-orange-700", ring: "ring-orange-200" },
+  { bg: "bg-teal-500",    border: "border-teal-600",    light: "bg-teal-50",   text: "text-teal-700",   ring: "ring-teal-200" },
+];
+
+const KOSHER_LABELS = { meat: "בשרי", dairy: "חלבי", parve: "פרווה" };
+
 export default function AvailabilityBoard({
   date,
   halls,
@@ -33,39 +48,51 @@ export default function AvailabilityBoard({
   onSlotClick,
   onEventClick,
 }) {
-  // ====== Core window: 06:00 -> 06:00 ======
+  // ─── Constants ───
   const START_HOUR = 6;
   const WINDOW_MINUTES = 24 * 60;
+  const HOUR_LABELS = useMemo(() => {
+    const labels = [];
+    for (let i = 0; i < 24; i++) {
+      const h = (START_HOUR + i) % 24;
+      labels.push({ hour: h, label: `${String(h).padStart(2, "0")}:00`, minuteOffset: i * 60 });
+    }
+    return labels;
+  }, []);
 
-  // Zoom levels (px per minute)
+  // ─── Zoom ───
   const ZOOMS = [
-    { id: "compact", label: "קומפקטי", pxPerMin: 1.8, minorEvery: 60 },
-    { id: "standard", label: "סטנדרט", pxPerMin: 2.6, minorEvery: 30 },
-    { id: "detailed", label: "מפורט", pxPerMin: 3.8, minorEvery: 15 },
+    { id: "compact", label: "קומפקטי", pxPerHour: 80 },
+    { id: "standard", label: "רגיל", pxPerHour: 130 },
+    { id: "detailed", label: "מפורט", pxPerHour: 200 },
   ];
+  const [zoomIdx, setZoomIdx] = useState(1);
+  const zoom = ZOOMS[zoomIdx];
+  const pxPerMin = zoom.pxPerHour / 60;
+  const timelineWidth = 24 * zoom.pxPerHour;
 
-  const [zoomId, setZoomId] = useState("standard");
-  const zoom = useMemo(() => ZOOMS.find((z) => z.id === zoomId) || ZOOMS[1], [zoomId]);
-
+  // ─── State ───
   const [search, setSearch] = useState("");
   const [scheduleMode, setScheduleMode] = useState(false);
-  const [requiredMinutes, setRequiredMinutes] = useState(90); // length needed to schedule
-
-  // Drawer
+  const [requiredMinutes, setRequiredMinutes] = useState(90);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [overlapWarning, setOverlapWarning] = useState(null);
 
-  const axisRef = useRef(null);
+  const scrollRef = useRef(null);
+  const ROW_HEIGHT = 72;
+  const HALL_COL = 180;
 
-  // ====== Date helpers ======
+  // ─── Date helpers ───
   const windowStart = useMemo(() => {
     const d = new Date(date);
     d.setHours(START_HOUR, 0, 0, 0);
     return d;
   }, [date]);
 
-  const windowEnd = useMemo(() => new Date(windowStart.getTime() + WINDOW_MINUTES * 60000), [windowStart]);
-
-  const isSameDay = (a, b) => a?.toDateString?.() === b?.toDateString?.();
+  const windowEnd = useMemo(
+    () => new Date(windowStart.getTime() + WINDOW_MINUTES * 60000),
+    [windowStart]
+  );
 
   const parseHHMM = (t) => {
     const [h, m] = (t || "00:00").split(":").map(Number);
@@ -79,18 +106,29 @@ export default function AvailabilityBoard({
     return base;
   };
 
-  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const minsFromStart = (dt) => Math.round((dt.getTime() - windowStart.getTime()) / 60000);
 
-  const formatTimeFromMinutes = (minsFromStart) => {
-    const total = START_HOUR * 60 + minsFromStart;
-    const h24 = Math.floor((total / 60) % 24);
+  const formatTime = (mins) => {
+    const total = START_HOUR * 60 + mins;
+    const h = Math.floor((total / 60) % 24);
     const m = total % 60;
-    return `${String(h24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
   };
 
-  const minsFromWindowStart = (dt) => Math.round((dt.getTime() - windowStart.getTime()) / 60000);
+  // ─── Group color map ───
+  const groupColorMap = useMemo(() => {
+    const map = new Map();
+    let idx = 0;
+    for (const g of groups || []) {
+      if (!map.has(g._id)) {
+        map.set(g._id, g._id === currentGroupId ? 0 : (idx++ % (GROUP_COLORS.length - 1)) + 1);
+      }
+    }
+    return map;
+  }, [groups, currentGroupId]);
 
-  // ====== Build a normalized, window-clamped event list ======
+  // ─── Normalize events ───
   const normalizedEvents = useMemo(() => {
     const out = [];
     for (const group of groups || []) {
@@ -101,235 +139,191 @@ export default function AvailabilityBoard({
 
         const startDT = buildDateTime(ev.date, ev.startTime);
         let endDT = buildDateTime(ev.date, ev.endTime);
+        if (endDT <= startDT) endDT = new Date(endDT.getTime() + 86400000);
 
-        // handle crossing midnight
-        if (endDT <= startDT) endDT = new Date(endDT.getTime() + 24 * 60 * 60 * 1000);
+        if (!(endDT > windowStart && startDT < windowEnd)) continue;
 
-        // Include if it overlaps the window (not only start within)
-        const overlaps = endDT > windowStart && startDT < windowEnd;
-        if (!overlaps) continue;
-
-        // clamp to window for rendering
-        const clampedStart = new Date(Math.max(startDT.getTime(), windowStart.getTime()));
-        const clampedEnd = new Date(Math.min(endDT.getTime(), windowEnd.getTime()));
-
-        const startMin = clamp(minsFromWindowStart(clampedStart), 0, WINDOW_MINUTES);
-        const endMin = clamp(minsFromWindowStart(clampedEnd), 0, WINDOW_MINUTES);
+        const cs = new Date(Math.max(startDT.getTime(), windowStart.getTime()));
+        const ce = new Date(Math.min(endDT.getTime(), windowEnd.getTime()));
+        const startMin = clamp(minsFromStart(cs), 0, WINDOW_MINUTES);
+        const endMin = clamp(minsFromStart(ce), 0, WINDOW_MINUTES);
 
         out.push({
           ...ev,
-          _render: {
-            hallId,
-            startMin,
-            endMin,
-            durationMin: Math.max(0, endMin - startMin),
-            isClippedStart: startDT < windowStart,
-            isClippedEnd: endDT > windowEnd,
-          },
+          _r: { hallId, startMin, endMin, dur: Math.max(0, endMin - startMin) },
           groupName: group.name,
-          isCurrentGroup: group._id === currentGroupId,
+          groupId: group._id,
+          isMine: group._id === currentGroupId,
+          colorIdx: groupColorMap.get(group._id) ?? 1,
         });
       }
     }
     return out;
-  }, [groups, currentGroupId, windowStart, windowEnd]);
+  }, [groups, currentGroupId, windowStart, windowEnd, groupColorMap]);
 
-  // ====== Hall filtering (search across hall name + group name + title) ======
-  const filteredHalls = useMemo(() => {
-    const q = (search || "").trim().toLowerCase();
-    if (!q) return halls || [];
-
-    return (halls || []).filter((h) => {
-      const hn = (h?.name || "").toLowerCase();
-      if (hn.includes(q)) return true;
-      // if any event in hall matches title/group
-      const matchEv = normalizedEvents.some((ev) => {
-        if (ev._render.hallId !== h._id) return false;
-        const t = (ev.title || "").toLowerCase();
-        const g = (ev.groupName || "").toLowerCase();
-        return t.includes(q) || g.includes(q);
-      });
-      return matchEv;
-    });
-  }, [halls, search, normalizedEvents]);
-
-  // ====== Events per hall (sorted) ======
+  // ─── Events by hall ───
   const eventsByHall = useMemo(() => {
     const map = new Map();
     for (const h of halls || []) map.set(h._id, []);
-
     for (const ev of normalizedEvents) {
-      if (!map.has(ev._render.hallId)) map.set(ev._render.hallId, []);
-      map.get(ev._render.hallId).push(ev);
+      if (!map.has(ev._r.hallId)) map.set(ev._r.hallId, []);
+      map.get(ev._r.hallId).push(ev);
     }
-
-    for (const [hallId, list] of map.entries()) {
-      list.sort((a, b) => a._render.startMin - b._render.startMin);
-      map.set(hallId, list);
-    }
+    for (const [, list] of map) list.sort((a, b) => a._r.startMin - b._r.startMin);
     return map;
   }, [halls, normalizedEvents]);
 
-  // ====== Free gaps per hall (within 0..1440) ======
+  // ─── Overlap detection per hall ───
+  const overlapsByHall = useMemo(() => {
+    const map = new Map();
+    for (const h of halls || []) {
+      const evs = eventsByHall.get(h._id) || [];
+      const overlaps = new Set();
+      for (let i = 0; i < evs.length; i++) {
+        for (let j = i + 1; j < evs.length; j++) {
+          if (evs[i]._r.endMin > evs[j]._r.startMin && evs[i]._r.startMin < evs[j]._r.endMin) {
+            overlaps.add(evs[i]._id || `${h._id}-${i}`);
+            overlaps.add(evs[j]._id || `${h._id}-${j}`);
+          }
+        }
+      }
+      map.set(h._id, overlaps);
+    }
+    return map;
+  }, [halls, eventsByHall]);
+
+  const totalConflicts = useMemo(() => {
+    let c = 0;
+    for (const [, s] of overlapsByHall) c += s.size;
+    return Math.floor(c / 2); // each overlap counted twice
+  }, [overlapsByHall]);
+
+  // ─── Gaps per hall ───
   const gapsByHall = useMemo(() => {
     const map = new Map();
     for (const h of halls || []) {
-      const evs = (eventsByHall.get(h._id) || []).slice().sort((a, b) => a._render.startMin - b._render.startMin);
-
+      const evs = (eventsByHall.get(h._id) || []).slice().sort((a, b) => a._r.startMin - b._r.startMin);
       const gaps = [];
       let cursor = 0;
-
       for (const ev of evs) {
-        const s = clamp(ev._render.startMin, 0, WINDOW_MINUTES);
-        const e = clamp(ev._render.endMin, 0, WINDOW_MINUTES);
-        if (s > cursor) gaps.push({ startMin: cursor, endMin: s, durationMin: s - cursor });
-        cursor = Math.max(cursor, e);
+        if (ev._r.startMin > cursor) gaps.push({ s: cursor, e: ev._r.startMin, d: ev._r.startMin - cursor });
+        cursor = Math.max(cursor, ev._r.endMin);
       }
-      if (cursor < WINDOW_MINUTES) gaps.push({ startMin: cursor, endMin: WINDOW_MINUTES, durationMin: WINDOW_MINUTES - cursor });
-
+      if (cursor < WINDOW_MINUTES) gaps.push({ s: cursor, e: WINDOW_MINUTES, d: WINDOW_MINUTES - cursor });
       map.set(h._id, gaps);
     }
     return map;
   }, [halls, eventsByHall]);
 
-  // ====== Layout measurements ======
-  const timelineWidth = useMemo(() => Math.round(WINDOW_MINUTES * zoom.pxPerMin), [zoom.pxPerMin]);
-  const rowHeight = 56;
-  const hallColWidth = 240;
+  // ─── Filter halls ───
+  const filteredHalls = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return halls || [];
+    return (halls || []).filter((h) => {
+      if (h.name.toLowerCase().includes(q)) return true;
+      return normalizedEvents.some(
+        (ev) => ev._r.hallId === h._id && ((ev.title || "").toLowerCase().includes(q) || (ev.groupName || "").toLowerCase().includes(q))
+      );
+    });
+  }, [halls, search, normalizedEvents]);
 
-  // ====== Now indicator (vertical line) ======
+  // ─── Now indicator ───
   const [nowMin, setNowMin] = useState(null);
-
   useEffect(() => {
     const tick = () => {
       const now = new Date();
-      // show "now" only when date is the same calendar day as windowStart's date
-      // and also allow after midnight until 06:00 to be treated as part of previous operational day
-      const same = isSameDay(new Date(date), now);
-
-      // If it's after midnight and before 06:00, it belongs to "yesterday's operational day"
-      const isEarly = now.getHours() < START_HOUR;
-      const operationalDay = new Date(now);
-      if (isEarly) operationalDay.setDate(operationalDay.getDate() - 1);
-
-      const isOperationalMatch = isSameDay(new Date(date), operationalDay);
-
-      if (!same && !isOperationalMatch) {
-        setNowMin(null);
-        return;
-      }
-
       const start = new Date(date);
       start.setHours(START_HOUR, 0, 0, 0);
-
       let diff = Math.round((now.getTime() - start.getTime()) / 60000);
-      if (diff < 0) diff += WINDOW_MINUTES; // early morning shift
-      if (diff < 0 || diff > WINDOW_MINUTES) {
-        setNowMin(null);
-        return;
-      }
+      if (diff < 0) diff += WINDOW_MINUTES;
+      if (diff < 0 || diff > WINDOW_MINUTES) { setNowMin(null); return; }
       setNowMin(diff);
     };
-
     tick();
-    const id = setInterval(tick, 60_000);
+    const id = setInterval(tick, 60000);
     return () => clearInterval(id);
   }, [date]);
 
-  // ====== Quick overview: conflicts ======
-  const conflicts = useMemo(() => {
-    let count = 0;
-    for (const h of halls || []) {
-      const evs = (eventsByHall.get(h._id) || []).slice().sort((a, b) => a._render.startMin - b._render.startMin);
-      for (let i = 0; i < evs.length - 1; i++) {
-        if (evs[i]._render.endMin > evs[i + 1]._render.startMin) count++;
-      }
-    }
-    return count;
-  }, [halls, eventsByHall]);
+  // ─── Scroll helper ───
+  const scrollTo = useCallback((min) => {
+    if (!scrollRef.current) return;
+    const x = clamp(min * pxPerMin - 300, 0, timelineWidth);
+    scrollRef.current.scrollTo({ left: x, behavior: "smooth" });
+  }, [pxPerMin, timelineWidth]);
 
-  // ====== Next available (top 3) given requiredMinutes; default from "now" if today else from 0 ======
-  const nextAvailable = useMemo(() => {
-    const fromMin = nowMin != null ? nowMin : 0;
-    const items = [];
+  useEffect(() => {
+    if (nowMin != null) scrollTo(nowMin);
+    else scrollTo(180);
+  }, [zoomIdx]);
 
-    for (const h of halls || []) {
-      const gaps = gapsByHall.get(h._id) || [];
-      const suitable = gaps.find((g) => g.durationMin >= requiredMinutes && g.endMin > fromMin && Math.max(g.startMin, fromMin) + requiredMinutes <= g.endMin);
-      if (!suitable) continue;
+  // ─── Slot click handler (with overlap warning) ───
+  const handleSlotClick = (hallId, startMin) => {
+    const hourInt = Math.floor(START_HOUR + startMin / 60);
 
-      const startMin = Math.max(suitable.startMin, fromMin);
-      items.push({
-        hallId: h._id,
-        hallName: h.name,
-        startMin,
+    // Check for overlap with existing events
+    const evs = eventsByHall.get(hallId) || [];
+    const endMin = startMin + requiredMinutes;
+    const overlapping = evs.filter(
+      (ev) => ev._r.startMin < endMin && ev._r.endMin > startMin
+    );
+
+    if (overlapping.length > 0) {
+      // Show warning but don't block
+      setOverlapWarning({
+        hallId,
+        hourInt,
+        events: overlapping,
+        hallName: (halls || []).find((h) => h._id === hallId)?.name || "",
       });
+      return;
     }
 
-    items.sort((a, b) => a.startMin - b.startMin);
-    return items.slice(0, 3);
-  }, [halls, gapsByHall, requiredMinutes, nowMin]);
-
-  // ====== Click handlers ======
-  const createFromGap = (hallId, startMin) => {
-    // Keep compatibility: onSlotClick(hallId, hourInt)
-    // We pass hour based on operational day: 06:00..29:00
-    const hourFloat = START_HOUR + startMin / 60;
-    const hourInt = Math.floor(hourFloat); // coarse, by hour
     onSlotClick && onSlotClick(hallId, hourInt);
   };
 
-  const openEvent = (ev) => {
-    setSelectedEvent(ev);
-    onEventClick && onEventClick(ev);
+  const confirmOverlap = () => {
+    if (overlapWarning) {
+      onSlotClick && onSlotClick(overlapWarning.hallId, overlapWarning.hourInt);
+      setOverlapWarning(null);
+    }
   };
 
-  const tickMarks = useMemo(() => {
-    // major every 60, minor based on zoom.minorEvery
-    const minors = [];
-    for (let m = 0; m <= WINDOW_MINUTES; m += zoom.minorEvery) minors.push(m);
-    return minors;
-  }, [zoom.minorEvery]);
-
-  const majorMarks = useMemo(() => {
-    const majors = [];
-    for (let m = 0; m <= WINDOW_MINUTES; m += 60) majors.push(m);
-    return majors;
-  }, []);
-
-  // Scroll helper (jump to now or morning)
-  const scrollToMinute = (min) => {
-    const el = axisRef.current;
-    if (!el) return;
-    const x = clamp(min * zoom.pxPerMin - 280, 0, timelineWidth);
-    el.scrollTo({ left: x, behavior: "smooth" });
+  // ─── Stacking for overlapping events in same hall ───
+  const getEventLayers = (evs) => {
+    const layers = [];
+    for (const ev of evs) {
+      let placed = false;
+      for (let l = 0; l < layers.length; l++) {
+        const last = layers[l][layers[l].length - 1];
+        if (last._r.endMin <= ev._r.startMin) {
+          layers[l].push(ev);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) layers.push([ev]);
+    }
+    return layers;
   };
 
-  useEffect(() => {
-    // initial: if today, center around now; else morning-ish
-    if (nowMin != null) scrollToMinute(nowMin);
-    else scrollToMinute(180); // 09:00
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zoomId]); // re-center on zoom change
-
-  // ====== UI ======
+  // ─── RENDER ───
   return (
-    <div className="h-full w-full rounded-2xl border border-slate-200 bg-slate-50 shadow-sm overflow-hidden" dir="rtl">
-      {/* Command bar */}
-      <div className="bg-white border-b border-slate-200">
-        <div className="px-4 py-3 flex items-center gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-            <div className="min-w-0">
-              <div className="text-sm font-semibold text-slate-900 truncate">שיבוץ אולמות</div>
-              <div className="text-xs text-slate-500">
+    <div className="h-full w-full flex flex-col rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden" dir="rtl">
+
+      {/* ═══ Top Bar ═══ */}
+      <div className="shrink-0 bg-gradient-to-l from-slate-50 to-white border-b border-slate-200 px-4 py-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Title */}
+          <div className="flex items-center gap-2.5 ml-4">
+            <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center">
+              <MapPin size={18} className="text-white" />
+            </div>
+            <div>
+              <div className="text-sm font-bold text-slate-900">לוח זמינות אולמות</div>
+              <div className="text-[11px] text-slate-500">
                 {new Date(date).toLocaleDateString("he-IL", {
-                  weekday: "long",
-                  day: "2-digit",
-                  month: "2-digit",
-                  year: "numeric",
-                })}{" "}
-                · 06:00–06:00
+                  weekday: "long", day: "2-digit", month: "long", year: "numeric",
+                })}
               </div>
             </div>
           </div>
@@ -337,472 +331,398 @@ export default function AvailabilityBoard({
           <div className="flex-1" />
 
           {/* Search */}
-          <div className="relative w-[320px] max-w-[40vw]">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <div className="relative w-56">
+            <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="חיפוש אולם / קבוצה / אירוע…"
-              className="w-full pr-9 pl-3 py-2 text-sm rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              placeholder="חיפוש..."
+              className="w-full pr-8 pl-3 py-1.5 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
             />
           </div>
 
           {/* Zoom */}
-          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl p-1">
-            {ZOOMS.map((z) => (
-              <button
-                key={z.id}
-                onClick={() => setZoomId(z.id)}
-                className={[
-                  "px-2.5 py-1.5 text-xs rounded-lg transition",
-                  zoomId === z.id ? "bg-white shadow-sm border border-slate-200 text-slate-900" : "text-slate-600 hover:bg-white/70",
-                ].join(" ")}
-              >
-                {z.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Mode */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center bg-slate-100 rounded-lg p-0.5 gap-0.5">
             <button
-              onClick={() => setScheduleMode((v) => !v)}
-              className={[
-                "px-3 py-2 rounded-xl text-sm font-medium border transition",
-                scheduleMode
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
-              ].join(" ")}
+              onClick={() => setZoomIdx((i) => Math.max(0, i - 1))}
+              className="p-1.5 rounded-md hover:bg-white text-slate-500 disabled:opacity-30"
+              disabled={zoomIdx === 0}
             >
-              {scheduleMode ? "מצב שיבוץ פעיל" : "מצב צפייה"}
+              <ZoomOut size={14} />
             </button>
-
-            <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2">
-              <span className="text-xs text-slate-500">אורך נדרש</span>
-              <select
-                value={requiredMinutes}
-                onChange={(e) => setRequiredMinutes(Number(e.target.value))}
-                className="text-sm bg-transparent outline-none"
-              >
-                <option value={30}>30 דק׳</option>
-                <option value={60}>60 דק׳</option>
-                <option value={90}>90 דק׳</option>
-                <option value={120}>120 דק׳</option>
-                <option value={180}>180 דק׳</option>
-              </select>
-            </div>
-
+            <span className="text-[11px] text-slate-600 px-1.5 font-medium">{zoom.label}</span>
             <button
-              onClick={() => scrollToMinute(nowMin ?? 0)}
-              className="px-3 py-2 rounded-xl text-sm font-medium border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-              title="קפיצה לזמן נוכחי"
+              onClick={() => setZoomIdx((i) => Math.min(ZOOMS.length - 1, i + 1))}
+              className="p-1.5 rounded-md hover:bg-white text-slate-500 disabled:opacity-30"
+              disabled={zoomIdx === ZOOMS.length - 1}
             >
-              עכשיו
+              <ZoomIn size={14} />
             </button>
           </div>
+
+          {/* Schedule Mode */}
+          <button
+            onClick={() => setScheduleMode((v) => !v)}
+            className={[
+              "px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all",
+              scheduleMode
+                ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-200"
+                : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50",
+            ].join(" ")}
+          >
+            {scheduleMode ? "✦ מצב שיבוץ" : "צפייה"}
+          </button>
+
+          {scheduleMode && (
+            <select
+              value={requiredMinutes}
+              onChange={(e) => setRequiredMinutes(Number(e.target.value))}
+              className="text-xs bg-white border border-slate-200 rounded-lg px-2 py-1.5 outline-none"
+            >
+              <option value={30}>30 דק׳</option>
+              <option value={60}>60 דק׳</option>
+              <option value={90}>90 דק׳</option>
+              <option value={120}>120 דק׳</option>
+              <option value={180}>180 דק׳</option>
+              <option value={240}>4 שעות</option>
+            </select>
+          )}
+
+          {/* Now button */}
+          <button
+            onClick={() => scrollTo(nowMin ?? 180)}
+            className="px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+          >
+            עכשיו
+          </button>
         </div>
 
-        {/* Overview strip */}
-        <div className="px-4 pb-3 flex items-center gap-3">
-          <div className="flex items-center gap-2 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
-            <Clock size={14} className="text-slate-500" />
-            <span>
-              מוצגים: <span className="font-semibold text-slate-900">{filteredHalls.length}</span> אולמות
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
-            <AlertTriangle size={14} className={conflicts ? "text-rose-500" : "text-slate-400"} />
-            <span>
-              התנגשויות: <span className={conflicts ? "font-semibold text-rose-600" : "font-semibold text-slate-900"}>{conflicts}</span>
-            </span>
-          </div>
-
-          <div className="flex-1" />
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500">הבא להתפנות (ע״פ אורך נדרש)</span>
-            {nextAvailable.length === 0 ? (
-              <span className="text-xs text-slate-600 bg-white border border-slate-200 rounded-xl px-3 py-2">
-                אין חלון מתאים בקרוב
+        {/* Stats row */}
+        <div className="flex items-center gap-3 mt-2 text-[11px]">
+          <span className="text-slate-500">
+            <span className="font-semibold text-slate-700">{filteredHalls.length}</span> אולמות
+          </span>
+          <span className="text-slate-300">|</span>
+          <span className="text-slate-500">
+            <span className="font-semibold text-slate-700">{normalizedEvents.length}</span> אירועים
+          </span>
+          {totalConflicts > 0 && (
+            <>
+              <span className="text-slate-300">|</span>
+              <span className="flex items-center gap-1 text-amber-600 font-semibold">
+                <AlertTriangle size={12} />
+                {totalConflicts} חפיפות
               </span>
-            ) : (
-              nextAvailable.map((x) => (
-                <button
-                  key={x.hallId}
-                  onClick={() => scrollToMinute(x.startMin)}
-                  className="text-xs bg-white border border-slate-200 rounded-xl px-3 py-2 hover:bg-slate-50"
-                  title="קפיצה לחלון"
-                >
-                  <span className="font-semibold text-slate-900">{x.hallName}</span>{" "}
-                  <span className="text-slate-500">{formatTimeFromMinutes(x.startMin)}</span>
-                </button>
-              ))
-            )}
-          </div>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Main area */}
-      <div className="h-[calc(100%-128px)] flex flex-col">
+      {/* ═══ Timeline Area ═══ */}
+      <div className="flex-1 overflow-hidden flex flex-col">
+
         {/* Time axis header */}
-        <div className="bg-white border-b border-slate-200 sticky top-0 z-20">
-          <div className="flex">
-            {/* Hall column header (sticky right in RTL) */}
-            <div
-              className="shrink-0 border-l border-slate-200 bg-white"
-              style={{ width: hallColWidth, height: 44 }}
-            >
-              <div className="h-full flex items-center justify-between px-3">
-                <span className="text-xs font-semibold text-slate-700">אולם</span>
-                <div className="flex items-center gap-1 text-slate-500">
-                  <button
-                    className="p-1 rounded-lg hover:bg-slate-50"
-                    onClick={() => scrollToMinute(0)}
-                    title="תחילת היום (06:00)"
-                  >
-                    <ChevronRight size={16} />
-                  </button>
-                  <button
-                    className="p-1 rounded-lg hover:bg-slate-50"
-                    onClick={() => scrollToMinute(WINDOW_MINUTES)}
-                    title="סוף היום (06:00 למחרת)"
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-                </div>
-              </div>
+        <div className="shrink-0 flex border-b border-slate-100 bg-slate-50/50">
+          {/* Hall column spacer */}
+          <div className="shrink-0 bg-white border-l border-slate-100" style={{ width: HALL_COL }}>
+            <div className="h-8 flex items-center px-3">
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">אולם</span>
             </div>
+          </div>
 
-            {/* Time axis scroll (LTR for time direction) */}
-            <div className="flex-1 overflow-x-auto" ref={axisRef} dir="ltr">
-              <div className="relative" style={{ width: timelineWidth, height: 44 }}>
-                {/* minor marks */}
-                {tickMarks.map((m) => {
-                  const x = m * zoom.pxPerMin;
-                  const isMajor = m % 60 === 0;
-                  return (
-                    <div
-                      key={`t-${m}`}
-                      className="absolute top-0 bottom-0"
-                      style={{ left: x, width: 1 }}
-                    >
-                      <div className={isMajor ? "h-full bg-slate-200" : "h-full bg-slate-100"} />
+          {/* Scrollable time axis */}
+          <div className="flex-1 overflow-x-auto" ref={scrollRef} dir="ltr">
+            <div className="relative" style={{ width: timelineWidth, height: 32 }}>
+              {HOUR_LABELS.map(({ hour, label, minuteOffset }) => {
+                const x = minuteOffset * pxPerMin;
+                return (
+                  <div key={`h-${minuteOffset}`} className="absolute top-0 bottom-0" style={{ left: x }}>
+                    <div className="h-full border-l border-slate-200" />
+                    <div className="absolute top-1.5 text-[10px] font-mono text-slate-500 font-medium" style={{ left: 4 }}>
+                      {label}
                     </div>
-                  );
-                })}
-
-                {/* labels for major marks */}
-                {majorMarks.map((m) => {
-                  const x = m * zoom.pxPerMin;
-                  return (
-                    <div
-                      key={`lbl-${m}`}
-                      className="absolute top-0"
-                      style={{ left: x + 6 }}
-                    >
-                      <div className="text-[11px] font-mono text-slate-500">
-                        {formatTimeFromMinutes(m)}
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {/* now line */}
-                {nowMin != null && (
-                  <div
-                    className="absolute top-0 bottom-0"
-                    style={{ left: nowMin * zoom.pxPerMin }}
-                  >
-                    <div className="h-full w-[2px] bg-rose-500" />
                   </div>
-                )}
-              </div>
+                );
+              })}
+
+              {/* Now line in header */}
+              {nowMin != null && (
+                <div className="absolute top-0 bottom-0 z-10" style={{ left: nowMin * pxPerMin }}>
+                  <div className="h-full w-0.5 bg-red-500" />
+                  <div className="absolute -top-0 -translate-x-1/2 bg-red-500 text-white text-[9px] px-1 rounded-b font-mono">
+                    {formatTime(nowMin)}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         {/* Rows */}
-        <div className="flex-1 overflow-auto bg-slate-50">
-          <div className="min-w-full">
-            {filteredHalls.map((hall) => {
-              const evs = eventsByHall.get(hall._id) || [];
-              const gaps = gapsByHall.get(hall._id) || [];
+        <div className="flex-1 overflow-auto">
+          {filteredHalls.map((hall) => {
+            const evs = eventsByHall.get(hall._id) || [];
+            const gaps = gapsByHall.get(hall._id) || [];
+            const hallOverlaps = overlapsByHall.get(hall._id) || new Set();
+            const layers = getEventLayers(evs);
+            const numLayers = Math.max(1, layers.length);
+            const rowH = Math.max(ROW_HEIGHT, numLayers * 28 + 16);
 
-              // For row summary: occupied minutes
-              const occupied = evs.reduce((sum, ev) => sum + (ev._render.durationMin || 0), 0);
-              const utilization = Math.round((occupied / WINDOW_MINUTES) * 100);
+            // Utilization
+            const occupied = evs.reduce((s, ev) => s + ev._r.dur, 0);
+            const utilPct = Math.round((occupied / WINDOW_MINUTES) * 100);
 
-              return (
-                <div key={hall._id} className="flex border-b border-slate-200">
-                  {/* Hall cell (sticky right) */}
-                  <div
-                    className="shrink-0 bg-white border-l border-slate-200"
-                    style={{ width: hallColWidth, height: rowHeight }}
-                  >
-                    <div className="h-full px-3 flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold text-slate-900 truncate">{hall.name}</div>
-                        <div className="text-[11px] text-slate-500">
-                          {hall.capacity ? `קיבולת עד ${hall.capacity} · ` : ""}
-                          תפוסה {utilization}%
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1">
+            return (
+              <div key={hall._id} className="flex border-b border-slate-100 hover:bg-slate-50/30 transition-colors">
+                {/* Hall label */}
+                <div
+                  className="shrink-0 bg-white border-l border-slate-100 flex items-center"
+                  style={{ width: HALL_COL, minHeight: rowH }}
+                >
+                  <div className="px-3 py-2 w-full">
+                    <div className="text-sm font-bold text-slate-800 truncate">{hall.name}</div>
+                    <div className="flex items-center gap-2 mt-1">
+                      {hall.capacity && (
+                        <span className="text-[10px] text-slate-400">{hall.capacity} מקומות</span>
+                      )}
+                      <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden max-w-[60px]">
                         <div
                           className={[
-                            "w-16 h-2 rounded-full bg-slate-100 overflow-hidden",
-                            utilization > 80 ? "ring-1 ring-rose-200" : utilization > 50 ? "ring-1 ring-amber-200" : "ring-1 ring-emerald-200",
+                            "h-full rounded-full transition-all",
+                            utilPct > 80 ? "bg-red-400" : utilPct > 50 ? "bg-amber-400" : "bg-emerald-400",
                           ].join(" ")}
-                        >
-                          <div
-                            className={[
-                              "h-full",
-                              utilization > 80 ? "bg-rose-500" : utilization > 50 ? "bg-amber-500" : "bg-emerald-500",
-                            ].join(" ")}
-                            style={{ width: `${utilization}%` }}
-                          />
-                        </div>
+                          style={{ width: `${utilPct}%` }}
+                        />
                       </div>
+                      <span className="text-[10px] text-slate-400">{utilPct}%</span>
                     </div>
                   </div>
+                </div>
 
-                  {/* Timeline cell (LTR) */}
-                  <div className="flex-1 overflow-x-auto" dir="ltr">
-                    <div
-                      className="relative bg-white"
-                      style={{ width: timelineWidth, height: rowHeight }}
-                    >
-                      {/* background grid */}
-                      {tickMarks.map((m) => {
-                        const x = m * zoom.pxPerMin;
-                        const isMajor = m % 60 === 0;
-                        return (
-                          <div
-                            key={`g-${hall._id}-${m}`}
-                            className="absolute top-0 bottom-0"
-                            style={{ left: x, width: 1 }}
+                {/* Timeline row */}
+                <div className="flex-1 overflow-x-auto" dir="ltr">
+                  <div className="relative" style={{ width: timelineWidth, minHeight: rowH }}>
+                    {/* Grid lines */}
+                    {HOUR_LABELS.map(({ minuteOffset }) => (
+                      <div
+                        key={`g-${hall._id}-${minuteOffset}`}
+                        className="absolute top-0 bottom-0 border-l border-slate-100"
+                        style={{ left: minuteOffset * pxPerMin }}
+                      />
+                    ))}
+
+                    {/* Free gaps (schedule mode) */}
+                    {scheduleMode &&
+                      gaps
+                        .filter((g) => g.d >= requiredMinutes)
+                        .map((g, idx) => (
+                          <button
+                            key={`gap-${idx}`}
+                            className="absolute top-1 bottom-1 rounded-lg border-2 border-dashed border-emerald-300 bg-emerald-50/60 hover:bg-emerald-100/80 transition-colors flex items-center justify-center gap-1 group"
+                            style={{ left: g.s * pxPerMin, width: (g.e - g.s) * pxPerMin }}
+                            title={`פנוי ${Math.floor(g.d / 60)}:${String(g.d % 60).padStart(2, "0")} · ${formatTime(g.s)}`}
+                            onClick={() => handleSlotClick(hall._id, g.s)}
                           >
-                            <div className={isMajor ? "h-full bg-slate-100" : "h-full bg-slate-50"} />
-                          </div>
-                        );
-                      })}
+                            <Plus size={14} className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            {(g.e - g.s) * pxPerMin > 100 && (
+                              <span className="text-[10px] text-emerald-600 font-medium opacity-60 group-hover:opacity-100 transition-opacity">
+                                {formatTime(g.s)} · {Math.floor(g.d / 60)}:{String(g.d % 60).padStart(2, "0")}
+                              </span>
+                            )}
+                          </button>
+                        ))}
 
-                      {/* Scheduling mode: show suitable gaps */}
-                      {scheduleMode &&
-                        gaps
-                          .filter((g) => g.durationMin >= requiredMinutes)
-                          .map((g, idx) => {
-                            const left = g.startMin * zoom.pxPerMin;
-                            const width = (g.endMin - g.startMin) * zoom.pxPerMin;
-
-                            // subtle label only if wide enough
-                            const showLabel = width > 140;
-
-                            return (
-                              <button
-                                key={`gap-${hall._id}-${idx}`}
-                                className="absolute top-2 bottom-2 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100/70 transition text-left"
-                                style={{ left, width }}
-                                title="חלון פנוי לשיבוץ"
-                                onClick={() => createFromGap(hall._id, g.startMin)}
-                              >
-                                <div className="h-full flex items-center justify-between px-2">
-                                  {showLabel ? (
-                                    <div className="text-[11px] text-emerald-800 font-semibold">
-                                      פנוי {Math.floor(g.durationMin / 60)}:{String(g.durationMin % 60).padStart(2, "0")} ·
-                                      {" "}{formatTimeFromMinutes(g.startMin)}
-                                    </div>
-                                  ) : (
-                                    <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                                  )}
-                                  <Plus size={14} className="text-emerald-700" />
-                                </div>
-                              </button>
-                            );
-                          })}
-
-                      {/* Events */}
-                      {evs.map((ev, idx) => {
-                        const left = ev._render.startMin * zoom.pxPerMin;
-                        const width = Math.max(12, (ev._render.endMin - ev._render.startMin) * zoom.pxPerMin);
-                        const isMine = !!ev.isCurrentGroup;
+                    {/* Events — layered */}
+                    {layers.map((layer, layerIdx) =>
+                      layer.map((ev) => {
+                        const left = ev._r.startMin * pxPerMin;
+                        const width = Math.max(16, ev._r.dur * pxPerMin);
+                        const c = GROUP_COLORS[ev.colorIdx % GROUP_COLORS.length];
+                        const hasOverlap = hallOverlaps.has(ev._id || `${hall._id}-${layerIdx}`);
+                        const layerH = (rowH - 8) / numLayers;
+                        const top = 4 + layerIdx * layerH;
 
                         return (
                           <button
-                            key={ev._id || `${hall._id}-${idx}`}
+                            key={ev._id || `${hall._id}-${ev._r.startMin}-${layerIdx}`}
                             className={[
-                              "absolute top-2 bottom-2 rounded-xl border px-2.5 py-2 text-right overflow-hidden",
-                              "shadow-sm hover:shadow-md transition focus:outline-none focus:ring-2 focus:ring-blue-500/20",
-                              isMine
-                                ? "bg-blue-600 border-blue-600 text-white"
-                                : "bg-white border-slate-200 text-slate-900",
-                              scheduleMode ? "opacity-95" : "",
+                              "absolute rounded-lg border px-2 py-1 text-right overflow-hidden transition-all",
+                              "hover:shadow-lg hover:z-20 focus:outline-none focus:ring-2",
+                              ev.isMine
+                                ? `${c.bg} border-white/20 text-white shadow-md ${c.ring}`
+                                : `bg-white ${c.border} border-l-4 shadow-sm hover:shadow-md ${c.ring}`,
+                              hasOverlap ? "ring-2 ring-amber-400 ring-offset-1" : "",
                             ].join(" ")}
-                            style={{ left, width }}
+                            style={{
+                              left,
+                              width,
+                              top,
+                              height: layerH - 2,
+                            }}
                             onClick={() => {
                               setSelectedEvent(ev);
-                              openEvent(ev);
+                              onEventClick && onEventClick(ev);
                             }}
-                            title={`${ev.title} (${ev.startTime}–${ev.endTime})`}
+                            title={`${ev.title} (${ev.startTime}–${ev.endTime})${hasOverlap ? " ⚠️ חפיפה!" : ""}`}
                           >
-                            {/* clipped indicators */}
-                            <div className="flex items-start justify-between gap-2" dir="rtl">
-                              <div className="min-w-0">
-                                <div className="text-xs font-semibold truncate">{ev.title}</div>
-                                <div className={isMine ? "text-[11px] text-white/80" : "text-[11px] text-slate-500"}>
-                                  <span className="font-mono">{ev.startTime}–{ev.endTime}</span>
-                                  {!isMine && ev.groupName ? <span className="mr-2">• {ev.groupName}</span> : null}
-                                </div>
+                            <div className="flex items-center gap-1.5 h-full min-w-0" dir="rtl">
+                              {hasOverlap && (
+                                <AlertTriangle size={12} className={ev.isMine ? "text-yellow-200 shrink-0" : "text-amber-500 shrink-0"} />
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <div className="text-[11px] font-bold truncate leading-tight">{ev.title}</div>
+                                {width > 80 && (
+                                  <div className={`text-[10px] truncate ${ev.isMine ? "text-white/70" : "text-slate-500"}`}>
+                                    <span className="font-mono">{ev.startTime}–{ev.endTime}</span>
+                                    {!ev.isMine && ev.groupName ? ` · ${ev.groupName}` : ""}
+                                  </div>
+                                )}
                               </div>
-                              {ev._render.isClippedStart || ev._render.isClippedEnd ? (
-                                <div className={isMine ? "text-white/80" : "text-slate-400"} title="האירוע נחתך ע״י חלון היום">
-                                  ▣
-                                </div>
-                              ) : null}
+                              {width > 120 && ev.pax > 0 && (
+                                <span className={`text-[10px] shrink-0 ${ev.isMine ? "text-white/60" : "text-slate-400"}`}>
+                                  {ev.pax}
+                                  <Users size={9} className="inline mr-0.5" />
+                                </span>
+                              )}
+                              {width > 140 && ev.isMeal && (
+                                <Utensils size={11} className={ev.isMine ? "text-white/60 shrink-0" : "text-orange-400 shrink-0"} />
+                              )}
                             </div>
-
-                            {/* compact badges only if enough width */}
-                            {width > 180 && (ev.pax || ev.isMeal) ? (
-                              <div className="mt-2 flex gap-1.5 flex-wrap" dir="rtl">
-                                {ev.pax ? (
-                                  <span className={isMine
-                                    ? "inline-flex items-center gap-1 rounded-md bg-white/10 px-2 py-1 text-[11px]"
-                                    : "inline-flex items-center gap-1 rounded-md bg-slate-50 border border-slate-200 px-2 py-1 text-[11px] text-slate-700"
-                                  }>
-                                    <Users size={12} />
-                                    {ev.pax}
-                                  </span>
-                                ) : null}
-                                {ev.isMeal ? (
-                                  <span className={isMine
-                                    ? "inline-flex items-center gap-1 rounded-md bg-white/10 px-2 py-1 text-[11px]"
-                                    : "inline-flex items-center gap-1 rounded-md bg-orange-50 border border-orange-100 px-2 py-1 text-[11px] text-orange-700"
-                                  }>
-                                    🍽️{" "}
-                                    {ev.kosherType === "meat"
-                                      ? "בשרי"
-                                      : ev.kosherType === "parve"
-                                      ? "פרווה"
-                                      : "חלבי"}
-                                  </span>
-                                ) : null}
-                              </div>
-                            ) : null}
                           </button>
                         );
-                      })}
+                      })
+                    )}
 
-                      {/* Now line in row */}
-                      {nowMin != null && (
-                        <div
-                          className="absolute top-0 bottom-0 pointer-events-none"
-                          style={{ left: nowMin * zoom.pxPerMin }}
-                        >
-                          <div className="h-full w-[2px] bg-rose-500/80" />
-                        </div>
-                      )}
-                    </div>
+                    {/* Now line */}
+                    {nowMin != null && (
+                      <div className="absolute top-0 bottom-0 z-10 pointer-events-none" style={{ left: nowMin * pxPerMin }}>
+                        <div className="h-full w-0.5 bg-red-500/70" />
+                      </div>
+                    )}
                   </div>
                 </div>
-              );
-            })}
-
-            {filteredHalls.length === 0 ? (
-              <div className="p-8 text-center text-slate-600">
-                לא נמצאו אולמות/אירועים לפי החיפוש.
               </div>
-            ) : null}
-          </div>
+            );
+          })}
+
+          {filteredHalls.length === 0 && (
+            <div className="p-12 text-center text-slate-400">
+              <Search size={32} className="mx-auto mb-3 text-slate-300" />
+              <div className="text-sm">לא נמצאו אולמות מתאימים</div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Side Drawer */}
+      {/* ═══ Event Drawer ═══ */}
       {selectedEvent && (
-        <div className="fixed inset-0 z-[9999]">
-          <div
-            className="absolute inset-0 bg-black/30"
-            onClick={() => setSelectedEvent(null)}
-          />
-          <div className="absolute top-0 bottom-0 right-0 w-[420px] max-w-[92vw] bg-white shadow-2xl border-l border-slate-200 p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-sm text-slate-500">פרטי אירוע</div>
-                <div className="text-lg font-semibold text-slate-900 truncate">{selectedEvent.title}</div>
-                <div className="mt-1 text-sm text-slate-600">
-                  <span className="font-mono">{selectedEvent.startTime}–{selectedEvent.endTime}</span>
-                  {selectedEvent.groupName ? <span className="mr-2">• {selectedEvent.groupName}</span> : null}
+        <div className="fixed inset-0 z-[9999]" dir="rtl">
+          <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={() => setSelectedEvent(null)} />
+          <div className="absolute top-0 bottom-0 right-0 w-[380px] max-w-[90vw] bg-white shadow-2xl border-l border-slate-200 overflow-y-auto">
+            {/* Drawer Header */}
+            <div className={`p-5 ${GROUP_COLORS[selectedEvent.colorIdx % GROUP_COLORS.length].bg} text-white`}>
+              <div className="flex items-start justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs opacity-70 mb-1">
+                    {selectedEvent.isMine ? "הקבוצה שלך" : selectedEvent.groupName}
+                  </div>
+                  <div className="text-lg font-bold truncate">{selectedEvent.title}</div>
+                  <div className="mt-1 text-sm opacity-80 font-mono">{selectedEvent.startTime} – {selectedEvent.endTime}</div>
                 </div>
+                <button
+                  className="p-1.5 rounded-lg hover:bg-white/20 transition-colors"
+                  onClick={() => setSelectedEvent(null)}
+                >
+                  <X size={18} />
+                </button>
               </div>
-              <button
-                className="p-2 rounded-xl hover:bg-slate-50 border border-slate-200"
-                onClick={() => setSelectedEvent(null)}
-                aria-label="Close"
-              >
-                <X size={18} />
-              </button>
             </div>
 
-            <div className="mt-5 space-y-3">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs text-slate-500 mb-2">סטטוס</div>
-                <div className="flex flex-wrap gap-2">
-                  <span className={[
-                    "px-2.5 py-1 rounded-full text-xs font-semibold",
-                    selectedEvent.isCurrentGroup ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-800",
-                  ].join(" ")}>
-                    {selectedEvent.isCurrentGroup ? "הקבוצה שלך" : "קבוצה אחרת"}
+            <div className="p-5 space-y-4">
+              {/* Info badges */}
+              <div className="flex flex-wrap gap-2">
+                {selectedEvent.pax > 0 && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                    <Users size={12} /> {selectedEvent.pax} משתתפים
                   </span>
-                  {selectedEvent.pax ? (
-                    <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-white border border-slate-200 text-slate-700">
-                      {selectedEvent.pax} משתתפים
-                    </span>
-                  ) : null}
-                  {selectedEvent.isMeal ? (
-                    <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-50 border border-orange-200 text-orange-800">
-                      🍽️{" "}
-                      {selectedEvent.kosherType === "meat"
-                        ? "בשרי"
-                        : selectedEvent.kosherType === "parve"
-                        ? "פרווה"
-                        : "חלבי"}
-                    </span>
-                  ) : null}
-                </div>
+                )}
+                {selectedEvent.isMeal && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-orange-50 text-orange-700 border border-orange-200">
+                    <Utensils size={12} /> {KOSHER_LABELS[selectedEvent.kosherType] || "ארוחה"}
+                  </span>
+                )}
               </div>
 
-              {selectedEvent.notes ? (
-                <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="text-xs text-slate-500 mb-2">הערות</div>
+              {/* Notes */}
+              {selectedEvent.notes && (
+                <div className="bg-slate-50 rounded-xl p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">הערות</div>
                   <div className="text-sm text-slate-700 whitespace-pre-wrap">{selectedEvent.notes}</div>
                 </div>
-              ) : null}
+              )}
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="text-xs text-slate-500 mb-3">פעולות</div>
-                <div className="flex flex-col gap-2">
-                  <button
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 text-white text-sm font-medium hover:bg-slate-800"
-                    onClick={() => {
-                      // keep your existing flow: use onEventClick
-                      onEventClick && onEventClick(selectedEvent);
-                    }}
-                  >
-                    עריכה / פתיחה מלאה
-                  </button>
-                  <button
-                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50"
-                    onClick={() => setSelectedEvent(null)}
-                  >
-                    סגירה
-                  </button>
+              {/* Actions */}
+              <div className="space-y-2 pt-2">
+                <button
+                  className="w-full py-2.5 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition-colors"
+                  onClick={() => { onEventClick && onEventClick(selectedEvent); }}
+                >
+                  פתיחה מלאה / עריכה
+                </button>
+                <button
+                  className="w-full py-2.5 rounded-xl bg-slate-100 text-slate-600 text-sm font-medium hover:bg-slate-200 transition-colors"
+                  onClick={() => setSelectedEvent(null)}
+                >
+                  סגירה
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Overlap Warning Modal ═══ */}
+      {overlapWarning && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center" dir="rtl">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setOverlapWarning(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl p-6 w-[420px] max-w-[90vw] border border-amber-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+                <AlertTriangle size={20} className="text-amber-600" />
+              </div>
+              <div>
+                <div className="font-bold text-slate-900">שים לב — חפיפת זמנים!</div>
+                <div className="text-sm text-slate-500">
+                  באולם <span className="font-semibold">{overlapWarning.hallName}</span> כבר קיימים אירועים בשעה זו:
                 </div>
               </div>
+            </div>
 
-              <div className="text-xs text-slate-500">
-                טיפ: במצב שיבוץ, לחיצה על חלון ירוק יוצרת שיבוץ מהיר לפי “אורך נדרש”.
-              </div>
+            <div className="space-y-2 mb-5 max-h-40 overflow-y-auto">
+              {overlapWarning.events.map((ev, i) => (
+                <div key={i} className="flex items-center gap-2 bg-amber-50 rounded-lg px-3 py-2 border border-amber-100">
+                  <div className="w-1.5 h-8 rounded-full bg-amber-400" />
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-slate-800 truncate">{ev.title}</div>
+                    <div className="text-xs text-slate-500 font-mono">{ev.startTime}–{ev.endTime} · {ev.groupName}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                className="flex-1 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-bold hover:bg-amber-600 transition-colors"
+                onClick={confirmOverlap}
+              >
+                בכל זאת לשבץ
+              </button>
+              <button
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-600 text-sm font-medium hover:bg-slate-200 transition-colors"
+                onClick={() => setOverlapWarning(null)}
+              >
+                ביטול
+              </button>
             </div>
           </div>
         </div>

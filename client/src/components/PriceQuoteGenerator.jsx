@@ -5,6 +5,7 @@ import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
 import axios from 'axios';
 import QuoteManager from './QuoteManager';
+import QuoteDatePicker from './QuoteDatePicker';
 
 // --- הגדרות A4 ---
 const A4_HEIGHT_PX = 1123;
@@ -69,15 +70,15 @@ const toGematria = (num) => {
 const formatEventDateDayHebrew = (dateInput) => {
     if (!dateInput) return '-';
     const date = new Date(dateInput);
-    if (isNaN(date.getTime())) return dateInput; 
-    
+    if (isNaN(date.getTime())) return dateInput;
+
     const dayName = date.toLocaleDateString('he-IL', { weekday: 'long' });
     const parts = new Intl.DateTimeFormat('he-IL', { calendar: 'hebrew', day: 'numeric', month: 'long' }).formatToParts(date);
     const hDay = parts.find(p => p.type === 'day')?.value;
     const hMonth = parts.find(p => p.type === 'month')?.value;
     const hDayGematria = isNaN(hDay) ? hDay : toGematria(parseInt(hDay));
     const gregDate = date.toLocaleDateString('en-GB');
-    
+
     return `${dayName}, ${hDayGematria} ב${hMonth} (${gregDate})`;
 };
 
@@ -110,12 +111,12 @@ const RichTextMenu = ({ position, onClose, onAction, type }) => {
                 <button onClick={() => onAction('justifyCenter')} className="p-1 hover:bg-gray-100 rounded"><AlignCenter size={16}/></button>
                 <button onClick={() => onAction('justifyLeft')} className="p-1 hover:bg-gray-100 rounded"><AlignLeft size={16}/></button>
             </div>
-            
+
             <div className="flex gap-1 border-b pb-2 mb-1">
                 <button onClick={() => onAction('insertUnorderedList')} className="p-1 hover:bg-gray-100 rounded w-full text-center flex justify-center"><List size={16}/></button>
                 <button onClick={() => onAction('insertOrderedList')} className="p-1 hover:bg-gray-100 rounded w-full text-center flex justify-center"><ListOrdered size={16}/></button>
             </div>
-   
+
             {type === 'table' && (
                 <>
                     <div className="text-[10px] font-bold text-gray-400 mt-1">שורות</div>
@@ -138,18 +139,13 @@ const PriceQuoteGenerator = () => {
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [contactEmail, setContactEmail] = useState('');
-  const [eventType, setEventType] = useState('יום עיון'); 
-  const [minPaxPrefix, setMinPaxPrefix] = useState('מינימום');   // המילה "מינימום"
-  const [minPaxSuffix, setMinPaxSuffix] = useState('משתתפים');    // המילה "משתתפים"
-  // התיקון: ניהול כפול של תאריכים
-  // 1. תאריך לתצוגה על הנייר (טקסט עברי)
+  const [eventType, setEventType] = useState('יום עיון');
+  const [minPaxPrefix, setMinPaxPrefix] = useState('מינימום');
+  const [minPaxSuffix, setMinPaxSuffix] = useState('משתתפים');
   const [arrivalDate, setArrivalDate] = useState('');
   const [departureDate, setDepartureDate] = useState('');
-  
-  // 2. תאריך גולמי למסד נתונים וליומן (YYYY-MM-DD)
   const [rawArrivalDate, setRawArrivalDate] = useState('');
   const [rawDepartureDate, setRawDepartureDate] = useState('');
-
   const [minPax, setMinPax] = useState('0');
   const [blocks, setBlocks] = useState([]);
   const [paginatedPages, setPaginatedPages] = useState([]);
@@ -157,7 +153,7 @@ const PriceQuoteGenerator = () => {
   const [contextMenu, setContextMenu] = useState(null);
   const [targetEmail, setTargetEmail] = useState('');
   const [isSending, setIsSending] = useState(false);
-  
+
   const blockRefs = useRef({});
   const containerRef = useRef(null);
 
@@ -168,15 +164,10 @@ const PriceQuoteGenerator = () => {
   }, []);
 
   useEffect(() => {
-    // אתחול ראשוני - תאריך נוכחי
     const today = new Date();
-    const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
-    
-    // מעדכן את הגולמי
+    const todayStr = today.toISOString().split('T')[0];
     setRawArrivalDate(todayStr);
     setRawDepartureDate(todayStr);
-    
-    // מעדכן את המעוצב
     setArrivalDate(formatEventDateDayHebrew(todayStr));
     setDepartureDate(formatEventDateDayHebrew(todayStr));
 
@@ -186,7 +177,7 @@ const PriceQuoteGenerator = () => {
     • ארוחת צהריים בשרית לפי החלטת המלון.<br>
     • אפשרויות חניה - חינם.<br>
     • המלון כולו נמצא בכל ימות השנה בהשגחת בד"ץ העדה החרדית ירושלים.`;
-    
+
     const defaultBottomNotes = `<b>המחירים כוללים מע"מ והם נט למלון.</b><br>
     <b>ההזמנה תכנס לתוקף רק לאחר חתימה על חוזה זה ושליחה למייל חזרה.</b><br>
     <br>
@@ -226,7 +217,7 @@ const PriceQuoteGenerator = () => {
 
     const newPages = [];
     let currentPage = [];
-    let currentHeight = 350; 
+    let currentHeight = 350;
 
     blocks.forEach((block) => {
         const element = blockRefs.current[block.id];
@@ -235,7 +226,7 @@ const PriceQuoteGenerator = () => {
         if (currentHeight + blockHeight > CONTENT_HEIGHT) {
             newPages.push(currentPage);
             currentPage = [block];
-            currentHeight = 150 + blockHeight; 
+            currentHeight = 150 + blockHeight;
         } else {
             currentPage.push(block);
             currentHeight += blockHeight;
@@ -366,15 +357,13 @@ const PriceQuoteGenerator = () => {
       }
   };
 
-  // איסוף כל הנתונים לשמירה (כולל הכנה למבנה השרת החדש)
   const dataToSave = {
     clientName,
     contactName,
     contactPhone,
     contactEmail,
     eventType,
-    // אנו שומרים את התאריכים הגולמיים למסד הנתונים! זה התיקון הקריטי.
-    arrivalDate: rawArrivalDate, 
+    arrivalDate: rawArrivalDate,
     departureDate: rawDepartureDate,
     minPax,
     blocks
@@ -390,27 +379,21 @@ const PriceQuoteGenerator = () => {
         setTargetEmail(data.contactEmail);
     }
     if (data.eventType) setEventType(data.eventType);
-    
-    // טעינת תאריכים חכמה
+
     if (data.dates) {
-        // אם זה נטען מה-DB החדש (כאובייקט תאריך)
         const fromDate = data.dates.from ? new Date(data.dates.from).toISOString().split('T')[0] : '';
         const toDate = data.dates.to ? new Date(data.dates.to).toISOString().split('T')[0] : '';
-        
         setRawArrivalDate(fromDate);
         setRawDepartureDate(toDate);
-        
         setArrivalDate(formatEventDateDayHebrew(fromDate));
         setDepartureDate(formatEventDateDayHebrew(toDate));
     } else {
-        // תמיכה לאחור או אם המידע נשמר שטוח
         if (data.arrivalDate) {
-             // בדיקה אם זה תאריך גולמי או עברי
-             if (data.arrivalDate.includes('-')) { // YYYY-MM-DD
+             if (data.arrivalDate.includes('-')) {
                  setRawArrivalDate(data.arrivalDate);
                  setArrivalDate(formatEventDateDayHebrew(data.arrivalDate));
              } else {
-                 setArrivalDate(data.arrivalDate); // זה כבר טקסט
+                 setArrivalDate(data.arrivalDate);
              }
         }
         if (data.departureDate) {
@@ -425,17 +408,17 @@ const PriceQuoteGenerator = () => {
 
     if (data.minPax) setMinPax(data.minPax);
     if (data.blocks) setBlocks(data.blocks);
-    
+
     toast.success('הצעה נטענה בהצלחה!');
   };
 
   const createPDFDocument = async () => {
     if (!containerRef.current) return null;
-    
+
     const pdf = new jsPDF('p', 'mm', 'a4', true);
     const pdfWidth = 210;
     const pdfHeight = 297;
-    
+
     const pageElements = containerRef.current.querySelectorAll('.quote-page');
 
     for (let i = 0; i < pageElements.length; i++) {
@@ -443,14 +426,14 @@ const PriceQuoteGenerator = () => {
 
         const dataUrl = await htmlToImage.toJpeg(element, {
             quality: 0.75,
-            pixelRatio: 2, 
+            pixelRatio: 2,
             backgroundColor: '#ffffff',
-            width: 794, 
-            height: 1123, 
-            fontEmbedCSS: '', // מונע שגיאת פונטים
+            width: 794,
+            height: 1123,
+            fontEmbedCSS: '',
             style: {
                 margin: 0,
-                transform: 'none', 
+                transform: 'none',
                 display: 'flex',
                 flexDirection: 'column'
             },
@@ -488,7 +471,7 @@ const PriceQuoteGenerator = () => {
         return;
     }
     if (isSending) return;
-    
+
     setIsSending(true);
     const toastId = toast.loading('מייצר PDF ושולח למייל...');
 
@@ -533,18 +516,18 @@ const PriceQuoteGenerator = () => {
          <div className="font-bold text-gray-700 text-lg flex items-center gap-2">
             <FileDown className="text-amber-500"/> מחולל הצעות
          </div>
-         
+
          <div className="flex items-center gap-2 bg-blue-50 px-3 py-1 rounded-md border border-blue-100 mx-4">
             <Mail size={16} className="text-blue-500"/>
-            <input 
-                type="email" 
+            <input
+                type="email"
                 value={targetEmail}
                 onChange={(e) => setTargetEmail(e.target.value)}
                 placeholder="מייל לשליחה..."
                 className="bg-transparent text-sm outline-none w-48 text-blue-900 placeholder:text-blue-300"
             />
-            <button 
-                onClick={handleSendEmail} 
+            <button
+                onClick={handleSendEmail}
                 disabled={isSending}
                 className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded hover:bg-blue-700 flex items-center gap-1 disabled:opacity-50"
             >
@@ -554,11 +537,13 @@ const PriceQuoteGenerator = () => {
          </div>
 
          <div className="flex gap-3 items-center">
-             <QuoteManager 
-                currentData={dataToSave} 
-                onLoadData={handleLoadData} 
+             {/* ★ שינוי: containerRef מועבר ל-QuoteManager */}
+             <QuoteManager
+                currentData={dataToSave}
+                onLoadData={handleLoadData}
+                containerRef={containerRef}
              />
-             
+
              <div className="h-6 w-[1px] bg-gray-300 mx-2"></div>
 
              <button onClick={handleDownloadPDF} disabled={isDownloading} className="flex items-center gap-2 bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 font-bold text-sm shadow-sm">
@@ -569,7 +554,7 @@ const PriceQuoteGenerator = () => {
       </div>
 
       <div className="flex flex-1 overflow-hidden relative">
-      
+
         <div className="w-80 bg-white border-l border-gray-200 shadow-xl overflow-y-auto shrink-0 flex flex-col no-print z-40">
             <div className="p-5 space-y-6">
                 <h2 className="text-xl font-bold text-gray-800 border-b pb-2 flex items-center gap-2">
@@ -580,8 +565,8 @@ const PriceQuoteGenerator = () => {
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-bold text-gray-600 mb-1">שם הלקוח / הקבוצה</label>
-                        <input 
-                            type="text" 
+                        <input
+                            type="text"
                             className="w-full border border-gray-300 rounded p-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
                             value={clientName === 'שם הלקוח / הקבוצה' ? '' : clientName}
                             onChange={(e) => setClientName(e.target.value)}
@@ -593,7 +578,7 @@ const PriceQuoteGenerator = () => {
                         <label className="text-xs font-bold text-gray-500 uppercase">איש קשר</label>
                         <div className="flex items-center bg-white border rounded px-2">
                             <User size={14} className="text-gray-400 ml-2"/>
-                            <input 
+                            <input
                                 type="text"
                                 className="w-full p-2 outline-none text-sm"
                                 placeholder="שם מלא"
@@ -603,7 +588,7 @@ const PriceQuoteGenerator = () => {
                         </div>
                         <div className="flex items-center bg-white border rounded px-2">
                             <Phone size={14} className="text-gray-400 ml-2"/>
-                            <input 
+                            <input
                                 type="text"
                                 className="w-full p-2 outline-none text-sm"
                                 placeholder="טלפון"
@@ -613,7 +598,7 @@ const PriceQuoteGenerator = () => {
                         </div>
                         <div className="flex items-center bg-white border rounded px-2">
                             <Mail size={14} className="text-gray-400 ml-2"/>
-                            <input 
+                            <input
                                 type="text"
                                 className="w-full p-2 outline-none text-sm"
                                 placeholder="אימייל"
@@ -626,45 +611,21 @@ const PriceQuoteGenerator = () => {
                         </div>
                     </div>
 
+                    {/* ★ שינוי: QuoteDatePicker במקום input type="date" רגילים */}
                     <div className="space-y-3 pt-2 border-t">
-                        <label className="block text-sm font-bold text-gray-600 mb-1 flex items-center gap-2">
-                            <Calendar size={16}/> תאריכי אירוע
-                        </label>
-                        
-                        <div className="grid grid-cols-1 gap-2">
-                            <div>
-                                <span className="text-xs text-gray-500 block mb-1">הגעה (בחר תאריך לעדכון):</span>
-                                <input 
-                                    type="date"
-                                    className="w-full border rounded p-2 text-sm"
-                                    // כאן אנו משתמשים ב-rawArrivalDate
-                                    value={rawArrivalDate}
-                                    onChange={(e) => {
-                                        setRawArrivalDate(e.target.value);
-                                        // ומעדכנים גם את הטקסט המעוצב לתצוגה
-                                        setArrivalDate(formatEventDateDayHebrew(e.target.value));
-                                    }}
-                                />
-                                <div className="text-xs text-blue-600 mt-1 truncate font-medium bg-blue-50 p-1 rounded">
-                                    {arrivalDate}
-                                </div>
-                            </div>
-                            <div>
-                                <span className="text-xs text-gray-500 block mb-1">עזיבה (בחר תאריך לעדכון):</span>
-                                <input 
-                                    type="date"
-                                    className="w-full border rounded p-2 text-sm"
-                                    value={rawDepartureDate}
-                                    onChange={(e) => {
-                                        setRawDepartureDate(e.target.value);
-                                        setDepartureDate(formatEventDateDayHebrew(e.target.value));
-                                    }}
-                                />
-                                <div className="text-xs text-blue-600 mt-1 truncate font-medium bg-blue-50 p-1 rounded">
-                                    {departureDate}
-                                </div>
-                            </div>
-                        </div>
+                        <QuoteDatePicker
+                            rawArrivalDate={rawArrivalDate}
+                            rawDepartureDate={rawDepartureDate}
+                            arrivalDateDisplay={arrivalDate}
+                            departureDateDisplay={departureDate}
+                            formatDateHebrew={formatEventDateDayHebrew}
+                            onDatesChange={({ rawArrival, rawDeparture, arrivalDisplay, departureDisplay }) => {
+                                setRawArrivalDate(rawArrival);
+                                setRawDepartureDate(rawDeparture);
+                                setArrivalDate(arrivalDisplay);
+                                setDepartureDate(departureDisplay);
+                            }}
+                        />
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 pt-2">
@@ -672,8 +633,8 @@ const PriceQuoteGenerator = () => {
                             <label className="block text-xs font-bold text-gray-600 mb-1">סוג פעילות</label>
                             <div className="flex items-center bg-white border rounded px-1">
                                 <FileText size={14} className="text-gray-400 ml-1"/>
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     className="w-full p-1.5 outline-none text-sm"
                                     value={eventType}
                                     onChange={(e) => setEventType(e.target.value)}
@@ -684,8 +645,8 @@ const PriceQuoteGenerator = () => {
                             <label className="block text-xs font-bold text-gray-600 mb-1">כמות משתתפים</label>
                             <div className="flex items-center bg-white border rounded px-1">
                                 <Users size={14} className="text-gray-400 ml-1"/>
-                                <input 
-                                    type="number" 
+                                <input
+                                    type="number"
                                     className="w-full p-1.5 outline-none text-sm"
                                     value={minPax}
                                     onChange={(e) => setMinPax(e.target.value)}
@@ -694,7 +655,7 @@ const PriceQuoteGenerator = () => {
                         </div>
                     </div>
                 </div>
-                
+
                 <div className="mt-8 bg-amber-50 p-3 rounded text-xs text-amber-800 border border-amber-200">
                     <p><strong>שים לב:</strong> הנתונים שמוזנים כאן נכנסים אוטומטית לתוך המסמך משמאל ונשמרים במערכת בעת שמירת ההצעה.</p>
                 </div>
@@ -713,13 +674,13 @@ const PriceQuoteGenerator = () => {
                             <div className="flex justify-between items-start">
                                 <div className="text-right pt-2 w-[55%]">
                                     <div className="text-sm font-bold mb-2 text-gray-500">בס"ד</div>
-                                    
+
                                     <div className="text-2xl font-bold mb-2 text-slate-900 flex items-center gap-1">
                                         <span>לכבוד:  </span>
-                                        <TransparentInput 
-                                            value={clientName} 
-                                            onChange={setClientName} 
-                                            className="font-bold text-slate-900" 
+                                        <TransparentInput
+                                            value={clientName}
+                                            onChange={setClientName}
+                                            className="font-bold text-slate-900"
                                         />
                                     </div>
 
@@ -750,39 +711,35 @@ const PriceQuoteGenerator = () => {
                                 </div>
                             </div>
 
-{/* אזור כותרת מרכזית - מיושר פלס */}
-{/* אזור כותרת מרכזית - מבנה: טקסט ימני | מספר | טקסט שמאלי */}
+{/* אזור כותרת מרכזית */}
                             <div className="w-full flex flex-col items-center justify-center mt-6 mx-auto">
-                                
+
                                 <h1 className="text-5xl font-bold mb-1 text-center whitespace-nowrap" style={{ color: GOLD }}>
                                     הצעת מחיר
                                 </h1>
 
                                 <div className="flex items-center justify-center gap-1.5 mt-0 w-full">
-                                    
-                                    {/* חלק 1: "מינימום" (צד ימין) */}
-                                    <TransparentInput 
-                                        value={minPaxPrefix} 
-                                        onChange={setMinPaxPrefix} 
+
+                                    <TransparentInput
+                                        value={minPaxPrefix}
+                                        onChange={setMinPaxPrefix}
                                         className="text-lg font-bold text-slate-900 w-auto"
-                                        style={{ textAlign: 'left', maxWidth: '120px' }} // textAlign:left מצמיד את הטקסט למספר
+                                        style={{ textAlign: 'left', maxWidth: '120px' }}
                                         placeholder="טקסט התחלה"
                                     />
-                                    
-                                    {/* חלק 2: המספר (אמצע) */}
-                                    <input 
+
+                                    <input
                                         type="text"
-                                        value={minPax} 
-                                        onChange={(e) => setMinPax(e.target.value)} 
+                                        value={minPax}
+                                        onChange={(e) => setMinPax(e.target.value)}
                                         className="w-12 text-lg font-bold text-center bg-transparent border-b border-gray-300 outline-none p-0 focus:border-amber-500"
                                     />
 
-                                    {/* חלק 3: "משתתפים" (צד שמאל) */}
-                                    <TransparentInput 
-                                        value={minPaxSuffix} 
-                                        onChange={setMinPaxSuffix} 
+                                    <TransparentInput
+                                        value={minPaxSuffix}
+                                        onChange={setMinPaxSuffix}
                                         className="text-lg font-bold text-slate-900 w-auto"
-                                        style={{ textAlign: 'right', maxWidth: '120px' }} // textAlign:right מצמיד את הטקסט למספר
+                                        style={{ textAlign: 'right', maxWidth: '120px' }}
                                         placeholder="טקסט סיום"
                                     />
 

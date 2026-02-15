@@ -28,31 +28,46 @@ export const registerUser = async (req, res) => {
   // המשך הקוד נשאר אותו דבר...
   const hash = await bcrypt.hash(password, 12);
   const finalRole = role === 'admin' ? 'admin' : 'user';
-  
+
   const user = await User.create({ name, email, passwordHash: hash, role: finalRole });
   const userPayload = { _id: user._id, name: user.name, email: user.email, role: user.role };
-  
+
   createAndSendTokens(user, res);
   return res.status(201).json({ message: "ההרשמה הושלמה בהצלחה", user: userPayload });
 };
 
 export const loginUser = async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password)
-    return res.status(400).json({ message: 'חסר אימייל או סיסמה' });
-  const user = await User.findOne({ email });
-  if (!user)
-    return res.status(401).json({ message: 'משתמש לא קיים' });
-  if (user.isLocked)
-    return res.status(423).json({ message: 'החשבון נעול זמנית' });
-  if (!(await bcrypt.compare(password, user.passwordHash))) {
-    await user.incrementLoginAttempts();
-    return res.status(401).json({ message: 'סיסמה שגויה' });
+  try {
+    const { email, password } = req.body;
+    if (!email || !password)
+      return res.status(400).json({ message: 'חסר אימייל או סיסמה' });
+    const user = await User.findOne({ email });
+    if (!user)
+      return res.status(401).json({ message: 'משתמש לא קיים' });
+    if (user.isLocked)
+      return res.status(423).json({ message: 'החשבון נעול זמנית' });
+
+    // ★ בדיקה שמונעת crash — אם passwordHash לא קיים, לא קוראים ל-bcrypt
+    if (!user.passwordHash) {
+      console.error('❌ [LOGIN] passwordHash is undefined for user:', user.email);
+      console.error('   DB fields:', Object.keys(user.toObject()));
+      return res.status(500).json({
+        message: 'שגיאת מערכת — הסיסמה לא נמצאה. הריצו: cd server && node fixPasswords.js'
+      });
+    }
+
+    if (!(await bcrypt.compare(password, user.passwordHash))) {
+      await user.incrementLoginAttempts();
+      return res.status(401).json({ message: 'סיסמה שגויה' });
+    }
+    await user.resetLoginAttempts();
+    const userPayload = { _id: user._id, name: user.name, email: user.email, role: user.role };
+    createAndSendTokens(user, res);
+    return res.status(200).json({ message: "התחברת בהצלחה", user: userPayload });
+  } catch (error) {
+    console.error('❌ [LOGIN] error:', error);
+    return res.status(500).json({ message: 'שגיאה בהתחברות' });
   }
-  await user.resetLoginAttempts();
-  const userPayload = { _id: user._id, name: user.name, email: user.email, role: user.role };
-  createAndSendTokens(user, res);
-  return res.status(200).json({ message: "התחברת בהצלחה", user: userPayload });
 };
 
 export const logout = async (req, res) => {

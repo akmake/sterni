@@ -1,7 +1,7 @@
 // client/src/pages/GroupDetails/GroupDetailsPage.jsx
 
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom'; // Link added
+import { useParams, Link } from 'react-router-dom';
 import useGroupsStore from '@/stores/groupsStore';
 import { Button } from '@/components/ui/Button';
 import {
@@ -11,7 +11,8 @@ import {
   Receipt,
   MapPin,
   Eye,
-  FileText, // Icon added
+  FileText,
+  DollarSign,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import DayDuplicator from '@/components/DayDuplicator';
@@ -58,7 +59,7 @@ const MEAL_DEFINITIONS = {
   },
   night_treats: {
     label: 'פינוקי לילה',
-    isManual: true // אין כאן kosherOptions
+    isManual: true
   }
 };
 
@@ -178,9 +179,7 @@ export default function GroupDetailsPage() {
         toast.error('יש להזין כותרת לאירוע');
         return null;
       }
-      // התיקון: אנחנו לא מאפסים את האולם! מאפשרים גם אולם וגם טקסט.
       if (!finalHall && !finalLocation) {
-         // אפשר להחליט אם לחייב אחד מהם, כרגע נשאיר אופציונלי או נדרוש אחד לפחות אם תרצה
       }
     }
 
@@ -194,13 +193,12 @@ export default function GroupDetailsPage() {
     return {
       ...data,
       title: finalTitle,
-      hall: finalHall || null, // שליחת ID או null
+      hall: finalHall || null,
       locationText: finalLocation,
       pax: parseInt(data.pax, 10) || 0,
       price: parseInt(data.price, 10) || 0,
       date: finalDate,
       
-      // שדות המודל החדש
       isMeal: isMeal, 
       mealType: isMeal ? data.mealType : '',
       kosherType: isMeal ? data.kosherType : '',
@@ -253,24 +251,18 @@ export default function GroupDetailsPage() {
     let type = event.eventType || 'meal';
     if (type === 'regular') type = 'meal';
 
-    // --- חישוב הערך הנכון לתפריט (מונע את הבעיה שזה מגיע ריק) ---
-    // 1. קודם מנסים לקחת מהשדה הישיר במסד הנתונים
     let finalMenu = event.menuItem || event.menu || '';
 
-    // 2. אם השדה ריק, מנסים לחלץ אותו מתוך הכותרת (למשל: "ארוחת צהריים - שניצל")
     if (!finalMenu && event.title && type === 'meal') {
-        // שימוש בלוגיקה חכמה כמו בדוחות שלך
         const dashMatch = event.title.match(/-\s+(.*?)(\s*\||$)/);
         if (dashMatch && dashMatch[1]) {
             finalMenu = dashMatch[1].trim();
         } else {
-            // גיבוי פשוט למקרה שה-Regex לא תפס
             const parts = event.title.split(' - ');
             if (parts.length > 1) finalMenu = parts[1].trim();
         }
     }
 
-    // הגדרת הנתונים לטופס העריכה
     setEditEventData({
       eventType: type,
       title: event.title,
@@ -283,13 +275,12 @@ export default function GroupDetailsPage() {
       requirements: event.requirements || '',
       mealType: event.mealType || 'breakfast',
       kosherType: event.kosherType || 'parve',
-      
-      // כאן אנחנו מכניסים את המשתנה שחישבנו למעלה
       menuItem: finalMenu 
     });
     
     setIsEditEventDialogOpen(true);
   };
+
   const handleUpdateEvent = async () => {
     const payload = validatePayload(editEventData, selectedDate);
     if (!payload) return;
@@ -309,12 +300,8 @@ export default function GroupDetailsPage() {
       name: editFormData.name,
       pax: parseInt(editFormData.pax, 10),
       minPax: parseInt(editFormData.minPax, 10),
-
-      // --- הוספתי את השורות האלו כדי שהתאריכים יישלחו לשרת ---
       startDate: editFormData.startDate,
       endDate: editFormData.endDate,
-      // --------------------------------------------------------
-
       contactPerson: {
         ...group.contactPerson,
         name: editFormData.contactName,
@@ -361,12 +348,20 @@ export default function GroupDetailsPage() {
           handleSaveDetails={handleSaveDetails}
         />
 
-        {/* --- כפתור הצעת מחיר (חדש!) --- */}
+        {/* --- כפתורי פעולות --- */}
         <div className="flex justify-end px-1 items-center gap-3">
-          {/* הכפתור החדש לשכפול ימים */}
+          {/* שכפול ימים */}
           <DayDuplicator group={group} />
 
-          {/* הכפתור הקיים לדרישת תשלום */}
+          {/* ★ כפתור תשלומים (חדש!) */}
+          <Link 
+            to={`/groups/${group._id}/payments`} 
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition shadow-sm font-medium"
+          >
+              <DollarSign size={18} /> תשלומים
+          </Link>
+
+          {/* דרישת תשלום */}
           <Link 
             to={`/groups/${group._id}/payment-request`} 
             className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700 transition shadow-sm font-medium"
@@ -439,7 +434,6 @@ export default function GroupDetailsPage() {
                         <h3 className="text-xl font-bold text-slate-800 group-hover:text-blue-700 transition-colors">
                           {event.title}
                         </h3>
-                        {/* תגית כשרות */}
                         {MEAL_DEFINITIONS[event.mealType] && 
                          !MEAL_DEFINITIONS[event.mealType].isManual && 
                          event.kosherType && (

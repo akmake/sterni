@@ -29,7 +29,8 @@ import KitchenStaffManager from './pages/KitchenStaffManager';
 import StaffPrintView from './pages/StaffPrintView';
 import StaffPrintA3 from "./pages/Staffprinta3";
 import ThaiSchedulePage from './pages/ThaiSchedulePage';
-
+import GroupPaymentsPage from '@/pages/GroupPaymentsPage';
+import FinancialReportPage from '@/pages/FinancialReportPage';
 
 export default function App() {
   return (
@@ -64,6 +65,8 @@ export default function App() {
           <Route path="staff-manager"         element={<KitchenStaffManager />} />
           <Route path="staff-print-a3"        element={<StaffPrintA3 />} />
           <Route path="thai-schedule"         element={<ThaiSchedulePage />} />
+          <Route path="groups/:groupId/payments" element={<GroupPaymentsPage />} />
+          <Route path="financial-report" element={<FinancialReportPage />} />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

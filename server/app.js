@@ -10,6 +10,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 // --- Imports ---
+import paymentRoutes from './routes/Paymentroutes.js';
 import authRoutes from './routes/auth.js';
 import hallRoutes from './routes/hallRoutes.js';
 import groupRoutes from './routes/groupRoutes.js';
@@ -93,6 +94,8 @@ app.use('/api/groups', requireAuth, groupRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/quotes', requireAuth, quoteRouter);
+app.use('/api/payments', requireAuth, paymentRoutes);
+
 // שימי לב: מחקתי מפה את quotes כי העברתי אותו למעלה!
 
 // Error Handling

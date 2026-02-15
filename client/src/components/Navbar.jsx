@@ -22,7 +22,7 @@ const navItems = [
     { to: '/settings', label: 'הגדרות מערכת', icon: Settings, type: 'link', auth: true },
     { to: '/staff-manager', label: 'ניהול מטבח', icon: Utensils, type: 'link', auth: true },
     { to: '/thai-schedule', label: 'לו"ז תאילנדי', icon: CalendarDays, type: 'link', auth: true },
-
+    { to: '/financial-report', label: 'דוחות פיננסיים', icon: FileText, type: 'link', auth: true },
 ];
 
 const getVisibleItems = (isAuthenticated, user) => {

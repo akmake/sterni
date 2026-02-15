@@ -29,8 +29,8 @@ import KitchenStaffManager from './pages/KitchenStaffManager';
 import StaffPrintView from './pages/StaffPrintView';
 import StaffPrintA3 from "./pages/Staffprinta3";
 import ThaiSchedulePage from './pages/ThaiSchedulePage';
-import GroupPaymentsPage from '@/pages/GroupPaymentsPage';
-import FinancialReportPage from '@/pages/FinancialReportPage';
+import GroupPaymentsPage from '@/pages/Grouppaymentspage';
+import FinancialReportPage from '@/pages/Financialreportpage';
 
 export default function App() {
   return (

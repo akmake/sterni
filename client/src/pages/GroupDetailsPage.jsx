@@ -13,6 +13,7 @@ import {
   Eye,
   FileText,
   DollarSign,
+  Printer,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import DayDuplicator from '@/components/DayDuplicator';
@@ -312,6 +313,28 @@ export default function GroupDetailsPage() {
     setIsEditingDetails(false);
   };
 
+  const handlePrintSchedule = () => {
+    if (!group) return;
+    
+    const dataToPrint = {
+      group: {
+        _id: group._id,
+        name: group.name,
+        pax: group.pax,
+        startDate: group.startDate,
+        endDate: group.endDate,
+        contactPerson: group.contactPerson,
+      },
+      schedule: (group.schedule || []).map(event => ({
+        ...event,
+        isMeal: event.isMeal || event.eventType === 'meal' || (event.mealType && event.mealType !== 'regular'),
+      }))
+    };
+    
+    localStorage.setItem('groupSchedulePrintData', JSON.stringify(dataToPrint));
+    window.open('/print/group-schedule', '_blank');
+  };
+
   if (!group) return <div className="p-10 text-center text-slate-500">טוען נתונים...</div>;
 
   // --- לוגיקת תצוגה חכמה ---
@@ -397,16 +420,24 @@ export default function GroupDetailsPage() {
         </div>
 
         <div className="space-y-4 pb-20">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center gap-4 flex-wrap">
             <h2 className="text-2xl font-bold text-slate-800">
               לו"ז ליום {selectedDate?.toLocaleDateString('he-IL', { weekday: 'long' })}
             </h2>
-            <Button
-              onClick={() => setIsSchedulerOpen(true)}
-              className="bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 rounded-xl px-4 h-12 shadow-sm"
-            >
-              <Eye size={18} className="ml-2" /> בדיקת זמינות אולמות
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={handlePrintSchedule}
+                className="bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 rounded-xl px-4 h-12 shadow-sm"
+              >
+                <Printer size={18} className="ml-2" /> הדפס לו"ז
+              </Button>
+              <Button
+                onClick={() => setIsSchedulerOpen(true)}
+                className="bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 rounded-xl px-4 h-12 shadow-sm"
+              >
+                <Eye size={18} className="ml-2" /> בדיקת זמינות אולמות
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-3">

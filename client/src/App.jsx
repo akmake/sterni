@@ -14,6 +14,7 @@ import HallsPage          from "@/pages/HallsPage";
 import GroupsPage         from "@/pages/GroupsPage";
 import NewGroupPage       from "@/pages/NewGroupPage";
 import GroupDetailsPage   from "@/pages/GroupDetailsPage";
+import GroupSchedulePrintPage from "@/pages/GroupSchedulePrintPage";
 import KitchenReportPage  from "@/pages/KitchenReportPage"
 import EmailsPage         from './pages/EmailsPage';
 import TasksPage          from './pages/TasksPage';
@@ -74,6 +75,7 @@ export default function App() {
 
       {/* ─── Print pages (outside Layout) ─── */}
       <Route path="/print/kitchen-a3" element={<KitchenPrintPageA3 />} />
+      <Route path="/print/group-schedule" element={<GroupSchedulePrintPage />} />
 
     </Routes>
   );

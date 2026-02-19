@@ -265,9 +265,9 @@ const PaymentRequestGenerator = () => {
 
     const bankDetails = `<b>בהעברה בנקאית לחשבוננו:</b><br>
 ע"ש ציפורי אירוח ואירועים בע"מ<br>
-מספר חשבון: 444574<br>
+מספר חשבון: 444571<br>
 בנק פועלים מס' 12<br>
-סניף 655 בני ברק<br>
+סניף 552 בני ברק<br>
 לאחר ביצוע העברה נא לשלוח אסמכתא למייל: ziporihotell@gmai.com`;
 
     setBlocks([
@@ -279,7 +279,7 @@ const PaymentRequestGenerator = () => {
         headers: [
             { title: 'פירוט', width: 40 },
             { title: 'כמות', width: 20 },
-            { title: 'מחיר יח\'', width: 20 },
+            { title: 'עלות', width: 20 },
             { title: 'סה"כ', width: 20 }
         ],
         rows: [

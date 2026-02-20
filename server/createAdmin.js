@@ -12,6 +12,7 @@ const createAdmin = async () => {
 
     const email = 'yosefdaean@gmail.com';
     const password = '0546205955'; // שנה לסיסמה חזקה
+    const name = 'יוסף יצחק דהאן'; // שם
     const existing = await User.findOne({ email });
 
     if (existing) {
@@ -22,8 +23,9 @@ const createAdmin = async () => {
     const hashedPassword = await bcrypt.hash(password, 12);
 
     await User.create({
+      name,
       email,
-      password: hashedPassword,
+      passwordHash: hashedPassword,
       role: 'admin',
     });
 

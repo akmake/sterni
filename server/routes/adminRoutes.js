@@ -7,18 +7,20 @@ import {
   deleteUser,
   changeUserRole
 } from '../controllers/adminController.js';
-import requireAuth from '../middlewares/requireAuth.js';
+import { requireAuth } from '../middlewares/authMiddleware.js';
 import requireAdmin from '../middlewares/requireAdmin.js';
 
 const router = express.Router();
 
-// All routes require authentication and admin role
+// ← כל requests חייב להיות מחובר
 router.use(requireAuth);
-router.use(requireAdmin);
 
-// --- User management ---
+// --- Get users list (for sharing projects) - auth only ---
 router.get('/users', getAllUsers);
 router.get('/users/:id', getUserById);
+
+// --- Admin-only operations ---
+router.use(requireAdmin);
 router.patch('/users/:id', updateUser);
 router.patch('/users/:id/password', changeUserPassword);
 router.patch('/users/:id/role', changeUserRole);

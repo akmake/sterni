@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Search, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import axios from 'axios';
+import api from '../api.js';
 
 export default function ProjectSharingModal({ projectId, isOpen, onClose, onUpdate }) {
   const [allUsers, setAllUsers] = useState([]);
@@ -20,11 +20,11 @@ export default function ProjectSharingModal({ projectId, isOpen, onClose, onUpda
   const fetchUsersAndCollaborators = async () => {
     try {
       const [usersRes, projectRes] = await Promise.all([
-        axios.get('/api/projects/users/all'),
-        axios.get(`/api/projects/${projectId}`)
+        api.get('/admin/users'),
+        api.get(`/projects/${projectId}`)
       ]);
       
-      setAllUsers(usersRes.data || []);
+      setAllUsers(usersRes.data.data?.users || []);
       setCollaborators(projectRes.data.collaborators || []);
     } catch (error) {
       toast.error('שגיאה בטעינת נתונים');
@@ -41,12 +41,12 @@ export default function ProjectSharingModal({ projectId, isOpen, onClose, onUpda
     }
 
     try {
-      const response = await axios.post(`/api/projects/${projectId}/collaborators`, {
+      const response = await api.post(`/projects/${projectId}/collaborators`, {
         userId: selectedUser._id,
         role: selectedRole
       });
       
-      setCollaborators(response.data.collaborators || []);
+      setCollaborators(response.data.collaborators || response.data.data?.project?.collaborators || []);
       setSelectedUser(null);
       setSelectedRole('view');
       setSearchTerm('');
@@ -64,8 +64,8 @@ export default function ProjectSharingModal({ projectId, isOpen, onClose, onUpda
 
   const handleRemoveCollaborator = async (collaboratorId) => {
     try {
-      const response = await axios.delete(
-        `/api/projects/${projectId}/collaborators/${collaboratorId}`
+      const response = await api.delete(
+        `/projects/${projectId}/collaborators/${collaboratorId}`
       );
       
       setCollaborators(response.data.collaborators || []);
@@ -79,8 +79,8 @@ export default function ProjectSharingModal({ projectId, isOpen, onClose, onUpda
 
   const handleChangeRole = async (collaboratorId, newRole) => {
     try {
-      const response = await axios.patch(
-        `/api/projects/${projectId}/collaborators/${collaboratorId}`,
+      const response = await api.patch(
+        `/projects/${projectId}/collaborators/${collaboratorId}`,
         { role: newRole }
       );
       

@@ -7,7 +7,7 @@ const assertProjectOwner = (project, userId) => {
   if (!project) {
     throw new AppError('Project not found', 404);
   }
-  if (project.owner.toString() !== userId) {
+  if (project.owner.toString() !== userId.toString()) {
     throw new AppError('Not authorized to access this project', 403);
   }
 };
@@ -18,11 +18,11 @@ const assertProjectOwner = (project, userId) => {
 export const getProjects = async (req, res, next) => {
   try {
     // פרויקטים שאני הבעלים שלהם
-    const ownProjects = await Project.find({ owner: req.user.id }).sort({ createdAt: -1 });
+    const ownProjects = await Project.find({ owner: req.user._id }).sort({ createdAt: -1 });
     
     // פרויקטים משותפים (כשאני collaborator)
     const sharedProjects = await Project.find({
-      'collaborators.userId': req.user.id
+      'collaborators.userId': req.user._id
     }).sort({ createdAt: -1 });
     
     // שילוב שניהם
@@ -45,9 +45,9 @@ export const getProject = async (req, res, next) => {
     if (!project) return next(new AppError('Project not found', 404));
     
     // בדיקה: האם אני בעלים או משתתף?
-    const isOwner = project.owner.toString() === req.user.id;
+    const isOwner = project.owner.toString() === req.user._id.toString();
     const collaborator = project.collaborators.find(
-      c => c.userId.toString() === req.user.id
+      c => c.userId.toString() === req.user._id.toString()
     );
     
     if (!isOwner && !collaborator) {
@@ -75,7 +75,7 @@ export const createProject = async (req, res, next) => {
     }
 
     const project = new Project({
-      owner: req.user.id,
+      owner: req.user._id,
       projectName,
       description,
       dueDate,
@@ -99,9 +99,9 @@ export const updateProject = async (req, res, next) => {
     if (!project) return next(new AppError('Project not found', 404));
     
     // בדיקה: האם יש לי הרשאה לעריכה?
-    const isOwner = project.owner.toString() === req.user.id;
+    const isOwner = project.owner.toString() === req.user._id.toString();
     const collaborator = project.collaborators.find(
-      c => c.userId.toString() === req.user.id
+      c => c.userId.toString() === req.user._id.toString()
     );
     
     const hasEditAccess = isOwner || (collaborator && collaborator.role === 'edit');
@@ -128,7 +128,7 @@ export const deleteProject = async (req, res, next) => {
     
     if (!project) return next(new AppError('Project not found', 404));
     
-    if (project.owner.toString() !== req.user.id) {
+    if (project.owner.toString() !== req.user._id.toString()) {
       return next(new AppError('Not authorized to delete this project', 403));
     }
 
@@ -149,9 +149,9 @@ export const addTask = async (req, res, next) => {
     if (!project) return next(new AppError('Project not found', 404));
 
     // בדיקה: האם יש לי הרשאה לעריכה?
-    const isOwner = project.owner.toString() === req.user.id;
+    const isOwner = project.owner.toString() === req.user._id.toString();
     const collaborator = project.collaborators.find(
-      c => c.userId.toString() === req.user.id
+      c => c.userId.toString() === req.user._id.toString()
     );
     
     const hasEditAccess = isOwner || (collaborator && collaborator.role === 'edit');
@@ -179,9 +179,9 @@ export const toggleTask = async (req, res, next) => {
     if (!project) return next(new AppError('Project not found', 404));
 
     // בדיקה: האם יש לי הרשאה לעריכה?
-    const isOwner = project.owner.toString() === req.user.id;
+    const isOwner = project.owner.toString() === req.user._id.toString();
     const collaborator = project.collaborators.find(
-      c => c.userId.toString() === req.user.id
+      c => c.userId.toString() === req.user._id.toString()
     );
     
     const hasEditAccess = isOwner || (collaborator && collaborator.role === 'edit');
@@ -209,9 +209,9 @@ export const deleteTask = async (req, res, next) => {
     if (!project) return next(new AppError('Project not found', 404));
 
     // בדיקה: האם יש לי הרשאה לעריכה?
-    const isOwner = project.owner.toString() === req.user.id;
+    const isOwner = project.owner.toString() === req.user._id.toString();
     const collaborator = project.collaborators.find(
-      c => c.userId.toString() === req.user.id
+      c => c.userId.toString() === req.user._id.toString()
     );
     
     const hasEditAccess = isOwner || (collaborator && collaborator.role === 'edit');
@@ -236,7 +236,7 @@ export const convertTaskToProject = async (req, res, next) => {
         const { id, taskId } = req.params;
         
         // 1. מוצאים את הפרויקט המקורי
-        const originalProject = await Project.findOne({ _id: id, owner: req.user.id });
+        const originalProject = await Project.findOne({ _id: id, owner: req.user._id });
         if(!originalProject) return next(new AppError('Project not found', 404));
 
         // 2. מוצאים את המשימה
@@ -245,7 +245,7 @@ export const convertTaskToProject = async (req, res, next) => {
 
         // 3. יוצרים פרויקט חדש על בסיס המשימה
         const newProject = new Project({
-            owner: req.user.id,
+            owner: req.user._id,
             projectName: task.name, // שם המשימה הופך לשם הפרויקט
             description: `נוצר אוטומטית מפרויקט: ${originalProject.projectName}`,
             tasks: [{ name: 'הגדר משימות ראשונות', done: false }] 
@@ -274,7 +274,7 @@ export const uploadProjectFile = async (req, res, next) => {
       return next(new AppError('לא נבחר קובץ', 400));
     }
 
-    const project = await Project.findOne({ _id: req.params.id, owner: req.user.id });
+    const project = await Project.findOne({ _id: req.params.id, owner: req.user._id });
     if (!project) return next(new AppError('Project not found', 404));
 
     // יצירת אובייקט הקובץ לפי הסכמה שלך [cite: 1321]
@@ -298,7 +298,7 @@ export const deleteProjectFile = async (req, res, next) => {
   try {
     const { id, fileId } = req.params;
 
-    const project = await Project.findOne({ _id: id, owner: req.user.id });
+    const project = await Project.findOne({ _id: id, owner: req.user._id });
     if (!project) return next(new AppError('Project not found', 404));
 
     // מציאת הקובץ בתוך המערך
@@ -343,7 +343,7 @@ export const getAllUsers = async (req, res, next) => {
       .lean();
     
     // הסרת המשתמש הנוכחי מהרשימה
-    const filteredUsers = users.filter(u => u._id.toString() !== req.user.id);
+    const filteredUsers = users.filter(u => u._id.toString() !== req.user._id.toString());
     
     res.json(filteredUsers);
   } catch (err) {
@@ -364,7 +364,7 @@ export const addCollaborator = async (req, res, next) => {
     if (!project) return next(new AppError('Project not found', 404));
     
     // רק בעלים יכול להוסיף משתתפים
-    if (project.owner.toString() !== req.user.id) {
+    if (project.owner.toString() !== req.user._id.toString()) {
       return next(new AppError('Not authorized to add collaborators', 403));
     }
     
@@ -406,7 +406,7 @@ export const removeCollaborator = async (req, res, next) => {
     if (!project) return next(new AppError('Project not found', 404));
     
     // רק בעלים יכול להסיר משתתפים
-    if (project.owner.toString() !== req.user.id) {
+    if (project.owner.toString() !== req.user._id.toString()) {
       return next(new AppError('Not authorized to remove collaborators', 403));
     }
     
@@ -434,7 +434,7 @@ export const updateCollaboratorRole = async (req, res, next) => {
     if (!project) return next(new AppError('Project not found', 404));
     
     // רק בעלים יכול לשנות הרשאות
-    if (project.owner.toString() !== req.user.id) {
+    if (project.owner.toString() !== req.user._id.toString()) {
       return next(new AppError('Not authorized to change roles', 403));
     }
     

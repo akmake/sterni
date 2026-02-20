@@ -8,6 +8,35 @@ const api = axios.create({
   },
 });
 
+// ★ CSRF Token management
+let csrfToken = null;
+
+const getCsrfToken = async () => {
+  if (csrfToken) return csrfToken;
+  try {
+    const response = await axios.get('/api/csrf-token', { withCredentials: true });
+    csrfToken = response.data.csrfToken;
+    return csrfToken;
+  } catch (err) {
+    console.error('Failed to fetch CSRF token:', err);
+    return null;
+  }
+};
+
+// ★ Request interceptor - add CSRF token to POST, PATCH, DELETE
+api.interceptors.request.use(
+  async (config) => {
+    if (['post', 'patch', 'delete'].includes(config.method?.toLowerCase())) {
+      const token = await getCsrfToken();
+      if (token) {
+        config.headers['X-CSRF-Token'] = token;
+      }
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 // ★ FIX: Proper 401 handling with token refresh
 let isRefreshing = false;
 let failedQueue = [];

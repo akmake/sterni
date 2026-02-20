@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 
 export const requireAuth = async (req, res, next) => {
   const token = req.cookies.jwt;
@@ -10,10 +11,9 @@ export const requireAuth = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
     
-    // התיקון הקריטי: אנחנו שמים גם 'id' וגם '_id' כדי למנוע התנגשויות
+    // ★ CRITICAL FIX: Convert string ID back to MongoDB ObjectId
     req.user = { 
-        id: decoded.id, 
-        _id: decoded.id, // זה השדה שהקונטרולרים מחפשים!
+        _id: new mongoose.Types.ObjectId(decoded.id),
         role: decoded.role 
     };
     

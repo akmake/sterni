@@ -4,6 +4,7 @@ import useProjectsStore from '@/stores/projectsStore';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Checkbox } from '@/components/ui/checkbox';
+import ProjectSharingModal from '@/components/ProjectSharingModal';
 import {
     Trash2,
     ArrowUpRight,
@@ -13,7 +14,8 @@ import {
     Download,
     UploadCloud,
     X, 
-    Play
+    Play,
+    Share2
 } from 'lucide-react';
 
 // כתובת השרת לתמונות - ודא שזה תואם לשרת שלך
@@ -34,6 +36,7 @@ export default function ProjectPage() {
   } = useProjectsStore();
 
   const [newTaskName, setNewTaskName] = useState('');
+  const [sharingModalOpen, setSharingModalOpen] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => { fetchProject(id); }, [id]);
@@ -170,25 +173,35 @@ export default function ProjectPage() {
                     </p>
                 </div>
 
-                {/* Progress Widget */}
-                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 min-w-[200px]">
-                    <div className="relative w-14 h-14 flex items-center justify-center">
-                        <svg className="w-full h-full transform -rotate-90">
-                            <circle cx="28" cy="28" r="24" stroke="#f1f5f9" strokeWidth="6" fill="transparent" />
-                            <circle cx="28" cy="28" r="24" stroke="#1e293b" strokeWidth="6" fill="transparent"
-                                strokeDasharray={150.7}
-                                strokeDashoffset={150.7 - (150.7 * progress) / 100}
-                                className="transition-all duration-1000 ease-out"
-                                strokeLinecap="round"
-                            />
-                        </svg>
-                        <span className="absolute text-xs font-bold">{progress}%</span>
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">התקדמות</span>
-                        <span className="font-bold text-slate-800 text-lg">
-                            {completedTasks} <span className="text-slate-400 text-sm font-normal">/ {totalTasks}</span>
-                        </span>
+                <div className="flex items-center gap-3">
+                    <Button
+                        onClick={() => setSharingModalOpen(true)}
+                        className="flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-lg transition"
+                    >
+                        <Share2 size={18} />
+                        שתף
+                    </Button>
+
+                    {/* Progress Widget */}
+                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 min-w-[200px]">
+                        <div className="relative w-14 h-14 flex items-center justify-center">
+                            <svg className="w-full h-full transform -rotate-90">
+                                <circle cx="28" cy="28" r="24" stroke="#f1f5f9" strokeWidth="6" fill="transparent" />
+                                <circle cx="28" cy="28" r="24" stroke="#1e293b" strokeWidth="6" fill="transparent"
+                                    strokeDasharray={150.7}
+                                    strokeDashoffset={150.7 - (150.7 * progress) / 100}
+                                    className="transition-all duration-1000 ease-out"
+                                    strokeLinecap="round"
+                                />
+                            </svg>
+                            <span className="absolute text-xs font-bold">{progress}%</span>
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">התקדמות</span>
+                            <span className="font-bold text-slate-800 text-lg">
+                                {completedTasks} <span className="text-slate-400 text-sm font-normal">/ {totalTasks}</span>
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -321,6 +334,13 @@ export default function ProjectPage() {
 
         </div>
       </div>
+
+      <ProjectSharingModal 
+        projectId={id}
+        isOpen={sharingModalOpen}
+        onClose={() => setSharingModalOpen(false)}
+        onUpdate={() => fetchProject(id)}
+      />
     </div>
   );
 }

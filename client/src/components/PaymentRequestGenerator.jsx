@@ -102,14 +102,17 @@ const RichTextMenu = ({ position, onClose, onAction, type }) => {
     );
 };
 
-const PaymentRequestGenerator = () => {
-  const { groupId } = useParams();
+const PaymentRequestGenerator = ({ groupId = null, onSave = null, paymentRequestId = null }) => {
+  const params = useParams();
+  const actualGroupId = groupId || params.groupId;
   const { groups, fetchGroups, updateGroup } = useGroupsStore();
-  const group = groups.find(g => g._id === groupId);
+  const group = actualGroupId ? groups.find(g => g._id === actualGroupId) : null;
 
   const [blocks, setBlocks] = useState([]);
   const [orderNumber, setOrderNumber] = useState('');
-  const [targetEmail, setTargetEmail] = useState(''); 
+  const [targetEmail, setTargetEmail] = useState('');
+  const [totalAmount, setTotalAmount] = useState(0);
+  const [currency, setCurrency] = useState('ILS');
   
   const [headerDetails, setHeaderDetails] = useState({
       groupName: '',
@@ -121,12 +124,27 @@ const PaymentRequestGenerator = () => {
   const [paginatedPages, setPaginatedPages] = useState([]);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSending, setIsSending] = useState(false); 
+  const [isSavingToServer, setIsSavingToServer] = useState(false);
   
   const [contextMenu, setContextMenu] = useState(null);
 
   const blockRefs = useRef({});
   const containerRef = useRef(null);
-  const DRAFT_KEY = `draft_payment_${groupId}`; 
+  const DRAFT_KEY = `draft_payment_${actualGroupId || paymentRequestId}`; 
+  const [csrfToken, setCsrfToken] = useState(null);
+
+  // --- טעינת CSRF token ---
+  useEffect(() => {
+    const fetchCSRFToken = async () => {
+      try {
+        const response = await axios.get('/api/csrf-token');
+        setCsrfToken(response.data.csrfToken);
+      } catch (err) {
+        console.error('Failed to fetch CSRF token:', err);
+      }
+    };
+    fetchCSRFToken();
+  }, []);
 
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
@@ -136,10 +154,29 @@ const PaymentRequestGenerator = () => {
 
   // --- טעינת נתונים ---
   useEffect(() => {
-    if (!group) { 
-        fetchGroups(); 
-    } else {
-        const savedDraft = localStorage.getItem(DRAFT_KEY);
+    if (!actualGroupId && !paymentRequestId) {
+      // Mode: דרישת תשלום חדשה ללא ייחוס לקבוצה
+      const savedDraft = localStorage.getItem(DRAFT_KEY);
+      if (savedDraft) {
+        try {
+          const draftData = JSON.parse(savedDraft);
+          setBlocks(draftData.blocks);
+          setOrderNumber(draftData.orderNumber);
+          setTargetEmail(draftData.targetEmail || '');
+          setTotalAmount(draftData.totalAmount || 0);
+          setCurrency(draftData.currency || 'ILS');
+          setHeaderDetails(draftData.headerDetails);
+          toast.success('טיוטה שלא נשמרה שוחזרה', { position: 'bottom-center', icon: '📝' });
+        } catch (e) {
+          console.error("Error parsing draft", e);
+          initializeDefaultPaymentRequest({});
+        }
+      } else {
+        initializeDefaultPaymentRequest({});
+      }
+    } else if (actualGroupId && group) {
+      // Mode: דרישת תשלום של קבוצה
+      const savedDraft = localStorage.getItem(DRAFT_KEY);
         let loadedFromDraft = false;
 
         if (savedDraft) {
@@ -151,6 +188,8 @@ const PaymentRequestGenerator = () => {
                     setBlocks(draftData.blocks);
                     setOrderNumber(draftData.orderNumber);
                     setTargetEmail(draftData.targetEmail || group.contactPerson?.email || '');
+                    setTotalAmount(draftData.totalAmount || 0);
+                    setCurrency(draftData.currency || 'ILS');
                     
                     if (draftData.headerDetails) {
                         setHeaderDetails(draftData.headerDetails);
@@ -175,6 +214,8 @@ const PaymentRequestGenerator = () => {
             if (group.paymentRequest?.blocks && group.paymentRequest.blocks.length > 0) {
                 setBlocks(group.paymentRequest.blocks);
                 setOrderNumber(group.paymentRequest.orderNumber || '');
+                setTotalAmount(group.paymentRequest.totalAmount || 0);
+                setCurrency(group.paymentRequest.currency || 'ILS');
                 if (group.paymentRequest.headerDetails) {
                     setHeaderDetails(group.paymentRequest.headerDetails);
                 } else {
@@ -196,22 +237,26 @@ const PaymentRequestGenerator = () => {
             }
             setTargetEmail(group.contactPerson?.email || '');
         }
+    } else if (actualGroupId && !group) {
+      fetchGroups();
     }
-  }, [group, DRAFT_KEY]);
+  }, [group, actualGroupId, paymentRequestId, DRAFT_KEY]);
 
   // --- שמירה אוטומטית ---
   useEffect(() => {
-      if (blocks.length > 0 && groupId) {
+      if (blocks.length > 0) {
           const draftData = {
               blocks,
               orderNumber,
               targetEmail,
               headerDetails,
+              totalAmount,
+              currency,
               timestamp: Date.now()
           };
           localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
       }
-  }, [blocks, orderNumber, targetEmail, headerDetails, groupId, DRAFT_KEY]);
+  }, [blocks, orderNumber, targetEmail, headerDetails, totalAmount, currency, DRAFT_KEY]);
 
   // --- פגינציה ---
   useLayoutEffect(() => {
@@ -242,10 +287,10 @@ const PaymentRequestGenerator = () => {
   }, [blocks, paginatedPages.length]);
 
   const initializeDefaultPaymentRequest = (groupData) => {
-    const isLodging = new Date(groupData.startDate).toDateString() !== new Date(groupData.endDate).toDateString();
-    const eventType = isLodging ? 'אירוח עם לינה' : 'יום עיון';
+    const isLodging = groupData.startDate ? new Date(groupData.startDate).toDateString() !== new Date(groupData.endDate).toDateString() : false;
+    const eventType = groupData.name ? (isLodging ? 'אירוח עם לינה' : 'יום עיון') : 'דרישת תשלום';
 
-    let arrivalDate = groupData.startDate;
+    let arrivalDate = groupData.startDate || new Date();
     if (groupData.events && groupData.events.length > 0) {
        const sorted = [...groupData.events].sort((a,b) => new Date(a.start) - new Date(b.start));
        arrivalDate = sorted[0].start;
@@ -491,8 +536,10 @@ const PaymentRequestGenerator = () => {
         formData.append('subject', `דרישת תשלום - ${headerDetails.groupName}`);
         formData.append('body', `מצורפת דרישת תשלום עבור ${headerDetails.groupName}.\n\nבברכה,\nצוות ציפורי.`);
 
+        const headers = csrfToken ? { 'X-CSRF-Token': csrfToken } : {};
+
         await axios.post('/api/emails/send-attachment', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' },
+            headers,
             withCredentials: true 
         });
         toast.success('המייל נשלח בהצלחה!', { id: toastId });
@@ -508,13 +555,89 @@ const PaymentRequestGenerator = () => {
   };
 
   const handleSave = async (showToast = true) => {
-      if(!group) return;
-      await updateGroup(group._id, { paymentRequest: { blocks, orderNumber, headerDetails, lastUpdated: new Date() }});
-      if(showToast) toast.success("נשמר בשרת");
-      localStorage.removeItem(DRAFT_KEY);
+      setIsSavingToServer(true);
+      try {
+        const headers = csrfToken ? { 'X-CSRF-Token': csrfToken } : {};
+        
+        if (actualGroupId && group) {
+          // שמירה לקבוצה + עדכון billing profile וטעינת תשלום
+          await updateGroup(group._id, { 
+            paymentRequest: { 
+              blocks, 
+              orderNumber, 
+              headerDetails, 
+              totalAmount,
+              currency,
+              lastUpdated: new Date() 
+            }
+          });
+          
+          // עדכון Billing Profile אם יש סכום כולל
+          if (totalAmount > 0) {
+            await axios.put(`/payments/groups/${actualGroupId}/billing`, {
+              totalExpected: totalAmount,
+              currency: currency
+            }, { headers });
+            
+            // יצירת Payment record (charge) אם עדיין לא קיים במצב זה
+            await axios.post(`/payments/groups/${actualGroupId}/payments`, {
+              type: 'invoice',
+              amount: totalAmount,
+              currency: currency,
+              paymentDate: new Date(),
+              description: `דרישת תשלום - ${headerDetails.groupName}`,
+              status: 'pending',
+              referenceNumber: `PR-${actualGroupId.substring(0, 8)}-${Date.now()}`
+            }, { headers });
+          }
+          
+          if(showToast) toast.success("נשמר בשרת ותשלום נוצר בקבוצה");
+        } else if (paymentRequestId) {
+          // עדכון דרישת תשלום קיימת
+          const htmlBody = containerRef.current?.innerHTML || '';
+          await axios.patch(`/api/payment-requests/${paymentRequestId}`, {
+            content: blocks,
+            htmlBody,
+            name: headerDetails.groupName,
+            clientName: headerDetails.contactName,
+            totalAmount: totalAmount,
+            currency: currency,
+            contactPerson: {
+              name: headerDetails.contactName,
+              phone: headerDetails.contactPhone,
+              email: headerDetails.contactEmail
+            }
+          }, { headers });
+          if(showToast) toast.success("נשמר בשרת");
+        } else {
+          // שמירת דרישת תשלום חדשה
+          const htmlBody = containerRef.current?.innerHTML || '';
+          const response = await axios.post('/api/payment-requests', {
+            content: blocks,
+            htmlBody,
+            name: headerDetails.groupName || `דרישה - ${new Date().toLocaleDateString('he-IL')}`,
+            clientName: headerDetails.contactName,
+            totalAmount: totalAmount,
+            currency: currency,
+            contactPerson: {
+              name: headerDetails.contactName,
+              phone: headerDetails.contactPhone,
+              email: headerDetails.contactEmail
+            }
+          }, { headers });
+          if(showToast) toast.success("נשמר בשרת");
+          if (onSave) onSave(response.data.data?.paymentRequest);
+        }
+        localStorage.removeItem(DRAFT_KEY);
+      } catch (err) {
+        if(showToast) toast.error('שגיאה בשמירה: ' + (err.response?.data?.message || err.message));
+        console.error(err);
+      } finally {
+        setIsSavingToServer(false);
+      }
   };
 
-  if (!group) return <div className="flex justify-center pt-20">טוען נתונים...</div>;
+  if (actualGroupId && !group) return <div className="flex justify-center pt-20">טוען נתונים...</div>;
 
   return (
     <div className="min-h-screen bg-slate-100 py-10 font-sans text-slate-800">
@@ -702,7 +825,39 @@ const PaymentRequestGenerator = () => {
                         );
                     })}
                 </div>
-
+                {/* Edit mode: סך הכל input section (no-print) */}
+                {pageIndex === paginatedPages.length - 1 && (
+                    <div className="mt-4 p-3 bg-blue-50 rounded no-print flex items-center gap-3 border border-blue-200">
+                        <label className="text-sm font-medium text-gray-700">סך הכל לתשלום:</label>
+                        <input
+                            type="number"
+                            value={totalAmount}
+                            onChange={(e) => setTotalAmount(Math.max(0, parseFloat(e.target.value) || 0))}
+                            placeholder="סכום"
+                            className="flex-1 max-w-xs font-semibold text-gray-800 border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none text-sm"
+                        />
+                        <select
+                            value={currency}
+                            onChange={(e) => setCurrency(e.target.value)}
+                            className="px-2 py-1 border border-gray-300 rounded bg-white text-sm font-medium"
+                        >
+                            <option value="ILS">₪</option>
+                            <option value="USD">$</option>
+                            <option value="EUR">€</option>
+                        </select>
+                    </div>
+                )}
+                {/* Printable: סך הכל summary - simple line */}
+                {pageIndex === paginatedPages.length - 1 && totalAmount > 0 && (
+                    <div className="mt-6 pt-3 border-t border-gray-300 px-4">
+                        <div className="flex justify-between items-center">
+                            <span className="text-sm font-semibold text-gray-700">סה"כ סכום לתשלום:</span>
+                            <span className="text-base font-bold text-gray-900">
+                                {totalAmount.toLocaleString('he-IL')} {currency === 'ILS' ? '₪' : currency === 'USD' ? '$' : '€'}
+                            </span>
+                        </div>
+                    </div>
+                )}
                 {pageIndex === paginatedPages.length - 1 && (
                     <div className="mt-auto pt-10 px-4 flex justify-between items-end pb-8 text-slate-800">
                        <div className="text-right text-sm leading-relaxed">

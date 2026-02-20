@@ -18,7 +18,11 @@ import {
     deleteTask,
     convertTaskToProject,
     uploadProjectFile,
-    deleteProjectFile
+    deleteProjectFile,
+    getAllUsers,
+    addCollaborator,
+    removeCollaborator,
+    updateCollaboratorRole
 } from '../controllers/projectController.js';
 
 const router = express.Router();
@@ -42,6 +46,9 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // Routes
+// ⚠️ Important: PUT SPECIFIC ROUTES BEFORE GENERIC /:id ROUTES
+router.get('/users/all', getAllUsers);
+
 router.route('/')
   .get(getProjects)
   .post(createProject);
@@ -62,5 +69,10 @@ router.post('/:id/tasks', addTask);
 router.post('/:id/tasks/:taskId/convert', convertTaskToProject);
 router.patch('/:id/tasks/:taskId/toggle', toggleTask);
 router.delete('/:id/tasks/:taskId', deleteTask);
+
+// Collaboration
+router.post('/:id/collaborators', addCollaborator);
+router.patch('/:id/collaborators/:collaboratorId', updateCollaboratorRole);
+router.delete('/:id/collaborators/:collaboratorId', removeCollaborator);
 
 export default router;

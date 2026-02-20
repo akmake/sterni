@@ -14,6 +14,17 @@ const fileSchema = new mongoose.Schema({
   uploadedAt: { type: Date, default: Date.now }
 });
 
+const collaboratorSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  role: { 
+    type: String, 
+    enum: ['view', 'edit'],
+    default: 'view',
+    required: true
+  },
+  addedAt: { type: Date, default: Date.now }
+});
+
 const projectSchema = new mongoose.Schema({
   owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   projectName: { type: String, required: true, trim: true },
@@ -23,6 +34,9 @@ const projectSchema = new mongoose.Schema({
   
   tasks: [taskSchema],
   files: [fileSchema], // המקום החדש לקבצים
+  
+  // Collaborators - משתמשים משותפים
+  collaborators: [collaboratorSchema],
 
   dueDate: { type: Date },
 }, { 

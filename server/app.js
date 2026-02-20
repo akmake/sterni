@@ -19,8 +19,10 @@ import taskRoutes from './routes/taskRoutes.js';
 import emailRoutes from './routes/emailRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import { connectToWhatsApp } from './services/whatsappService.js';
-import quoteRouter from './routes/quoteRoutes.js'; // <--- זה כבר קיים, מצוין
+import quoteRouter from './routes/quoteRoutes.js';
+import paymentRequestRoutes from './routes/paymentRequestRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 
 import rateLimiter from './middlewares/rateLimiter.js';
 import { requireAuth } from './middlewares/authMiddleware.js';
@@ -95,6 +97,8 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/quotes', requireAuth, quoteRouter);
 app.use('/api/payments', requireAuth, paymentRoutes);
+app.use('/api/payment-requests', requireAuth, paymentRequestRoutes);
+app.use('/api/admin', adminRoutes);
 
 // שימי לב: מחקתי מפה את quotes כי העברתי אותו למעלה!
 

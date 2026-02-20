@@ -1,4 +1,5 @@
 import Project from '../models/Project.js';
+import User from '../models/userModel.js';
 import AppError from '../utils/AppError.js';
 
 // --- Helper: Validate Ownership ---
@@ -13,23 +14,51 @@ const assertProjectOwner = (project, userId) => {
 
 // --- CRUD Operations ---
 
-// 1. קבלת כל הפרויקטים של המשתמש
+// 1. קבלת כל הפרויקטים של המשתמש (אישיים + משותפים)
 export const getProjects = async (req, res, next) => {
   try {
-    // ממיינים לפי תאריך יצירה יורד (הכי חדש למעלה)
-    const projects = await Project.find({ owner: req.user.id }).sort({ createdAt: -1 });
-    res.json(projects);
+    // פרויקטים שאני הבעלים שלהם
+    const ownProjects = await Project.find({ owner: req.user.id }).sort({ createdAt: -1 });
+    
+    // פרויקטים משותפים (כשאני collaborator)
+    const sharedProjects = await Project.find({
+      'collaborators.userId': req.user.id
+    }).sort({ createdAt: -1 });
+    
+    // שילוב שניהם
+    const allProjects = [...ownProjects, ...sharedProjects];
+    
+    // מיון לפי תאריך ירידה
+    allProjects.sort((a, b) => b.createdAt - a.createdAt);
+    
+    res.json(allProjects);
   } catch (err) {
     next(err);
   }
 };
 
-// 2. קבלת פרויקט ספציפי
+// 2. קבלת פרויקט ספציפי (עם בדיקת הרשאות)
 export const getProject = async (req, res, next) => {
   try {
-    const project = await Project.findOne({ _id: req.params.id, owner: req.user.id });
+    const project = await Project.findById(req.params.id);
+    
     if (!project) return next(new AppError('Project not found', 404));
-    res.json(project);
+    
+    // בדיקה: האם אני בעלים או משתתף?
+    const isOwner = project.owner.toString() === req.user.id;
+    const collaborator = project.collaborators.find(
+      c => c.userId.toString() === req.user.id
+    );
+    
+    if (!isOwner && !collaborator) {
+      return next(new AppError('Not authorized to access this project', 403));
+    }
+    
+    // הוספת מידע על הרשאותיי
+    const projectData = project.toJSON();
+    projectData.myRole = isOwner ? 'owner' : collaborator.role;
+    
+    res.json(projectData);
   } catch (err) {
     next(err);
   }
@@ -61,33 +90,51 @@ export const createProject = async (req, res, next) => {
   }
 };
 
-// 4. עדכון פרטי פרויקט (שם/תיאור)
+// 4. עדכון פרטי פרויקט (שם/תיאור) - רק בעלים או משתתפים עם edit
 export const updateProject = async (req, res, next) => {
   try {
     const { projectName, description, dueDate } = req.body;
     
-    const project = await Project.findOneAndUpdate(
-      { _id: req.params.id, owner: req.user.id },
-      { projectName, description, dueDate },
-      { new: true, runValidators: true }
-    );
-
+    const project = await Project.findById(req.params.id);
     if (!project) return next(new AppError('Project not found', 404));
+    
+    // בדיקה: האם יש לי הרשאה לעריכה?
+    const isOwner = project.owner.toString() === req.user.id;
+    const collaborator = project.collaborators.find(
+      c => c.userId.toString() === req.user.id
+    );
+    
+    const hasEditAccess = isOwner || (collaborator && collaborator.role === 'edit');
+    
+    if (!hasEditAccess) {
+      return next(new AppError('Not authorized to edit this project', 403));
+    }
 
+    project.projectName = projectName || project.projectName;
+    project.description = description || project.description;
+    project.dueDate = dueDate || project.dueDate;
+    
+    await project.save();
     res.json(project);
   } catch (err) {
     next(err);
   }
 };
 
-// 5. מחיקת פרויקט (הפונקציה שהייתה חסרה לך!)
+// 5. מחיקת פרויקט (רק בעלים)
 export const deleteProject = async (req, res, next) => {
   try {
-    const project = await Project.findOneAndDelete({ _id: req.params.id, owner: req.user.id });
+    const project = await Project.findById(req.params.id);
     
     if (!project) return next(new AppError('Project not found', 404));
+    
+    if (project.owner.toString() !== req.user.id) {
+      return next(new AppError('Not authorized to delete this project', 403));
+    }
 
-    res.status(204).send(); // 204 No Content
+    await Project.findByIdAndDelete(req.params.id);
+
+    res.status(204).send();
   } catch (err) {
     next(err);
   }
@@ -95,11 +142,23 @@ export const deleteProject = async (req, res, next) => {
 
 // --- Task Operations ---
 
-// 6. הוספת משימה
+// 6. הוספת משימה - רק בעלים או משתתפים עם edit
 export const addTask = async (req, res, next) => {
   try {
-    const project = await Project.findOne({ _id: req.params.id, owner: req.user.id });
+    const project = await Project.findById(req.params.id);
     if (!project) return next(new AppError('Project not found', 404));
+
+    // בדיקה: האם יש לי הרשאה לעריכה?
+    const isOwner = project.owner.toString() === req.user.id;
+    const collaborator = project.collaborators.find(
+      c => c.userId.toString() === req.user.id
+    );
+    
+    const hasEditAccess = isOwner || (collaborator && collaborator.role === 'edit');
+    
+    if (!hasEditAccess) {
+      return next(new AppError('Not authorized to edit this project', 403));
+    }
 
     const { name } = req.body;
     if (!name) return next(new AppError('Task name is required', 400));
@@ -113,11 +172,23 @@ export const addTask = async (req, res, next) => {
   }
 };
 
-// 7. שינוי סטטוס משימה (בוצע/לא בוצע)
+// 7. שינוי סטטוס משימה (בוצע/לא בוצע) - רק בעלים או משתתפים עם edit
 export const toggleTask = async (req, res, next) => {
   try {
-    const project = await Project.findOne({ _id: req.params.id, owner: req.user.id });
+    const project = await Project.findById(req.params.id);
     if (!project) return next(new AppError('Project not found', 404));
+
+    // בדיקה: האם יש לי הרשאה לעריכה?
+    const isOwner = project.owner.toString() === req.user.id;
+    const collaborator = project.collaborators.find(
+      c => c.userId.toString() === req.user.id
+    );
+    
+    const hasEditAccess = isOwner || (collaborator && collaborator.role === 'edit');
+    
+    if (!hasEditAccess) {
+      return next(new AppError('Not authorized to edit this project', 403));
+    }
 
     const task = project.tasks.id(req.params.taskId);
     if (!task) return next(new AppError('Task not found', 404));
@@ -131,11 +202,23 @@ export const toggleTask = async (req, res, next) => {
   }
 };
 
-// 8. מחיקת משימה
+// 8. מחיקת משימה - רק בעלים או משתתפים עם edit
 export const deleteTask = async (req, res, next) => {
   try {
-    const project = await Project.findOne({ _id: req.params.id, owner: req.user.id });
+    const project = await Project.findById(req.params.id);
     if (!project) return next(new AppError('Project not found', 404));
+
+    // בדיקה: האם יש לי הרשאה לעריכה?
+    const isOwner = project.owner.toString() === req.user.id;
+    const collaborator = project.collaborators.find(
+      c => c.userId.toString() === req.user.id
+    );
+    
+    const hasEditAccess = isOwner || (collaborator && collaborator.role === 'edit');
+    
+    if (!hasEditAccess) {
+      return next(new AppError('Not authorized to edit this project', 403));
+    }
 
     // שימוש ב-pull להסרת תת-מסמך ממערך
     project.tasks.pull({ _id: req.params.taskId });
@@ -245,6 +328,125 @@ export const deleteProjectFile = async (req, res, next) => {
     }
 
     res.status(200).json(project);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// --- Collaboration Functions ---
+
+// 10. קבלת כל המשתמשים באתר (לשתוף פרויקטים איתם)
+export const getAllUsers = async (req, res, next) => {
+  try {
+    const users = await User.find({})
+      .select('_id name email')
+      .lean();
+    
+    // הסרת המשתמש הנוכחי מהרשימה
+    const filteredUsers = users.filter(u => u._id.toString() !== req.user.id);
+    
+    res.json(filteredUsers);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// 11. הוספת משתתף לפרויקט
+export const addCollaborator = async (req, res, next) => {
+  try {
+    const { userId, role } = req.body;
+    
+    if (!userId || !['view', 'edit'].includes(role)) {
+      return next(new AppError('userId and valid role are required', 400));
+    }
+    
+    const project = await Project.findById(req.params.id);
+    if (!project) return next(new AppError('Project not found', 404));
+    
+    // רק בעלים יכול להוסיף משתתפים
+    if (project.owner.toString() !== req.user.id) {
+      return next(new AppError('Not authorized to add collaborators', 403));
+    }
+    
+    // בדיקה שהמשתמש כבר לא משתתף
+    const exists = project.collaborators.some(
+      c => c.userId.toString() === userId
+    );
+    
+    if (exists) {
+      return next(new AppError('User is already a collaborator', 400));
+    }
+    
+    // בדיקה שהמשתמש קיים במערכת
+    const user = await User.findById(userId);
+    if (!user) {
+      return next(new AppError('User not found', 404));
+    }
+    
+    // הוספת המשתתף
+    project.collaborators.push({
+      userId,
+      role,
+      addedAt: new Date()
+    });
+    
+    await project.save();
+    res.status(201).json(project);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// 12. הסרת משתתף מפרויקט
+export const removeCollaborator = async (req, res, next) => {
+  try {
+    const { collaboratorId } = req.params;
+    
+    const project = await Project.findById(req.params.id);
+    if (!project) return next(new AppError('Project not found', 404));
+    
+    // רק בעלים יכול להסיר משתתפים
+    if (project.owner.toString() !== req.user.id) {
+      return next(new AppError('Not authorized to remove collaborators', 403));
+    }
+    
+    // הסרת המשתתף
+    project.collaborators.pull({ _id: collaboratorId });
+    await project.save();
+    
+    res.json(project);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// 13. עדכון הרשאות משתתף
+export const updateCollaboratorRole = async (req, res, next) => {
+  try {
+    const { collaboratorId } = req.params;
+    const { role } = req.body;
+    
+    if (!['view', 'edit'].includes(role)) {
+      return next(new AppError('Invalid role', 400));
+    }
+    
+    const project = await Project.findById(req.params.id);
+    if (!project) return next(new AppError('Project not found', 404));
+    
+    // רק בעלים יכול לשנות הרשאות
+    if (project.owner.toString() !== req.user.id) {
+      return next(new AppError('Not authorized to change roles', 403));
+    }
+    
+    const collaborator = project.collaborators.id(collaboratorId);
+    if (!collaborator) {
+      return next(new AppError('Collaborator not found', 404));
+    }
+    
+    collaborator.role = role;
+    await project.save();
+    
+    res.json(project);
   } catch (err) {
     next(err);
   }

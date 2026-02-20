@@ -10,6 +10,8 @@ import RegisterPage    from "@/pages/RegisterPage";
 import ProjectsPage       from "@/pages/ProjectsPage";
 import ProjectPage        from "@/pages/ProjectPage";
 import NewProjectPage     from "@/pages/NewProjectPage";
+import PaymentRequestsPage from "@/pages/PaymentRequestsPage";
+import PaymentRequestEditorPage from "@/pages/PaymentRequestEditorPage";
 import HallsPage          from "@/pages/HallsPage";
 import GroupsPage         from "@/pages/GroupsPage";
 import NewGroupPage       from "@/pages/NewGroupPage";
@@ -32,6 +34,7 @@ import StaffPrintA3 from "./pages/Staffprinta3";
 import ThaiSchedulePage from './pages/ThaiSchedulePage';
 import GroupPaymentsPage from '@/pages/Grouppaymentspage';
 import FinancialReportPage from '@/pages/Financialreportpage';
+import AdminUsersPage from './pages/AdminUsersPage';
 
 export default function App() {
   return (
@@ -48,6 +51,9 @@ export default function App() {
           {/* ★ FIX: Consistent paths — all relative (no leading slash) */}
           <Route path="settings"              element={<SystemSettings />} />
           <Route path="price-quote"           element={<PriceQuoteGenerator />} />
+          <Route path="payment-requests"      element={<PaymentRequestsPage />} />
+          <Route path="payment-request/new"   element={<PaymentRequestEditorPage />} />
+          <Route path="payment-request/:id"   element={<PaymentRequestEditorPage />} />
           <Route path="projects"              element={<ProjectsPage />} />
           <Route path="projects/new"          element={<NewProjectPage />} />
           <Route path="projects/:id"          element={<ProjectPage />} />
@@ -68,6 +74,7 @@ export default function App() {
           <Route path="thai-schedule"         element={<ThaiSchedulePage />} />
           <Route path="groups/:groupId/payments" element={<GroupPaymentsPage />} />
           <Route path="financial-report" element={<FinancialReportPage />} />
+          <Route path="admin/users" element={<AdminUsersPage />} />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

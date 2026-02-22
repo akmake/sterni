@@ -94,3 +94,108 @@ export const refresh = async (req, res) => {
     return res.status(403).json({ message: 'Invalid or expired refresh token.' });
   }
 };
+
+// --- Get current user profile ---
+export const getProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('-passwordHash -tokenVersion -__v');
+    if (!user) {
+      return res.status(404).json({ message: 'משתמש לא נמצא' });
+    }
+    return res.status(200).json({ 
+      status: 'success',
+      data: { user } 
+    });
+  } catch (error) {
+    console.error('❌ [GET_PROFILE] error:', error);
+    return res.status(500).json({ message: 'שגיאה בטעינת הפרופיל' });
+  }
+};
+
+// --- Update user profile (name, email) ---
+export const updateProfile = async (req, res) => {
+  try {
+    const { name, email } = req.body;
+    const userId = req.user._id;
+
+    const updateData = {};
+    if (name) updateData.name = name.trim();
+    
+    // Check if email is changing and is unique
+    if (email) {
+      const currentUser = await User.findById(userId);
+      if (email !== currentUser.email) {
+        const existing = await User.findOne({ email });
+        if (existing) {
+          return res.status(400).json({ message: 'אימייל זה כבר בשימוש' });
+        }
+        updateData.email = email.toLowerCase().trim();
+      }
+    }
+
+    const user = await User.findByIdAndUpdate(userId, updateData, {
+      new: true,
+      runValidators: true
+    }).select('-passwordHash -tokenVersion -__v');
+
+    if (!user) {
+      return res.status(404).json({ message: 'משתמש לא נמצא' });
+    }
+
+    // Update tokens with new user data
+    createAndSendTokens(user, res);
+    
+    return res.status(200).json({ 
+      status: 'success',
+      message: 'הפרופיל עודכן בהצלחה',
+      data: { user: { _id: user._id, name: user.name, email: user.email, role: user.role } }
+    });
+  } catch (error) {
+    console.error('❌ [UPDATE_PROFILE] error:', error);
+    return res.status(500).json({ message: 'שגיאה בעדכון הפרופיל' });
+  }
+};
+
+// --- Change password (user changing their own password) ---
+export const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user._id;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'יש להזין את הסיסמה הנוכחית והסיסמה החדשה' });
+    }
+
+    if (newPassword.length < 4) {
+      return res.status(400).json({ message: 'הסיסמה החדשה חייבת להכיל לפחות 4 תווים' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'משתמש לא נמצא' });
+    }
+
+    // Verify current password
+    const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'הסיסמה הנוכחית שגויה' });
+    }
+
+    // Hash and save new password
+    const hash = await bcrypt.hash(newPassword, 12);
+    user.passwordHash = hash;
+    user.tokenVersion = (user.tokenVersion || 0) + 1; // Invalidate all other sessions
+    await user.save();
+
+    // Issue new tokens
+    createAndSendTokens(user, res);
+
+    return res.status(200).json({ 
+      status: 'success',
+      message: 'הסיסמה שונתה בהצלחה'
+    });
+  } catch (error) {
+    console.error('❌ [CHANGE_PASSWORD] error:', error);
+    return res.status(500).json({ message: 'שגיאה בשינוי הסיסמה' });
+  }
+};

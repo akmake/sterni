@@ -1,6 +1,6 @@
 import { useState, Fragment } from "react";
-import { Link, NavLink  } from "react-router-dom";
-import { Menu, X, LogOut, Home, Briefcase,Utensils,FileText, ChevronDown,MessageSquare, Settings,MapPin, UserCircle,ListTodo, User, Users,Mail,CalendarDays, CreditCard, Shield, BarChart3, Scissors } from "lucide-react";
+import { Link, NavLink, useLocation } from "react-router-dom";
+import { Menu, X, LogOut, Briefcase, Utensils, FileText, ChevronDown, ChevronUp, Settings, UserCircle, ListTodo, User, Users, CalendarDays, CreditCard, Shield, BarChart3, Scissors, FolderPlus, ClipboardList } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/stores/authStore";
 import { Button } from "@/components/ui/Button";
@@ -9,45 +9,76 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 
-// --- נתונים ---
-const navItems = [
-    { to: '/tasks', label: 'מטלות מהירות', icon: ListTodo, type: 'link', auth: true },
-    { to: '/projects', label: 'פרויקטים', icon: Briefcase, type: 'link', auth: true },
-    { to: '/groups', label: 'ניהול קבוצות', icon: Users, type: 'link', auth: true },
-    { to: '/price-quote', label: 'הצעות מחיר', icon: FileText },
-    { to: '/payment-requests', label: 'דרישות תשלום', icon: CreditCard, type: 'link', auth: true },
-    { to: '/reports/kitchen', label: 'דוח מטבח', icon: Utensils, type: 'link', auth: true },
-    { to: '/full-schedule', label: 'לו"ז מפורט', icon: CalendarDays, type: 'link', auth: true },
-    { to: '/halls', label: 'ניהול אולמות', icon: MapPin, type: 'link', auth: true },
-    //{ to: '/whatsapp', label: 'מערכת צ׳אט', icon: MessageSquare, type: 'link', auth: true }, 
-    { to: '/settings', label: 'הגדרות מערכת', icon: Settings, type: 'link', auth: true },
-    { to: '/staff-manager', label: 'ניהול מטבח', icon: Utensils, type: 'link', auth: true },
-    { to: '/thai-schedule', label: 'לו"ז תאילנדי', icon: CalendarDays, type: 'link', auth: true },
-    { to: '/financial-report', label: 'דוחות פיננסיים', icon: FileText, type: 'link', auth: true },
-    { to: '/admin/users', label: 'ניהול משתמשים', icon: Shield, type: 'link', auth: true, admin: true },
-    { to: '/admin/meals', label: 'ניהול ארוחות', icon: Utensils, type: 'link', auth: true, admin: true },
-    { to: '/admin/logs', label: 'דוח מבקרים', icon: BarChart3, type: 'link', auth: true, admin: true },
-    { to: '/admin/tzitzit', label: 'ניהול ציציות', icon: Scissors, type: 'link', auth: true, admin: true },
-];
+// --- נתוני ניווט מסודרים ---
+const getNavStructure = (isAuthenticated, isAdmin) => {
+  const items = [];
 
-const getVisibleItems = (isAuthenticated, user) => {
-    return navItems.filter(item => {
-        if (item.auth && !isAuthenticated) return false;
-        if (item.admin && user?.role !== 'admin') return false;
-        return true;
+  // למנהל - ציציות בראש
+  if (isAdmin) {
+    items.push({ to: '/admin/tzitzit', label: 'ניהול ציציות', icon: Scissors, type: 'link' });
+  }
+
+  // פריטים רגילים
+  items.push(
+    { to: '/tasks', label: 'מטלות מהירות', icon: ListTodo, type: 'link' },
+    { to: '/projects', label: 'פרויקטים', icon: Briefcase, type: 'link' },
+    { to: '/groups', label: 'ניהול קבוצות', icon: Users, type: 'link' },
+  );
+
+  // תפריט יצירת קבצים
+  items.push({
+    label: 'יצירת קבצים',
+    icon: FolderPlus,
+    type: 'dropdown',
+    children: [
+      { to: '/price-quote', label: 'הצעות מחיר', icon: FileText },
+      { to: '/payment-requests', label: 'דרישות תשלום', icon: CreditCard },
+    ]
+  });
+
+  // תפריט דוחות
+  items.push({
+    label: 'דוחות',
+    icon: ClipboardList,
+    type: 'dropdown',
+    children: [
+      { to: '/reports/kitchen', label: 'דוח מטבח', icon: Utensils },
+      { to: '/full-schedule', label: 'לו"ז מפורט', icon: CalendarDays },
+      { to: '/staff-manager', label: 'ניהול מטבח', icon: Utensils },
+      { to: '/thai-schedule', label: 'לו"ז תאילנדי', icon: CalendarDays },
+    ]
+  });
+
+  // תפריט ניהול (רק למנהל)
+  if (isAdmin) {
+    items.push({
+      label: 'ניהול מערכת',
+      icon: Shield,
+      type: 'dropdown',
+      children: [
+        { to: '/admin/meals', label: 'ניהול ארוחות', icon: Utensils },
+        { to: '/admin/users', label: 'ניהול משתמשים', icon: Users },
+        { to: '/settings', label: 'הגדרות מערכת', icon: Settings },
+        { to: '/admin/logs', label: 'דוח מבקרים', icon: BarChart3 },
+      ]
     });
+  } else if (isAuthenticated) {
+    // למשתמש רגיל - הגדרות בלבד
+    items.push({ to: '/settings', label: 'הגדרות מערכת', icon: Settings, type: 'link' });
+  }
+
+  return items;
 };
 
 export default function Navbar({ mobileOnly = false }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const { isAuthenticated, user, logout } = useAuthStore();
-    const visibleItems = getVisibleItems(isAuthenticated, user);
+    const isAdmin = user?.role === 'admin';
+    const navItems = getNavStructure(isAuthenticated, isAdmin);
 
     return (
         <>
-            {/* === כפתור צף למובייל === 
-                זה הדבר היחיד שיוצג בטלפון כשהתפריט סגור.
-            */}
+            {/* === כפתור צף למובייל === */}
             <div className="md:hidden">
                 <Button 
                     variant="outline" 
@@ -59,10 +90,10 @@ export default function Navbar({ mobileOnly = false }) {
                 </Button>
             </div>
 
-            {/* === תפריט צד לדסקטופ (מוצג רק אם אנחנו לא במצב מובייל-בלבד) === */}
+            {/* === תפריט צד לדסקטופ === */}
             {!mobileOnly && (
                 <div className="hidden md:flex md:flex-col h-full w-full">
-                    <SidebarContent items={visibleItems} user={user} isAuthenticated={isAuthenticated} logout={logout} />
+                    <SidebarContent items={navItems} user={user} isAuthenticated={isAuthenticated} logout={logout} />
                 </div>
             )}
 
@@ -70,7 +101,6 @@ export default function Navbar({ mobileOnly = false }) {
             <AnimatePresence>
                 {sidebarOpen && (
                     <Fragment>
-                        {/* רקע כהה (Overlay) */}
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -79,7 +109,6 @@ export default function Navbar({ mobileOnly = false }) {
                             onClick={() => setSidebarOpen(false)}
                         />
                         
-                        {/* התפריט עצמו */}
                         <motion.div
                             initial={{ x: '100%' }}
                             animate={{ x: 0 }}
@@ -88,7 +117,7 @@ export default function Navbar({ mobileOnly = false }) {
                             className="fixed inset-y-0 right-0 z-[70] w-72 bg-white shadow-2xl md:hidden border-l border-slate-100"
                         >
                             <SidebarContent
-                                items={visibleItems}
+                                items={navItems}
                                 user={user}
                                 isAuthenticated={isAuthenticated}
                                 logout={logout}
@@ -125,8 +154,10 @@ function SidebarContent({ items, user, isAuthenticated, logout, onClose }) {
 
             {/* רשימת הלינקים */}
             <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
-                {items.map((item) => (
-                    <NavItem key={item.label} item={item} onClick={onClose} />
+                {items.map((item, index) => (
+                    item.type === 'dropdown' 
+                        ? <NavDropdown key={item.label} item={item} onClick={onClose} />
+                        : <NavItem key={item.to || index} item={item} onClick={onClose} />
                 ))}
             </div>
 
@@ -149,7 +180,7 @@ function SidebarContent({ items, user, isAuthenticated, logout, onClose }) {
     );
 }
 
-// --- פריט ניווט ---
+// --- פריט ניווט רגיל ---
 function NavItem({ item, onClick }) {
     return (
         <NavLink
@@ -162,9 +193,69 @@ function NavItem({ item, onClick }) {
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}
             `}
         >
-            <item.icon className={`ml-3 h-5 w-5 ${({ isActive }) => isActive ? "text-blue-600" : "text-slate-400"}`} />
+            <item.icon className="ml-3 h-5 w-5" />
             {item.label}
         </NavLink>
+    );
+}
+
+// --- תפריט נפתח ---
+function NavDropdown({ item, onClick }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const location = useLocation();
+    
+    // בדוק אם אחד מהילדים פעיל
+    const isChildActive = item.children?.some(child => location.pathname === child.to);
+
+    return (
+        <div className="space-y-1">
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className={`
+                    w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200
+                    ${isChildActive 
+                        ? "bg-blue-50 text-blue-700" 
+                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}
+                `}
+            >
+                <div className="flex items-center">
+                    <item.icon className="ml-3 h-5 w-5" />
+                    {item.label}
+                </div>
+                {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+            
+            <AnimatePresence>
+                {isOpen && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="mr-4 pr-4 border-r-2 border-slate-200 space-y-1">
+                            {item.children.map((child) => (
+                                <NavLink
+                                    key={child.to}
+                                    to={child.to}
+                                    onClick={onClick}
+                                    className={({ isActive }) => `
+                                        flex items-center px-4 py-2.5 rounded-lg text-sm transition-all duration-200
+                                        ${isActive 
+                                            ? "bg-blue-100 text-blue-700 font-medium" 
+                                            : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"}
+                                    `}
+                                >
+                                    <child.icon className="ml-2 h-4 w-4" />
+                                    {child.label}
+                                </NavLink>
+                            ))}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
     );
 }
 
@@ -193,9 +284,6 @@ function UserNav({ user, logout }) {
             <DropdownMenuContent className="w-60 mb-2" align="end" side="top">
                 <DropdownMenuItem asChild>
                     <Link to="/profile"><UserCircle className="mr-2 h-4 w-4" /><span>פרופיל אישי</span></Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                    <Link to="/settings"><Settings className="mr-2 h-4 w-4" /><span>הגדרות מערכת</span></Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={logout} className="text-red-600 focus:text-red-700 focus:bg-red-50">

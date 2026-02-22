@@ -39,6 +39,7 @@ import AdminUsersPage from './pages/AdminUsersPage';
 import AdminMealsPage from './pages/AdminMealsPage';
 import AdminLogsPage from './pages/AdminLogsPage';
 import TzitzitManagementPage from './pages/TzitzitManagementPage';
+import ProfilePage from './pages/ProfilePage';
 
 export default function App() {
   return (
@@ -53,6 +54,7 @@ export default function App() {
 
         <Route element={<ProtectedRoute />}>
           {/* ★ FIX: Consistent paths — all relative (no leading slash) */}
+          <Route path="profile"               element={<ProfilePage />} />
           <Route path="settings"              element={<SystemSettings />} />
           <Route path="price-quote"           element={<PriceQuoteGenerator />} />
           <Route path="payment-requests"      element={<PaymentRequestsPage />} />

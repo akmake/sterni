@@ -7,12 +7,22 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
 const getKosherType = (kosher) => {
-  if (!kosher) return 'לא צוין';
+  if (!kosher) return 'unspecified';
   const k = kosher.toLowerCase();
-  if (k.includes('meat') || k.includes('בשר')) return 'בשרי';
-  if (k.includes('dairy') || k.includes('חלב') || k.includes('halavi')) return 'חלבי';
-  if (k.includes('parve') || k.includes('פרו')) return 'פרווה';
-  return 'לא צוין';
+  if (k.includes('meat') || k.includes('בשר')) return 'meat';
+  if (k.includes('dairy') || k.includes('חלב') || k.includes('halavi')) return 'halavi';
+  if (k.includes('parve') || k.includes('פרו')) return 'parve';
+  return 'unspecified';
+};
+
+const getKosherLabel = (code) => {
+  const labels = {
+    'meat': 'בשרי',
+    'halavi': 'חלבי',
+    'parve': 'פרווה',
+    'unspecified': 'לא צוין'
+  };
+  return labels[code] || 'לא צוין';
 };
 
 const StaffPrintView = () => {
@@ -40,7 +50,7 @@ const StaffPrintView = () => {
         workerMap[workerName][dateKey] = {
           dateObj: item.date,
           dateDisplay: format(item.date, 'EEEE, dd/MM/yyyy', { locale: he }),
-          totals: { בשרי: 0, חלבי: 0, פרווה: 0, 'לא צוין': 0 }
+          totals: { meat: 0, halavi: 0, parve: 0, unspecified: 0 }
         };
       }
 
@@ -51,12 +61,12 @@ const StaffPrintView = () => {
 
     const pages = Object.keys(workerMap).map(workerName => {
       const days = Object.values(workerMap[workerName]).sort((a, b) => a.dateObj - b.dateObj);
-      const weekTotals = { בשרי: 0, חלבי: 0, פרווה: 0, 'לא צוין': 0 };
+      const weekTotals = { meat: 0, halavi: 0, parve: 0, unspecified: 0 };
       days.forEach(day => {
-        weekTotals.בשרי += day.totals.בשרי;
-        weekTotals.חלבי += day.totals.חלבי;
-        weekTotals.פרווה += day.totals.פרווה;
-        weekTotals['לא צוין'] += day.totals['לא צוין'];
+        weekTotals.meat += day.totals.meat;
+        weekTotals.halavi += day.totals.halavi;
+        weekTotals.parve += day.totals.parve;
+        weekTotals.unspecified += day.totals.unspecified;
       });
       return { name: workerName, days, weekTotals };
     });
@@ -174,18 +184,18 @@ const StaffPrintView = () => {
                     
                     <div className="grid grid-cols-3 gap-4">
                       <div className="text-center bg-red-50 rounded-lg p-3 border-2 border-red-200">
-                        <div className="text-xs text-red-600 font-semibold mb-1">בשרי</div>
-                        <div className="text-3xl font-black text-red-800">{day.totals.בשרי}</div>
+                        <div className="text-xs text-red-600 font-semibold mb-1">{getKosherLabel('meat')}</div>
+                        <div className="text-3xl font-black text-red-800">{day.totals.meat}</div>
                       </div>
                       
                       <div className="text-center bg-blue-50 rounded-lg p-3 border-2 border-blue-200">
-                        <div className="text-xs text-blue-600 font-semibold mb-1">חלבי</div>
-                        <div className="text-3xl font-black text-blue-800">{day.totals.חלבי}</div>
+                        <div className="text-xs text-blue-600 font-semibold mb-1">{getKosherLabel('halavi')}</div>
+                        <div className="text-3xl font-black text-blue-800">{day.totals.halavi}</div>
                       </div>
                       
                       <div className="text-center bg-green-50 rounded-lg p-3 border-2 border-green-200">
-                        <div className="text-xs text-green-600 font-semibold mb-1">פרווה</div>
-                        <div className="text-3xl font-black text-green-800">{day.totals.פרווה}</div>
+                        <div className="text-xs text-green-600 font-semibold mb-1">{getKosherLabel('parve')}</div>
+                        <div className="text-3xl font-black text-green-800">{day.totals.parve}</div>
                       </div>
                     </div>
                   </div>
@@ -197,18 +207,18 @@ const StaffPrintView = () => {
                 <h3 className="text-xl font-black text-slate-900 mb-4">סיכום שבועי</h3>
                 <div className="grid grid-cols-3 gap-4">
                   <div className="text-center bg-white rounded-lg p-4 border-2 border-red-300 shadow-sm">
-                    <div className="text-sm text-red-700 font-bold mb-1">בשרי</div>
-                    <div className="text-4xl font-black text-red-900">{worker.weekTotals.בשרי}</div>
+                    <div className="text-sm text-red-700 font-bold mb-1">{getKosherLabel('meat')}</div>
+                    <div className="text-4xl font-black text-red-900">{worker.weekTotals.meat}</div>
                   </div>
                   
                   <div className="text-center bg-white rounded-lg p-4 border-2 border-blue-300 shadow-sm">
-                    <div className="text-sm text-blue-700 font-bold mb-1">חלבי</div>
-                    <div className="text-4xl font-black text-blue-900">{worker.weekTotals.חלבי}</div>
+                    <div className="text-sm text-blue-700 font-bold mb-1">{getKosherLabel('halavi')}</div>
+                    <div className="text-4xl font-black text-blue-900">{worker.weekTotals.halavi}</div>
                   </div>
                   
                   <div className="text-center bg-white rounded-lg p-4 border-2 border-green-300 shadow-sm">
-                    <div className="text-sm text-green-700 font-bold mb-1">פרווה</div>
-                    <div className="text-4xl font-black text-green-900">{worker.weekTotals.פרווה}</div>
+                    <div className="text-sm text-green-700 font-bold mb-1">{getKosherLabel('parve')}</div>
+                    <div className="text-4xl font-black text-green-900">{worker.weekTotals.parve}</div>
                   </div>
                 </div>
               </div>

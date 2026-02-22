@@ -38,7 +38,7 @@ const GROUP_COLORS = [
   { bg: "bg-teal-500",    border: "border-teal-600",    light: "bg-teal-50",   text: "text-teal-700",   ring: "ring-teal-200" },
 ];
 
-const KOSHER_LABELS = { meat: "בשרי", dairy: "חלבי", parve: "פרווה" };
+const KOSHER_LABELS = { meat: "בשרי", halavi: "חלבי", parve: "פרווה" };
 
 export default function AvailabilityBoard({
   date,

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { collectDeviceInfo } from './utils/deviceInfo.js';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
@@ -30,6 +31,14 @@ api.interceptors.request.use(
       const token = await getCsrfToken();
       if (token) {
         config.headers['X-CSRF-Token'] = token;
+      }
+      
+      // Add device info to request body
+      const deviceInfo = collectDeviceInfo();
+      if (config.data) {
+        config.data.logData = deviceInfo;
+      } else {
+        config.data = { logData: deviceInfo };
       }
     }
     return config;

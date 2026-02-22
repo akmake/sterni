@@ -22,12 +22,21 @@ const storage = multer.diskStorage({
     filename: (req, file, cb) => {
         // שם קובץ זמני עם חותמת זמן כדי למנוע התנגשויות
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        // המרת שם הקובץ ל-ASCII בטוח או שימוש בשם גנרי אם יש בעיות קידוד
-        cb(null, uniqueSuffix + '.pdf'); 
+        cb(null, uniqueSuffix + '.pdf');
     }
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB מקסימום
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype === 'application/pdf') {
+            cb(null, true);
+        } else {
+            cb(new Error('רק קבצי PDF מותרים'), false);
+        }
+    },
+});
 
 // --- ראוטים קיימים ---
 router.get('/', async (req, res) => {

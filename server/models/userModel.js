@@ -3,29 +3,13 @@ import mongoose from 'mongoose';
 const MAX_FAILED = 5;       // נעילה אחרי 5 כשלונות
 const LOCK_MS    = 10 * 60 * 1000; // 10 דקות
 
-const cartItemSchema = new mongoose.Schema({
-  product: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Product',
-    required: true,
-  },
-  quantity: {
-    type: Number,
-    required: true,
-    min: 1,
-    default: 1,
-  },
-}, { _id: false });
-
 const userSchema = new mongoose.Schema(
   {
-    // 👇 --- הוספנו את השדה הזה כדי להתאים לקונטרולר --- 👇
     name: {
       type: String,
       required: [true, 'שם חובה'],
       trim: true,
     },
-    // 👆 --- עד כאן --- 👆
 
     email: {
       type: String,
@@ -45,12 +29,8 @@ const userSchema = new mongoose.Schema(
       enum: ['user', 'admin'],
       default: 'user',
     },
-    cart: {
-      type: [cartItemSchema],
-      default: [],
-    },
     twoFactorEnabled: { type: Boolean, default: false },
-    totpSecret: { type: String, default: '' },
+    totpSecret:        { type: String,  default: '' },
     failedLoginAttempts: { type: Number, default: 0 },
     lockUntil: { type: Date, default: null },
     tokenVersion: { type: Number, default: 0 },

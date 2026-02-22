@@ -37,12 +37,8 @@ export default function KitchenReportPage() {
   }, [fetchGroups]);
 
   const getSmartMenuName = (event) => {
+    // Use menuItem field directly - never parse from title
     if (event.menuItem) return event.menuItem;
-    const title = event.title || '';
-    const dashMatch = title.match(/-\s+(.*?)(\s*\||$)/);
-    if (dashMatch && dashMatch[1]) return dashMatch[1].trim();
-    const colonMatch = title.match(/:\s+(.*?)(\s*\||$)/);
-    if (colonMatch && colonMatch[1]) return colonMatch[1].trim();
     if (event.menu) return event.menu;
     if (event.description) return event.description;
     return '-';

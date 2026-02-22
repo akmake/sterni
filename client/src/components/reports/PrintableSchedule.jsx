@@ -5,6 +5,15 @@ import { he } from 'date-fns/locale';
 import { Users, MapPin, Info } from 'lucide-react';
 import { usePrintPortalRoot } from '@/hooks/usePrintPortalRoot'; // וודא שהנתיב נכון
 
+const getNormalizedKosherType = (kosherType) => {
+  if (!kosherType) return 'parve';
+  const normalized = String(kosherType).toLowerCase().trim();
+  if (normalized === 'meat' || normalized === 'בשרי' || normalized === 'בשר') return 'meat';
+  if (normalized === 'halavi' || normalized === 'חלבי' || normalized === 'חלב' || normalized === 'dairy') return 'halavi';
+  if (normalized === 'parve' || normalized === 'פרווה' || normalized === 'פרו') return 'parve';
+  return 'parve';
+};
+
 export default function PrintableSchedule({ printPages, weekLabel }) {
   const printRoot = usePrintPortalRoot();
 
@@ -150,11 +159,11 @@ export default function PrintableSchedule({ printPages, weekLabel }) {
                             {ev.kosherType && (
                               <span
                                 className={`text-[10px] px-1.5 py-0.5 rounded font-bold border
-                                  ${ev.kosherType === 'meat' ? 'bg-red-50 text-red-600 border-red-100' :
-                                    ev.kosherType === 'halavi' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                  ${getNormalizedKosherType(ev.kosherType) === 'meat' ? 'bg-red-50 text-red-600 border-red-100' :
+                                    getNormalizedKosherType(ev.kosherType) === 'halavi' ? 'bg-blue-50 text-blue-600 border-blue-100' :
                                     'bg-green-50 text-green-600 border-green-100'}`}
                               >
-                                {ev.kosherType === 'meat' ? 'בשרי' : ev.kosherType === 'halavi' ? 'חלבי' : 'פרווה'}
+                                {getNormalizedKosherType(ev.kosherType) === 'meat' ? 'בשרי' : getNormalizedKosherType(ev.kosherType) === 'halavi' ? 'חלבי' : 'פרווה'}
                               </span>
                             )}
                           </div>

@@ -18,15 +18,18 @@ import projectRoutes from './routes/projectRoutes.js';
 import taskRoutes from './routes/taskRoutes.js';
 import emailRoutes from './routes/emailRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
+import mealsRoutes from './routes/mealsRoutes.js';
 import { connectToWhatsApp } from './services/whatsappService.js';
 import quoteRouter from './routes/quoteRoutes.js';
 import paymentRequestRoutes from './routes/paymentRequestRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import logsRoutes from './routes/logsRoutes.js';
 
 import rateLimiter from './middlewares/rateLimiter.js';
 import { requireAuth } from './middlewares/authMiddleware.js';
 import { startEmailListener } from './services/emailListener.js';
+import { loggingMiddleware } from './middlewares/loggingMiddleware.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,7 +50,7 @@ const app = express();
 
 // --- Security & Config ---
 app.use(helmet({
-  crossOriginResourcePolicy: false
+  crossOriginResourcePolicy: { policy: 'same-site' },
 }));
 
 app.use(cors({
@@ -62,15 +65,14 @@ app.use(mongoSanitize());
 
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// =================================================================
-// 🚨 Routes ללא הגנה (Public / Webhooks)
-// =================================================================
-app.use('/api/chat', chatRoutes); 
-app.use('/api/auth', authRoutes);
-app.use('/api/emails', emailRoutes); // 2. שימוש
-// ✅ התיקון: הזזתי את זה לפה והורדתי את requireAuth זמנית
-// עכשיו זה פתוח וזמין לשמירה בלי חסימות
+// --- Logging Middleware ---
+app.use(loggingMiddleware);
 
+// =================================================================
+// Routes ללא הגנה (Public)
+// =================================================================
+app.use('/api/chat', chatRoutes);
+app.use('/api/auth', authRoutes);
 // =================================================================
 
 
@@ -88,26 +90,26 @@ app.get('/api/csrf-token', rateLimiter, csrfProtection, (req, res) => {
 });
 
 // --- Protected Routes (מכאן והלאה הכל חסום ללא טוקן) ---
-app.use(csrfProtection); 
+app.use(csrfProtection);
 
+app.use('/api/emails', requireAuth, emailRoutes);
 app.use('/api/projects', requireAuth, projectRoutes);
 app.use('/api/halls', requireAuth, hallRoutes);
 app.use('/api/groups', requireAuth, groupRoutes);
+app.use('/api/meals', mealsRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/logs', logsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/quotes', requireAuth, quoteRouter);
 app.use('/api/payments', requireAuth, paymentRoutes);
 app.use('/api/payment-requests', requireAuth, paymentRequestRoutes);
 app.use('/api/admin', adminRoutes);
 
-// שימי לב: מחקתי מפה את quotes כי העברתי אותו למעלה!
-
 // Error Handling
 app.use('*', (req, res) => {
   res.status(404).json({ message: 'API endpoint not found' });
 });
 
-// שימוש ב-Global Error Handler (אם יצרת אותו לפי ההוראות הקודמות, תוסיף אותו כאן)
 app.use((err, req, res, next) => {
   if (err.code === 'EBADCSRFTOKEN') {
     return res.status(403).json({ message: 'Form has been tampered with (CSRF Invalid)' });
@@ -116,7 +118,7 @@ app.use((err, req, res, next) => {
   res.status(err.statusCode || 500).json({ message: err.message || 'Internal Server Error' });
 });
 
-startEmailListener(); 
+startEmailListener();
 connectToWhatsApp();
 
 const PORT = process.env.PORT || 5000;

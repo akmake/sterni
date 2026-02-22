@@ -15,23 +15,40 @@ import {
 import { he } from 'date-fns/locale';
 import { Loader2, Printer, ChefHat, ChevronRight, ChevronLeft, Plus, X, Users } from 'lucide-react';
 
+const KOSHER_MAPPING = {
+  'בשרי': 'בשרי',
+  'meat': 'בשרי',
+  'חלבי': 'חלבי',
+  'dairy': 'חלבי',
+  'halavi': 'חלבי',
+  'פרווה': 'פרווה',
+  'parve': 'פרווה',
+};
+
 const getKosherType = (kosher) => {
   if (!kosher) return 'לא צוין';
-  const k = kosher.toLowerCase();
+  
+  // Try exact match first
+  if (KOSHER_MAPPING[kosher]) return KOSHER_MAPPING[kosher];
+  
+  // Try case-insensitive match
+  const k = kosher.toLowerCase().trim();
+  for (const [key, value] of Object.entries(KOSHER_MAPPING)) {
+    if (key.toLowerCase() === k) return value;
+  }
+  
+  // Fallback: check inclusions
   if (k.includes('meat') || k.includes('בשר')) return 'בשרי';
   if (k.includes('dairy') || k.includes('חלב') || k.includes('halavi')) return 'חלבי';
   if (k.includes('parve') || k.includes('פרו')) return 'פרווה';
+  
   return 'לא צוין';
 };
 
 const getSmartMenuName = (event) => {
+  // Use menuItem field directly - never parse from title
   if (event.menuItem) return event.menuItem;
-  const title = event.title || '';
-  const dashMatch = title.match(/-\s+(.*?)(\s*\||$)/);
-  if (dashMatch && dashMatch[1]) return dashMatch[1].trim();
-  const colonMatch = title.match(/:\s+(.*?)(\s*\||$)/);
-  if (colonMatch && colonMatch[1]) return colonMatch[1].trim();
-  return title || '-';
+  return '-';
 };
 
 const KitchenStaffManager = () => {

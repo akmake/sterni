@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import useMealsStore from '@/stores/mealsStore';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { Button } from './ui/Button';
 import { Input } from "./ui/Input";
@@ -9,45 +10,13 @@ import { toast } from 'react-hot-toast'; // הוספת ייבוא ל-Toast
 // ייבוא הלוח החדש שיצרנו
 import AvailabilityBoard from './AvailabilityBoard';
 
-// --- קונפיגורציית ארוחות ---
-const MEAL_DEFINITIONS = {
-  breakfast: {
-    label: 'ארוחת בוקר',
-    kosherOptions: ['חלבי'],
-    menuOptions: ['תפריט נוער', 'תפריט ימי עיון', 'פרטיים']
-  },
-  light_meal: {
-    label: 'ארוחה קלה',
-    kosherOptions: ['פרווה', 'בשרי', 'חלבי'],
-    menuOptions: [
-      'כיבוד קל', 'כיבוד קל משודרג', 'פיתה פלאפל',
-      'מזנון קליל', 'בורקס פיצה ופסטה',
-      'לחמניות סלטים ומעדן', 'וופל בלגי'
-    ]
-  },
-  lunch: {
-    label: 'ארוחת צהריים',
-    kosherOptions: ['פרווה', 'בשרי', 'חלבי'],
-    menuOptions: ['תפריט נוער', 'תפריט ימי עיון', 'פרטיים']
-  },
-  light_evening: {
-    label: 'ארוחה קלה ערב',
-    kosherOptions: ['פרווה', 'בשרי', 'חלבי'],
-    menuOptions: [
-      'כיבוד קל', 'כיבוד קל משודרג', 'פיתה פלאפל',
-      'מזנון קליל', 'בורקס פיצה ופסטה',
-      'לחמניות סלטים ומעדן', 'וופל בלגי'
-    ]
-  },
-  dinner: {
-    label: 'ארוחת ערב',
-    kosherOptions: ['פרווה', 'בשרי', 'חלבי'],
-    menuOptions: ['תפריט נוער', 'תפריט ימי עיון', 'פרטיים']
-  },
-  night_treats: {
-    label: 'פינוקי לילה',
-    isManual: true
-  }
+const getKosherLabel = (code) => {
+  const labels = {
+    'meat': 'בשרי',
+    'halavi': 'חלבי',
+    'parve': 'פרווה'
+  };
+  return labels[code] || code;
 };
 
 export default function DayScheduler({
@@ -57,6 +26,23 @@ export default function DayScheduler({
   currentGroupId,
   onSaveEvent
 }) {
+  const { meals } = useMealsStore();
+
+  // --- Build MEAL_DEFINITIONS from API meals (simplified)
+  const MEAL_DEFINITIONS = React.useMemo(() => {
+    const result = {};
+    if (!meals || meals.length === 0) return result;
+    
+    meals.forEach((meal) => {
+      result[meal._id] = {
+        label: meal.name,
+        kosherOptions: meal.kosherOptions || [],
+        menuOptions: meal.menuOptions || [],
+        _id: meal._id
+      };
+    });
+    return result;
+  }, [meals]);
 
   // -- ניהול הדיאלוג והטופס --
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -67,10 +53,9 @@ export default function DayScheduler({
     endTime: '09:00',
     hallId: '',
     type: 'activity',
-    specificMealType: '',
+    mealId: '',
     kosherType: '',
     menuItem: '',
-    manualDescription: '',
     notes: ''
   });
 
@@ -86,10 +71,9 @@ export default function DayScheduler({
       endTime: `${(formattedHour + 1).toString().padStart(2, '0')}:00`,
       hallId: hallId,
       type: 'activity',
-      specificMealType: '',
+      mealId: '',
       kosherType: '',
       menuItem: '',
-      manualDescription: '',
       notes: ''
     });
     setIsDialogOpen(true);
@@ -130,6 +114,50 @@ export default function DayScheduler({
 
   // שמירת הטופס
   const handleSave = () => {
+    // Validate based on event type
+    if (formData.type === 'meal') {
+      if (!formData.mealId) {
+        toast.error('אנא בחר ארוחה');
+        return;
+      }
+
+      const def = MEAL_DEFINITIONS[formData.mealId];
+      if (!def) {
+        toast.error('ארוחה לא תקינה');
+        return;
+      }
+
+      // Validate kosher type if meal has options
+      if (def.kosherOptions && def.kosherOptions.length > 0) {
+        if (!formData.kosherType) {
+          toast.error('אנא בחר סוג כשרות');
+          return;
+        }
+        if (!def.kosherOptions.includes(formData.kosherType)) {
+          toast.error('סוג כשרות לא תקין');
+          return;
+        }
+      }
+
+      // Validate menu item if meal has options
+      if (def.menuOptions && def.menuOptions.length > 0) {
+        if (!formData.menuItem) {
+          toast.error('אנא בחר תפריט');
+          return;
+        }
+        if (!def.menuOptions.includes(formData.menuItem)) {
+          toast.error('תפריט לא תקין');
+          return;
+        }
+      }
+    } else {
+      // General event validation
+      if (!formData.title) {
+        toast.error('אנא הזן כותרת לאירוע');
+        return;
+      }
+    }
+
     // 1. בדיקת חפיפה והצגת אזהרה (ללא חסימה)
     if (checkOverlap()) {
         toast('שים לב: קיים אירוע אחר באולם זה בשעות שנבחרו, אך האירוע נוצר.', {
@@ -145,19 +173,11 @@ export default function DayScheduler({
 
     let displayTitle = formData.title;
 
-    if (formData.type === 'meal' && formData.specificMealType) {
-      const def = MEAL_DEFINITIONS[formData.specificMealType];
-      if (def.isManual) {
+    if (formData.type === 'meal' && formData.mealId) {
+      const def = MEAL_DEFINITIONS[formData.mealId];
+      if (def) {
         displayTitle = `${def.label}`;
-        if (formData.manualDescription) displayTitle += `: ${formData.manualDescription}`;
-      } else {
-        displayTitle = `${def.label}`;
-        if (formData.kosherType) displayTitle += ` (${formData.kosherType})`;
         if (formData.menuItem) displayTitle += ` - ${formData.menuItem}`;
-      }
-
-      if (formData.notes) {
-        displayTitle += ` | ה: ${formData.notes}`;
       }
     }
 
@@ -166,9 +186,6 @@ export default function DayScheduler({
       title: displayTitle,
       date: date,
       isMeal: formData.type === 'meal',
-      mealType: formData.specificMealType,
-      kosherType: formData.kosherType,
-      menuItem: formData.menuItem,
     };
 
     if (onSaveEvent) {
@@ -226,96 +243,72 @@ export default function DayScheduler({
             {/* --- טופס חכם לארוחות (מוצג רק אם נבחר Meal) --- */}
             {formData.type === 'meal' ? (
                 <div className="space-y-4 bg-slate-50 p-4 rounded-md border">
-
                 <div className="space-y-2">
                     <Label>איזו ארוחה?</Label>
                     <Select
-                    value={formData.specificMealType}
+                    value={formData.mealId}
                     onValueChange={(val) => {
-                        const config = MEAL_DEFINITIONS[val];
-
-                        // הגנה עם Optional Chaining
-                        let defaultKosher = 'parve';
-                        if (config?.kosherOptions?.length === 1) {
-                            defaultKosher = config.kosherOptions[0];
-                        }
-
                         setFormData(prev => ({
                         ...prev,
-                        specificMealType: val,
-                        kosherType: defaultKosher,
-                        menuItem: '',
-                        manualDescription: ''
+                        mealId: val,
+                        kosherType: '',
+                        menuItem: ''
                         }));
                     }}
                     >
                     <SelectTrigger><SelectValue placeholder="בחר ארוחה..." /></SelectTrigger>
                     <SelectContent>
-                        {Object.entries(MEAL_DEFINITIONS).map(([key, def]) => (
-                        <SelectItem key={key} value={key}>{def.label}</SelectItem>
+                        {Object.entries(MEAL_DEFINITIONS).map(([id, def]) => (
+                        <SelectItem key={id} value={id}>
+                          {def.label}
+                        </SelectItem>
                         ))}
                     </SelectContent>
                     </Select>
                 </div>
 
-                {formData.specificMealType && (
-                    <>
-                    {MEAL_DEFINITIONS[formData.specificMealType].isManual ? (
-                        <div className="space-y-2">
-                        <Label>פירוט (ידני)</Label>
-                        <Input
-                            value={formData.manualDescription}
-                            onChange={e => setFormData({...formData, manualDescription: e.target.value})}
-                            placeholder="מה להגיש?"
-                        />
-                        </div>
-                    ) : (
-                        <>
-                        {/* בחירת כשרות */}
-                        {MEAL_DEFINITIONS[formData.specificMealType]?.kosherOptions?.length > 1 && (
-                            <div className="space-y-2">
-                            <Label>כשרות</Label>
-                            <Select
-                                value={formData.kosherType}
-                                onValueChange={val => setFormData({...formData, kosherType: val})}
-                            >
-                                <SelectTrigger><SelectValue placeholder="בחר כשרות" /></SelectTrigger>
-                                <SelectContent>
-                                {MEAL_DEFINITIONS[formData.specificMealType].kosherOptions.map(opt => (
-                                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                                ))}
-                                </SelectContent>
-                            </Select>
-                            </div>
-                        )}
-
-                        <div className="space-y-2">
-                            <Label>תפריט</Label>
-                            <Select
-                            value={formData.menuItem}
-                            onValueChange={val => setFormData({...formData, menuItem: val})}
-                            >
-                            <SelectTrigger><SelectValue placeholder="בחר תפריט" /></SelectTrigger>
-                            <SelectContent>
-                                {MEAL_DEFINITIONS[formData.specificMealType].menuOptions.map(opt => (
-                                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                                ))}
-                            </SelectContent>
-                            </Select>
-                        </div>
-                        </>
-                    )}
-
-                    <div className="space-y-2">
-                        <Label>הערות</Label>
-                        <Textarea
-                        value={formData.notes}
-                        onChange={e => setFormData({...formData, notes: e.target.value})}
-                        placeholder="הערות מיוחדות למטבח..."
-                        />
-                    </div>
-                    </>
+                {formData.mealId && MEAL_DEFINITIONS[formData.mealId]?.kosherOptions?.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>כשרות</Label>
+                    <Select
+                      value={formData.kosherType}
+                      onValueChange={(val) => setFormData(prev => ({ ...prev, kosherType: val }))}
+                    >
+                      <SelectTrigger><SelectValue placeholder="בחר כשרות" /></SelectTrigger>
+                      <SelectContent>
+                        {MEAL_DEFINITIONS[formData.mealId].kosherOptions.map(opt => (
+                          <SelectItem key={opt} value={opt}>{getKosherLabel(opt)}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 )}
+
+                {formData.mealId && MEAL_DEFINITIONS[formData.mealId]?.menuOptions?.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>תפריט</Label>
+                    <Select
+                      value={formData.menuItem}
+                      onValueChange={(val) => setFormData(prev => ({ ...prev, menuItem: val }))}
+                    >
+                      <SelectTrigger><SelectValue placeholder="בחר תפריט" /></SelectTrigger>
+                      <SelectContent>
+                        {MEAL_DEFINITIONS[formData.mealId].menuOptions.map(opt => (
+                          <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                    <Label>הערות</Label>
+                    <Textarea
+                    value={formData.notes}
+                    onChange={e => setFormData({...formData, notes: e.target.value})}
+                    placeholder="הערות מיוחדות למטבח..."
+                    />
+                </div>
                 </div>
             ) : (
                 <div className="space-y-2">

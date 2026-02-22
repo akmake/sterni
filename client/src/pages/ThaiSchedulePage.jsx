@@ -108,11 +108,28 @@ function getThaiMealType(mealType) {
 }
 
 function getThaiKosherType(kosherType) {
-  return THAI.kosherTypes[kosherType] || kosherType || '';
+  if (!kosherType) return '';
+  // Normalize Hebrew/English to English code first
+  const normalized = String(kosherType).toLowerCase().trim();
+  let code = kosherType;
+  if (normalized === 'בשרי' || normalized === 'בשר') code = 'meat';
+  if (normalized === 'חלבי' || normalized === 'חלב' || normalized === 'dairy') code = 'halavi';
+  if (normalized === 'פרווה' || normalized === 'פרו') code = 'parve';
+  return THAI.kosherTypes[code] || kosherType || '';
 }
 
 function getThaiEventType(eventType) {
   return THAI.eventTypes[eventType] || eventType || '';
+}
+
+// Normalize kosher type to English code
+function getNormalizedKosherType(kosherType) {
+  if (!kosherType) return 'parve';
+  const normalized = String(kosherType).toLowerCase().trim();
+  if (normalized === 'meat' || normalized === 'בשרי' || normalized === 'בשר') return 'meat';
+  if (normalized === 'halavi' || normalized === 'חלבי' || normalized === 'חלב' || normalized === 'dairy') return 'halavi';
+  if (normalized === 'parve' || normalized === 'פרווה' || normalized === 'פרו') return 'parve';
+  return 'parve';
 }
 
 // ====================================================================
@@ -413,8 +430,8 @@ function ThaiPrintableSchedule({ printPages }) {
                           {ev.title || '-'}
                           {ev.kosherType && (
                             <span className={`thai-badge ${
-                              ev.kosherType === 'meat' ? 'badge-meat' :
-                              ev.kosherType === 'halavi' ? 'badge-dairy' :
+                              getNormalizedKosherType(ev.kosherType) === 'meat' ? 'badge-meat' :
+                              getNormalizedKosherType(ev.kosherType) === 'halavi' ? 'badge-dairy' :
                               'badge-parve'
                             }`}>
                               {thaiKosher}
@@ -844,14 +861,14 @@ export default function ThaiSchedulePage() {
                                   {ev.kosherType && (
                                     <span
                                       className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                                        ev.kosherType === 'meat'
-                                          ? 'bg-red-50 text-red-600'
-                                          : ev.kosherType === 'halavi'
-                                          ? 'bg-blue-50 text-blue-600'
-                                          : 'bg-green-50 text-green-600'
+                                        getNormalizedKosherType(ev.kosherType) === 'meat'
+                                          ? 'badge-meat'
+                                          : getNormalizedKosherType(ev.kosherType) === 'halavi'
+                                          ? 'badge-dairy'
+                                          : 'badge-parve'
                                       }`}
                                     >
-                                      {ev.kosherType === 'meat' ? 'בשרי' : ev.kosherType === 'halavi' ? 'חלבי' : 'פרווה'}
+                                      {getNormalizedKosherType(ev.kosherType) === 'meat' ? 'בשרי' : getNormalizedKosherType(ev.kosherType) === 'halavi' ? 'חלבי' : 'פרווה'}
                                     </span>
                                   )}
                                 </div>

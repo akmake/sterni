@@ -5,7 +5,7 @@ import { Contact } from '../models/Contact.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { sock } from './whatsappService.js';
+import { isConnected, sendMessageHuman } from './whatsappService.js';
 import SystemConfig from '../models/SystemConfig.js';
 import EmailAccount from '../models/EmailAccount.js';
 import { decrypt } from '../utils/encryption.js';
@@ -19,11 +19,12 @@ if (!fs.existsSync(UPLOADS_DIR)){
 }
 
 let connection = null;
+let healthCheckInterval = null;
 
 const getImapConfig = async () => {
     const sysConfig = await SystemConfig.findOne();
     if (!sysConfig?.opsEmailId) throw new Error("לא הוגדר מייל תפעול ב-DB");
-    
+
     const account = await EmailAccount.findById(sysConfig.opsEmailId);
     if (!account) throw new Error("חשבון המייל לא נמצא");
 
@@ -40,7 +41,7 @@ const getImapConfig = async () => {
             authTimeout: 10000,
             tlsOptions: { rejectUnauthorized: false }
         },
-        systemEmail: account.user 
+        systemEmail: account.user
     };
 };
 
@@ -49,15 +50,14 @@ const getImapConfig = async () => {
 // ==========================================
 const cleanEmailBody = (text) => {
     if (!text) return "";
-    
+
     const lines = text.split(/\r?\n/);
     const cleanLines = [];
 
     for (let line of lines) {
-        let trimmed = line.trim(); 
-        
-        // לוגיקת הניקוי הקיימת
-        if (trimmed.includes("On ") && trimmed.includes(" at ") && (trimmed.includes("wrote") || trimmed.includes("<"))) break; 
+        let trimmed = line.trim();
+
+        if (trimmed.includes("On ") && trimmed.includes(" at ") && (trimmed.includes("wrote") || trimmed.includes("<"))) break;
         if (/^On .* wrote:$/i.test(trimmed)) break;
         if (trimmed.includes("בתאריך") && trimmed.includes("מאת")) break;
         if (/^From:\s/i.test(trimmed)) break;
@@ -74,26 +74,48 @@ const cleanEmailBody = (text) => {
 };
 
 export const startEmailListener = async () => {
+    if (healthCheckInterval) {
+        clearInterval(healthCheckInterval);
+        healthCheckInterval = null;
+    }
+
     try {
         console.log("🔌 טוען הגדרות ומתחבר ל-IMAP...");
-        const config = await getImapConfig(); 
-        
+        const config = await getImapConfig();
+
         connection = await imap.connect(config);
         console.log("✅ מחובר! מאזין למיילים...");
 
         await connection.openBox('INBOX');
-        
+
         await checkForNewEmails(config.systemEmail);
-        setInterval(() => checkForNewEmails(config.systemEmail), 10000);
+
+        const emailInterval = setInterval(() => checkForNewEmails(config.systemEmail), 10000);
+
+        healthCheckInterval = setInterval(async () => {
+            try {
+                if (!connection || connection.imap.state === 'disconnected') {
+                    console.warn('⚠️ IMAP health check: חיבור מת, מתחבר מחדש...');
+                    clearInterval(emailInterval);
+                    clearInterval(healthCheckInterval);
+                    healthCheckInterval = null;
+                    connection = null;
+                    setTimeout(startEmailListener, 1000);
+                }
+            } catch (err) {
+                console.error('Health check error:', err.message);
+            }
+        }, 5 * 60 * 1000);
 
         connection.on('error', (err) => {
             console.error('IMAP Connection Error:', err);
+            clearInterval(emailInterval);
             setTimeout(startEmailListener, 10000);
         });
 
     } catch (err) {
         console.error("❌ שגיאת IMAP (חיבור נכשל):", err.message);
-        setTimeout(startEmailListener, 30000); 
+        setTimeout(startEmailListener, 30000);
     }
 };
 
@@ -101,7 +123,6 @@ const checkForNewEmails = async (systemEmail) => {
     try {
         if (!connection) return;
 
-        // markSeen: false (לא לסמן כנקרא עד שלא נשלח בהצלחה!)
         const searchCriteria = ['UNSEEN'];
         const fetchOptions = { bodies: ['HEADER', 'TEXT', ''], markSeen: false, struct: true };
 
@@ -116,33 +137,30 @@ const checkForNewEmails = async (systemEmail) => {
             const id = item.attributes.uid;
             const idHeader = "Imap-Id: " + id + "\r\n";
             const parsed = await simpleParser(idHeader + all.body);
-            
+
             const fromEmail = parsed.from.value[0].address;
             const fromName = parsed.from.value[0].name || fromEmail.split('@')[0];
             const subject = parsed.subject || '';
-            
+
             const cleanContent = cleanEmailBody(parsed.text);
             let shouldMarkAsSeen = false;
 
             // =========================================================
-            // לוגיקת הגשר (BRIDGE) + דיבוג מטורף
+            // לוגיקת הגשר (BRIDGE) — מייל → וואצאפ
             // =========================================================
             if ((fromEmail === TARGET_EMAIL || fromEmail === systemEmail) && subject.includes('WA_MSG:')) {
-                
+
                 console.log(`\n================= 🔍 DEBUG START =================`);
                 console.log(`📧 נושא: ${subject}`);
                 console.log(`📧 מאת: ${fromEmail}`);
-                console.log(`📝 תוכן גולמי (RAW) לפני ניקוי:`);
-                // JSON.stringify יראה לנו בדיוק איפה יש \n ואיפה יש תווים נסתרים
-                console.log(JSON.stringify(parsed.text)); 
-                console.log(`--------------------------------------------------`);
-                console.log(`🧹 תוכן אחרי ניקוי:`);
-                console.log(JSON.stringify(cleanContent));
+                console.log(`📝 תוכן גולמי:`, JSON.stringify(parsed.text));
+                console.log(`🧹 תוכן אחרי ניקוי:`, JSON.stringify(cleanContent));
                 console.log(`================= 🔍 DEBUG END ===================\n`);
 
-                if (!sock || !sock.user) {
-                    console.warn(`⏳ וואצאפ לא מחובר, מדלג...`);
-                    continue; 
+                // ★ שימוש ב-isConnected() במקום בדיקה ישירה של sock
+                if (!isConnected()) {
+                    console.warn(`⏳ וואצאפ לא מחובר, לא מסמנים כנקרא — ננסה שוב בסבב הבא`);
+                    continue; // לא מסמנים כ-seen — ננסה שוב ב-10 שניות
                 }
 
                 const match = subject.match(/WA_MSG:\s*([0-9\-\+]+)/);
@@ -151,35 +169,45 @@ const checkForNewEmails = async (systemEmail) => {
                     const remoteJid = `${phoneNumber}@s.whatsapp.net`;
 
                     try {
+                        // שליחת טקסט עם התנהגות אנושית
                         if (cleanContent && cleanContent.length > 0) {
-                            await sock.sendMessage(remoteJid, { text: cleanContent });
+                            await sendMessageHuman(remoteJid, { text: cleanContent }, cleanContent);
                             console.log(`📤 נשלחה תשובה ל-${phoneNumber}`);
                         } else {
-                            console.log(`⚠️ התוכן ריק אחרי ניקוי (אולי נשלח רק קובץ?)`);
+                            console.log(`⚠️ התוכן ריק אחרי ניקוי`);
                         }
 
+                        // שליחת קבצים מצורפים
                         if (parsed.attachments && parsed.attachments.length > 0) {
                             for (const attachment of parsed.attachments) {
                                 let msgPayload = {};
-                                if (attachment.contentType.startsWith('image/')) msgPayload = { image: attachment.content, caption: attachment.filename };
-                                else if (attachment.contentType.startsWith('video/')) msgPayload = { video: attachment.content, caption: attachment.filename };
-                                else if (attachment.contentType.startsWith('audio/')) msgPayload = { audio: attachment.content, mimetype: 'audio/mp4', ptt: true };
-                                else msgPayload = { document: attachment.content, mimetype: attachment.contentType, fileName: attachment.filename };
-                                await sock.sendMessage(remoteJid, msgPayload);
+
+                                if (attachment.contentType.startsWith('image/')) {
+                                    msgPayload = { image: attachment.content, caption: attachment.filename };
+                                } else if (attachment.contentType.startsWith('video/')) {
+                                    msgPayload = { video: attachment.content, caption: attachment.filename };
+                                } else if (attachment.contentType.startsWith('audio/')) {
+                                    msgPayload = { audio: attachment.content, mimetype: 'audio/mp4', ptt: true };
+                                } else {
+                                    msgPayload = { document: attachment.content, mimetype: attachment.contentType, fileName: attachment.filename };
+                                }
+
+                                await sendMessageHuman(remoteJid, msgPayload);
                             }
                         }
-                        
+
                         shouldMarkAsSeen = true;
 
                     } catch (waError) {
                         console.error(`❌ שגיאה בשליחה לוואצאפ:`, waError.message);
+                        // לא מסמנים כנקרא — ננסה שוב
                     }
                 } else {
                      shouldMarkAsSeen = true;
                 }
-            } 
+            }
             // =========================================================
-            // לוגיקת CRM (ללא שינוי)
+            // לוגיקת CRM — מיילים רגילים
             // =========================================================
             else {
                 const ticketMatch = subject.match(/#(\d+)/);
@@ -189,7 +217,7 @@ const checkForNewEmails = async (systemEmail) => {
                     let fileType = 'text';
 
                     if (parsed.attachments && parsed.attachments.length > 0) {
-                        const attachment = parsed.attachments[0]; 
+                        const attachment = parsed.attachments[0];
                         const fileName = `${Date.now()}-${attachment.filename.replace(/\s+/g, '_')}`;
                         const savePath = path.join(UPLOADS_DIR, fileName);
                         fs.writeFileSync(savePath, attachment.content);
@@ -211,7 +239,7 @@ const checkForNewEmails = async (systemEmail) => {
                         { email: fromEmail }, { $set: { lastActive: new Date(), name: fromName } }, { upsert: true }
                     );
                 }
-                shouldMarkAsSeen = true; 
+                shouldMarkAsSeen = true;
             }
 
             if (shouldMarkAsSeen) {

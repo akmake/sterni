@@ -20,13 +20,26 @@ export function heDate(d, pattern = 'dd/MM/yyyy') {
 }
 
 export function getKosherMeta(kosherType) {
-  const isMeat = kosherType === 'meat';
-  const isParve = kosherType === 'parve';
-  const isDairy = kosherType === 'halavi';
+  if (!kosherType) return null;
   
-  if (isMeat) return { label: 'בשרי', tone: 'meat' };
-  if (isParve) return { label: 'פרווה', tone: 'parve' };
-  if (isDairy) return { label: 'חלבי', tone: 'dairy' };
+  // Support both Hebrew (בשרי, חלבי, פרווה) and English (meat, dairy/halavi, parve) variants
+  const type = String(kosherType).toLowerCase().trim();
+  
+  // Meat - בשרי
+  if (type === 'meat' || type === 'בשרי' || type === 'בשר') {
+    return { label: 'בשרי', tone: 'meat' };
+  }
+  
+  // Parve - פרווה
+  if (type === 'parve' || type === 'פרווה' || type === 'פרו') {
+    return { label: 'פרווה', tone: 'parve' };
+  }
+  
+  // Dairy - חלבי (also accept halavi and related variants)
+  if (type === 'halavi' || type === 'dairy' || type === 'חלבי' || type === 'חלב') {
+    return { label: 'חלבי', tone: 'dairy' };
+  }
+  
   return null;
 }
 

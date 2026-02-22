@@ -22,6 +22,10 @@ const eventSchema = new mongoose.Schema({
   // --- לוגיקה לארוחות ---
   isMeal: { type: Boolean, default: false },
 
+  // ★ קישור לארוחה גלובלית (חדש)
+  mealId: { type: mongoose.Schema.Types.ObjectId, ref: 'Meal', required: false },
+
+  // ★ שדות ישנים (backends compatibility עד שמעברנו את הכל)
   mealType: { 
     type: String, 
     // התיקון הקריטי: הוספנו "" (מחרוזת ריקה) לסוף הרשימה כדי למנוע קריסה באירועים רגילים

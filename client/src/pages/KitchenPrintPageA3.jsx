@@ -12,12 +12,34 @@ const MEAL_LABELS = {
   snack: 'כיבוד/אחר',
 };
 
+// Kosher type mapping - normalize all variants to standard display
+const KOSHER_MAPPING = {
+  'בשרי': { label: 'בשרי', color: 'red' },
+  'meat': { label: 'בשרי', color: 'red' },
+  'חלבי': { label: 'חלבי', color: 'blue' },
+  'dairy': { label: 'חלבי', color: 'blue' },
+  'halavi': { label: 'חלבי', color: 'blue' },
+  'פרווה': { label: 'פרווה', color: 'green' },
+  'parve': { label: 'פרווה', color: 'green' },
+};
+
 const getKosherMeta = (type) => {
   if (!type) return { label: '', color: 'gray' };
-  const t = type.toLowerCase();
-  if (t === 'meat' || t === 'בשרי') return { label: 'בשרי', color: 'red' };
-  if (t === 'halavi' || t === 'חלבי') return { label: 'חלבי', color: 'blue' };
-  if (t === 'parve' || t === 'פרווה') return { label: 'פרווה', color: 'green' };
+  
+  // Try exact match first
+  if (KOSHER_MAPPING[type]) return KOSHER_MAPPING[type];
+  
+  // Try case-insensitive match
+  const normalized = type.toLowerCase().trim();
+  for (const [key, value] of Object.entries(KOSHER_MAPPING)) {
+    if (key.toLowerCase() === normalized) return value;
+  }
+  
+  // Fallback: check inclusions for partial matches
+  if (normalized.includes('meat') || normalized.includes('בשר')) return KOSHER_MAPPING['בשרי'];
+  if (normalized.includes('dairy') || normalized.includes('חלב') || normalized.includes('halavi')) return KOSHER_MAPPING['חלבי'];
+  if (normalized.includes('parve') || normalized.includes('פרו')) return KOSHER_MAPPING['פרווה'];
+  
   return { label: '', color: 'gray' };
 };
 
@@ -195,12 +217,12 @@ export default function KitchenPrintPageA3() {
                             </span>
                           </div>
                           
-                          {/* שורה 2: ארוחה */}
+                          {/* שורה 2: ארוחה + כשרות */}
                           <div className={cx("font-black leading-tight text-sm mb-1", titleColor)}>
                             {mealLabel} 
                             {kosher.label && (
-                              <span className="opacity-60 text-black font-normal scale-75 inline-block">
-                                ({kosher.label})
+                              <span className="text-black font-bold">
+                                {' '}{kosher.label}
                               </span>
                             )}
                           </div>

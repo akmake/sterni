@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import useGroupsStore from '@/stores/groupsStore';
+import useMealsStore from '@/stores/mealsStore';
 import { Button } from '@/components/ui/Button';
 import {
   Calendar as CalIcon,
@@ -23,51 +24,34 @@ import GroupPageHeader from './GroupPageHeader';
 import GroupPageModals from './GroupPageModals';
 import GroupQuickAdd from './GroupQuickAdd';
 
-// --- הגדרות ארוחות ---
-const MEAL_DEFINITIONS = {
-  breakfast: {
-    label: 'ארוחת בוקר',
-    kosherOptions: ['חלבי'],
-    menuOptions: ['תפריט נוער', 'תפריט ימי עיון', 'פרטיים']
-  },
-  light_meal: {
-    label: 'ארוחה קלה',
-    kosherOptions: ['פרווה', 'בשרי', 'חלבי'],
-    menuOptions: [
-      'כיבוד קל', 'כיבוד קל משודרג', 'פיתה פלאפל', 
-      'מזנון קליל', 'בורקס פיצה ופסטה', 
-      'לחמניות סלטים ומעדן', 'וופל בלגי'
-    ]
-  },
-  lunch: {
-    label: 'ארוחת צהריים',
-    kosherOptions: ['פרווה', 'בשרי', 'חלבי'],
-    menuOptions: ['תפריט נוער', 'תפריט ימי עיון', 'פרטיים']
-  },
-  light_evening: {
-    label: 'ארוחה קלה ערב',
-    kosherOptions: ['פרווה', 'בשרי', 'חלבי'],
-    menuOptions: [
-      'כיבוד קל', 'כיבוד קל משודרג', 'פיתה פלאפל', 
-      'מזנון קליל', 'בורקס פיצה ופסטה', 
-      'לחמניות סלטים ומעדן', 'וופל בלגי'
-    ]
-  },
-  dinner: {
-    label: 'ארוחת ערב',
-    kosherOptions: ['פרווה', 'בשרי', 'חלבי'],
-    menuOptions: ['תפריט נוער', 'תפריט ימי עיון', 'פרטיים']
-  },
-  night_treats: {
-    label: 'פינוקי לילה',
-    isManual: true
-  }
+const getKosherNormalized = (kosherType) => {
+  if (!kosherType) return 'parve';
+  const val = String(kosherType).toLowerCase().trim();
+  if (val === 'meat' || val === 'בשרי' || val === 'בשר') return 'meat';
+  if (val === 'halavi' || val === 'חלבי' || val === 'חלב' || val === 'dairy') return 'halavi';
+  if (val === 'parve' || val === 'פרווה' || val === 'פרו') return 'parve';
+  return 'parve';
+};
+
+const getKosherDisplay = (kosherType) => {
+  const normalized = getKosherNormalized(kosherType);
+  if (normalized === 'meat') return 'בשרי';
+  if (normalized === 'halavi') return 'חלבי';
+  return 'פרווה';
+};
+
+const getKosherColor = (kosherType) => {
+  const normalized = getKosherNormalized(kosherType);
+  if (normalized === 'meat') return 'bg-rose-50 text-rose-600 border-rose-100';
+  if (normalized === 'halavi') return 'bg-blue-50 text-blue-600 border-blue-100';
+  return 'bg-emerald-50 text-emerald-600 border-emerald-100';
 };
 
 export default function GroupDetailsPage() {
   const { id } = useParams();
   const { groups, fetchGroups, updateGroup, halls, fetchHalls, addEvent, updateEvent, deleteEvent } =
     useGroupsStore();
+  const { meals, fetchMeals } = useMealsStore();
   
   const [selectedDate, setSelectedDate] = useState(null);
 
@@ -92,13 +76,14 @@ export default function GroupDetailsPage() {
     pax: '',
     price: '',
     requirements: '',
-    mealType: 'breakfast', 
-    kosherType: 'halavi',
+    mealId: '',
+    kosherType: '',
     menuItem: '' 
   });
 
   useEffect(() => {
     if (groups.length === 0) fetchGroups();
+    if (meals.length === 0) fetchMeals();
     fetchHalls();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -138,6 +123,21 @@ export default function GroupDetailsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [group, days.length]);
 
+  // --- Helper: Convert meals array to MEAL_DEFINITIONS format ---
+  const MEAL_DEFINITIONS = React.useMemo(() => {
+    const result = {};
+    if (!meals || meals.length === 0) return result;
+    
+    meals.forEach((meal) => {
+      result[meal._id] = {
+        label: meal.name,
+        kosherOptions: meal.kosherOptions || [],
+        menuOptions: meal.menuOptions || [],
+        _id: meal._id
+      };
+    });
+    return result;
+  }, [meals]);
 
   // --- פונקציות עזר ולוגיקה ---
 
@@ -155,19 +155,46 @@ export default function GroupDetailsPage() {
     const isMeal = data.eventType === 'meal';
     
     if (isMeal) {
-      const def = MEAL_DEFINITIONS[data.mealType];
+      // Validation for meal selection
+      if (!data.mealId) {
+        toast.error('אנא בחר ארוחה');
+        return null;
+      }
+
+      const def = MEAL_DEFINITIONS[data.mealId];
       if (!def) {
           toast.error('סוג ארוחה לא תקין');
           return null;
       }
 
-      // בניית כותרת יפה לתצוגה
-      if (def.isManual) {
-          finalTitle = def.label; 
-      } else {
-          finalTitle = `${def.label}`;
-          if (data.menuItem) finalTitle += ` - ${data.menuItem}`;
+      // Validate kosher type selection if meal has options
+      if (def.kosherOptions && def.kosherOptions.length > 0) {
+        if (!data.kosherType) {
+          toast.error('אנא בחר סוג כשרות');
+          return null;
+        }
+        if (!def.kosherOptions.includes(data.kosherType)) {
+          toast.error('סוג כשרות לא תקין');
+          return null;
+        }
       }
+
+      // Validate menu item selection if meal has options
+      if (def.menuOptions && def.menuOptions.length > 0) {
+        if (!data.menuItem) {
+          toast.error('אנא בחר תפריט');
+          return null;
+        }
+        if (!def.menuOptions.includes(data.menuItem)) {
+          toast.error('תפריט לא תקין');
+          return null;
+        }
+      }
+
+      // בניית כותרת יפה לתצוגה
+      // הערה: אל תוסף kosherType לכותרת! זה יוצג בנפרד בדוחות
+      finalTitle = def.label;
+      if (data.menuItem) finalTitle += ` - ${data.menuItem}`;
 
       if (!finalHall) {
         toast.error('יש לבחור אולם לארוחה');
@@ -201,7 +228,7 @@ export default function GroupDetailsPage() {
       date: finalDate,
       
       isMeal: isMeal, 
-      mealType: isMeal ? data.mealType : '',
+      mealId: isMeal ? data.mealId : '',
       kosherType: isMeal ? data.kosherType : '',
       menuItem: isMeal ? data.menuItem : '', 
       eventType: isMeal ? 'meal' : 'activity'
@@ -226,8 +253,8 @@ export default function GroupDetailsPage() {
         pax: group.pax,
         price: '',
         requirements: '',
-        mealType: 'breakfast',
-        kosherType: 'parve',
+        mealId: '',
+        kosherType: '',
         menuItem: '' 
       });
     } catch (e) {
@@ -252,17 +279,8 @@ export default function GroupDetailsPage() {
     let type = event.eventType || 'meal';
     if (type === 'regular') type = 'meal';
 
+    // השתמש ב-menuItem ישירות, אל תוציא מתוך title
     let finalMenu = event.menuItem || event.menu || '';
-
-    if (!finalMenu && event.title && type === 'meal') {
-        const dashMatch = event.title.match(/-\s+(.*?)(\s*\||$)/);
-        if (dashMatch && dashMatch[1]) {
-            finalMenu = dashMatch[1].trim();
-        } else {
-            const parts = event.title.split(' - ');
-            if (parts.length > 1) finalMenu = parts[1].trim();
-        }
-    }
 
     setEditEventData({
       eventType: type,
@@ -468,15 +486,8 @@ export default function GroupDetailsPage() {
                         {MEAL_DEFINITIONS[event.mealType] && 
                          !MEAL_DEFINITIONS[event.mealType].isManual && 
                          event.kosherType && (
-                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border 
-                             ${event.kosherType === 'meat' 
-                               ? 'bg-rose-50 text-rose-600 border-rose-100'
-                               : event.kosherType === 'parve' 
-                                 ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                                 : 'bg-blue-50 text-blue-600 border-blue-100'
-                             }
-                           `}>
-                             {event.kosherType === 'meat' ? 'בשרי' : event.kosherType === 'parve' ? 'פרווה' : 'חלבי'}
+                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border ${getKosherColor(event.kosherType)}`}>
+                             {getKosherDisplay(event.kosherType)}
                            </span>
                         )}
                     </div>

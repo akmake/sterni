@@ -4,6 +4,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Trash2, MapPin, Info } from 'lucide-react'; // תיקון מ-info ל-Info
 import DayScheduler from '@/components/DayScheduler';
 import { MEAL_TYPES } from './GroupPageComponents';
+
+const getKosherLabel = (code) => {
+  const labels = {
+    'meat': 'בשרי',
+    'halavi': 'חלבי',
+    'parve': 'פרווה'
+  };
+  return labels[code] || code;
+};
+
 export default function GroupPageModals({
   // Scheduler Props
   isSchedulerOpen,
@@ -87,42 +97,36 @@ export default function GroupPageModals({
                   <label className="text-xs font-bold text-slate-500 mr-1">סוג ארוחה</label>
                   <select
                     className="w-full p-3 border rounded-xl bg-white shadow-sm"
-                    value={editEventData.mealType}
-                    onChange={(e) => setEditEventData({ ...editEventData, mealType: e.target.value })}
+                    value={editEventData.mealId || ''}
+                    onChange={(e) => setEditEventData({ ...editEventData, mealId: e.target.value, kosherType: '', menuItem: '' })}
                   >
-                    {MEAL_TYPES.map((t) => (
-                      <option key={t.id} value={t.id}>{t.label}</option>
+                    <option value="">בחר ארוחה...</option>
+                    {Object.entries(MEAL_DEFINITIONS).map(([id, def]) => (
+                      <option key={id} value={id}>{def.label}</option>
                     ))}
                   </select>
                 </div>
 
                 {/* כשרות */}
-                <div className="flex gap-4 mt-2">
-                  {['meat', 'halavi', 'parve'].map((type) => (
-                    <label key={type} className={`flex gap-2 items-center cursor-pointer p-2 rounded-lg flex-1 justify-center transition-all border ${
-                      editEventData.kosherType === type 
-                        ? (type === 'meat' ? 'bg-red-50 text-red-600 border-red-200 ring-1 ring-red-100' : 
-                           type === 'halavi' ? 'bg-blue-50 text-blue-600 border-blue-200 ring-1 ring-blue-100' : 
-                           'bg-green-50 text-green-600 border-green-200 ring-1 ring-green-100')
-                        : 'bg-slate-50 border-transparent hover:bg-slate-100'
-                    }`}>
-                      <input
-                        type="radio"
-                        name="kosherTypeEdit"
-                        checked={editEventData.kosherType === type}
-                        onChange={() => setEditEventData({ ...editEventData, kosherType: type })}
-                        className="hidden" 
-                      />
-                      <span className="font-bold text-sm">
-                        {type === 'meat' ? 'בשרי' : type === 'halavi' ? 'חלבי' : 'פרווה'}
-                      </span>
-                    </label>
-                  ))}
-                </div>
+                {editEventData.mealId && MEAL_DEFINITIONS[editEventData.mealId]?.kosherOptions?.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 mr-1">כשרות</label>
+                    <select
+                      className="w-full p-3 border rounded-xl bg-white shadow-sm"
+                      value={editEventData.kosherType || ''}
+                      onChange={(e) => setEditEventData({ ...editEventData, kosherType: e.target.value })}
+                    >
+                      <option value="">בחר כשרות</option>
+                      {MEAL_DEFINITIONS[editEventData.mealId].kosherOptions.map(opt => (
+                        <option key={opt} value={opt}>{getKosherLabel(opt)}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 {/* תפריט */}
-                {MEAL_DEFINITIONS?.[editEventData.mealType] && !MEAL_DEFINITIONS[editEventData.mealType].isManual && (
-                   <div className="space-y-1">
+                {editEventData.mealId && MEAL_DEFINITIONS[editEventData.mealId]?.menuOptions?.length > 0 && (
+                   <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-500 mr-1">תפריט</label>
                       <select
                         className="w-full p-3 border rounded-xl bg-white shadow-sm"
@@ -130,7 +134,7 @@ export default function GroupPageModals({
                         onChange={(e) => setEditEventData({ ...editEventData, menuItem: e.target.value })}
                       >
                         <option value="">בחר תפריט...</option>
-                        {MEAL_DEFINITIONS[editEventData.mealType].menuOptions.map(opt => (
+                        {MEAL_DEFINITIONS[editEventData.mealId].menuOptions.map(opt => (
                           <option key={opt} value={opt}>{opt}</option>
                         ))}
                       </select>

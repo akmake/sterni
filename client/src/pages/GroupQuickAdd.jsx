@@ -2,6 +2,15 @@ import React from 'react';
 import { Button } from '@/components/ui/Button';
 import { SegmentedControl, AppleInput, AppleSelect } from './GroupPageComponents';
 
+const getKosherLabel = (code) => {
+  const labels = {
+    'meat': 'בשרי',
+    'halavi': 'חלבי',
+    'parve': 'פרווה'
+  };
+  return labels[code] || code;
+};
+
 export default function GroupQuickAdd({
   quickEvent,
   setQuickEvent,
@@ -35,56 +44,47 @@ export default function GroupQuickAdd({
             {quickEvent.eventType === 'meal' ? (
               <div className="flex flex-col gap-2">
                 {/* בחירת סוג ארוחה */}
-                <div className="flex gap-2">
+                <AppleSelect
+                  value={quickEvent.mealId}
+                  onChange={(e) => {
+                    const newMealId = e.target.value;
+                    setQuickEvent({ 
+                      ...quickEvent, 
+                      mealId: newMealId,
+                      kosherType: '',
+                      menuItem: ''
+                    });
+                  }}
+                >
+                  <option value="">בחר ארוחה...</option>
+                  {Object.entries(MEAL_DEFINITIONS).map(([id, def]) => (
+                    <option key={id} value={id}>
+                      {def.label}
+                    </option>
+                  ))}
+                </AppleSelect>
+
+                {/* בחירת כשרות */}
+                {quickEvent.mealId && MEAL_DEFINITIONS[quickEvent.mealId]?.kosherOptions?.length > 0 && (
                   <AppleSelect
-                    value={quickEvent.mealType}
-                    onChange={(e) => {
-                      const newType = e.target.value;
-                      setQuickEvent({ 
-                        ...quickEvent, 
-                        mealType: newType,
-                        menuItem: ''
-                      });
-                    }}
+                    value={quickEvent.kosherType}
+                    onChange={(e) => setQuickEvent({ ...quickEvent, kosherType: e.target.value, menuItem: '' })}
                   >
-                    {Object.entries(MEAL_DEFINITIONS).map(([key, def]) => (
-                      <option key={key} value={key}>{def.label}</option>
+                    <option value="">בחר כשרות...</option>
+                    {MEAL_DEFINITIONS[quickEvent.mealId].kosherOptions.map(opt => (
+                      <option key={opt} value={opt}>{getKosherLabel(opt)}</option>
                     ))}
                   </AppleSelect>
-
-                  {/* כפתורי כשרות */}
-                  <div className="bg-slate-50 rounded-xl p-1 flex items-center shrink-0">
-                    <button
-                      onClick={() => setQuickEvent({ ...quickEvent, kosherType: 'meat' })}
-                      className={`h-full px-3 rounded-lg text-xs font-bold transition-all ${
-                        quickEvent.kosherType === 'meat' ? 'bg-white shadow-sm text-red-600' : 'text-slate-400'
-                      }`}
-                    >בשרי</button>
-
-                    <button
-                      onClick={() => setQuickEvent({ ...quickEvent, kosherType: 'halavi' })}
-                      className={`h-full px-3 rounded-lg text-xs font-bold transition-all ${
-                        quickEvent.kosherType === 'halavi' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400'
-                      }`}
-                    >חלבי</button>
-
-                    <button
-                      onClick={() => setQuickEvent({ ...quickEvent, kosherType: 'parve' })}
-                      className={`h-full px-3 rounded-lg text-xs font-bold transition-all ${
-                        quickEvent.kosherType === 'parve' ? 'bg-white shadow-sm text-green-600' : 'text-slate-400'
-                      }`}
-                    >פרווה</button>
-                  </div>
-                </div>
+                )}
 
                 {/* בחירת תפריט */}
-                {MEAL_DEFINITIONS[quickEvent.mealType] && !MEAL_DEFINITIONS[quickEvent.mealType].isManual && (
+                {quickEvent.mealId && MEAL_DEFINITIONS[quickEvent.mealId]?.menuOptions?.length > 0 && (
                    <AppleSelect
                      value={quickEvent.menuItem}
                      onChange={(e) => setQuickEvent({ ...quickEvent, menuItem: e.target.value })}
                    >
                      <option value="">בחר תפריט...</option>
-                     {MEAL_DEFINITIONS[quickEvent.mealType].menuOptions.map(opt => (
+                     {MEAL_DEFINITIONS[quickEvent.mealId].menuOptions.map(opt => (
                         <option key={opt} value={opt}>{opt}</option>
                      ))}
                    </AppleSelect>

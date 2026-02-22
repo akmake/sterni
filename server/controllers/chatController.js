@@ -3,15 +3,12 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { Message } from '../models/Message.js';
 import { Contact } from '../models/Contact.js';
-// תיקון: ייבוא הפונקציות הנכונות מהשירות החדש
 import { sendOpsEmail, formatEmailHtml } from '../services/emailService.js';
-import { sock } from '../services/whatsappService.js';
+import { sock, isConnected, sendMessageHuman } from '../services/whatsappService.js';
 import AppError from '../utils/AppError.js';
 
-// הגדרת נתיב בסיס לקריאת קבצים (עבור שליחת קבצים בוואצפ)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-// הנתיב לתיקיית ההעלאות הציבורית של הקליינט
 const UPLOADS_PATH = path.join(__dirname, '../../client/public');
 
 // --- שליחת הודעה (משולב: מייל + וואצפ) ---
@@ -28,7 +25,6 @@ export const sendMessageToClient = async (req, res, next) => {
                 phone: clientPhone || ''
             });
         } else {
-            // עדכון טלפון אם התקבל חדש (והמקורי היה ריק או שונה), וזמן פעילות
             if (clientPhone) contact.phone = clientPhone;
             contact.lastActive = new Date();
             await contact.save();
@@ -42,71 +38,78 @@ export const sendMessageToClient = async (req, res, next) => {
             content,
             type: type || 'text',
             fileUrl,
-            source: 'web', // מסמן שההודעה יצאה מממשק הניהול
+            source: 'web',
             isRead: true
         });
 
         // 3. לוגיקת שליחה (Routing) - וואצפ ומייל
 
-        // --- אופציה א': שליחה בוואצפ (אם יש טלפון והסוקט מחובר) ---
-        if (contact.phone && sock) {
+        // --- אופציה א': שליחה בוואצפ (עם התנהגות אנושית) ---
+        if (contact.phone && isConnected()) {
             const jid = `${contact.phone}@s.whatsapp.net`;
             try {
-                // אם יש קובץ מצורף - שולחים אותו כקובץ אמיתי (Buffer)
                 if (fileUrl) {
-                    // בניית נתיב מלא לקובץ בדיסק
-                    // fileUrl מגיע בפורמט: /uploads/filename.ext
                     const fullPath = path.join(UPLOADS_PATH, fileUrl);
 
                     if (fs.existsSync(fullPath)) {
                         const fileBuffer = fs.readFileSync(fullPath);
-                        const isImage = type === 'image' || fileUrl.match(/\.(jpg|jpeg|png|gif)$/i);
-                        const isVideo = type === 'video' || fileUrl.match(/\.(mp4)$/i);
+                        const ext = path.extname(fileUrl).toLowerCase();
+                        const isImage = type === 'image' || ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext);
+                        const isVideo = type === 'video' || ['.mp4', '.avi', '.mov'].includes(ext);
 
                         if (isImage) {
-                            await sock.sendMessage(jid, { image: fileBuffer, caption: content });
+                            await sendMessageHuman(jid, { image: fileBuffer, caption: content }, content);
                         } else if (isVideo) {
-                            await sock.sendMessage(jid, { video: fileBuffer, caption: content });
+                            await sendMessageHuman(jid, { video: fileBuffer, caption: content }, content);
                         } else {
-                            // ברירת מחדל למסמכים (PDF וכו')
-                            await sock.sendMessage(jid, {
+                            // זיהוי mimetype דינמי
+                            const mimeTypes = {
+                                '.pdf': 'application/pdf',
+                                '.doc': 'application/msword',
+                                '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                                '.xls': 'application/vnd.ms-excel',
+                                '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                                '.zip': 'application/zip',
+                                '.txt': 'text/plain',
+                            };
+                            const mimetype = mimeTypes[ext] || 'application/octet-stream';
+
+                            await sendMessageHuman(jid, {
                                 document: fileBuffer,
-                                mimetype: 'application/pdf', // אפשר לשפר זיהוי דינמי אם צריך
+                                mimetype,
                                 fileName: path.basename(fileUrl)
                             });
                         }
                         console.log(`📤 נשלח קובץ בוואצפ ל-${contact.phone}`);
                     } else {
-                        // מקרה קצה: הקובץ רשום ב-DB אך לא נמצא בתיקייה
-                        await sock.sendMessage(jid, { text: `${content}\n\n(קובץ מצורף חסר בשרת)` });
+                        await sendMessageHuman(jid, { text: `${content}\n\n(קובץ מצורף חסר בשרת)` }, content);
                     }
                 } else {
-                    // שליחת הודעת טקסט רגילה
-                    await sock.sendMessage(jid, { text: content });
+                    await sendMessageHuman(jid, { text: content }, content);
                     console.log(`📤 נשלחה הודעת וואצפ ל-${contact.phone}`);
                 }
             } catch (waError) {
-                console.error('❌ שגיאה בשליחה לוואצפ:', waError);
-                // אנחנו לא עוצרים את הריצה (לא עושים return) כדי שהמייל עדיין יישלח
+                console.error('❌ שגיאה בשליחה לוואצפ:', waError.message);
+                // ממשיכים — המייל עדיין יישלח כגיבוי
             }
+        } else if (contact.phone && !isConnected()) {
+            console.warn(`⚠️ וואצאפ לא מחובר — ההודעה ל-${contact.phone} תישלח רק במייל`);
         }
 
-        // --- אופציה ב': שליחה במייל (תמיד, כגיבוי או כערוץ ראשי) ---
+        // --- אופציה ב': שליחה במייל (תמיד, כגיבוי) ---
         if (clientEmail) {
             let emailHtml = formatEmailHtml(content);
 
             if (fileUrl) {
-                // במייל שולחים כקישור להורדה (כדי לא להכביד על ה-SMTP או לחסום את המייל)
                 emailHtml += `<br><br><a href="${process.env.CLIENT_URL || 'http://localhost:5173'}${fileUrl}">לחץ לצפייה בקובץ המצורף</a>`;
             }
 
-            // תיקון: שימוש בפונקציה החדשה sendOpsEmail
             await sendOpsEmail(
-                clientEmail, 
-                `Re: פנייה #${ticketId}`, 
-                emailHtml // שולחים את הטקסט המפורמט כפרמטר שלישי (Text content בדרך כלל, אך כאן אפשר לעדכן את sendOpsEmail לתמוך ב-HTML או לשלוח טקסט פשוט)
+                clientEmail,
+                `Re: פנייה #${ticketId}`,
+                emailHtml
             );
-            
+
             console.log(`📧 נשלח מייל ל-${clientEmail}`);
         }
 
@@ -121,31 +124,30 @@ export const sendMessageToClient = async (req, res, next) => {
 // --- קבלת רשימת שיחות (Dashboard) ---
 export const getConversations = async (req, res, next) => {
     try {
-        // קיבוץ לפי TicketID כדי להציג רשימת שיחות ייחודיות
         const messages = await Message.aggregate([
-            { $sort: { createdAt: -1 } }, // מיון לפי הזמן החדש ביותר
+            { $sort: { createdAt: -1 } },
             { $group: {
                 _id: "$ticketId",
-                lastMessage: { $first: "$$ROOT" }, // לוקח את ההודעה האחרונה
+                lastMessage: { $first: "$$ROOT" },
                 clientEmail: { $first: "$clientEmail" }
             }}
         ]);
 
-        // העשרת המידע עם פרטי איש הקשר (שם וטלפון)
         const enrichedConversations = await Promise.all(messages.map(async (conv) => {
             const contact = await Contact.findOne({ email: conv.clientEmail });
             return {
                 ticketId: conv._id,
                 from: conv.clientEmail,
                 clientName: contact ? contact.name : conv.clientEmail,
-                clientPhone: contact ? contact.phone : '', // חשוב כדי לדעת אם אפשר לשלוח וואצפ
+                clientPhone: contact ? contact.phone : '',
                 subject: conv.lastMessage.content ? conv.lastMessage.content.substring(0, 30) : 'קובץ מצורף',
                 createdAt: conv.lastMessage.createdAt,
                 lastMessage: conv.lastMessage
             };
         }));
 
-        res.status(200).json({ status: 'success', data: enrichedConversations });
+        res.status(200).json(enrichedConversations);
+
     } catch (error) {
         next(new AppError(error.message, 500));
     }

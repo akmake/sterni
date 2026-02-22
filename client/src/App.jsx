@@ -35,6 +35,8 @@ import ThaiSchedulePage from './pages/ThaiSchedulePage';
 import GroupPaymentsPage from '@/pages/Grouppaymentspage';
 import FinancialReportPage from '@/pages/Financialreportpage';
 import AdminUsersPage from './pages/AdminUsersPage';
+import AdminMealsPage from './pages/AdminMealsPage';
+import AdminLogsPage from './pages/AdminLogsPage';
 
 export default function App() {
   return (
@@ -75,6 +77,8 @@ export default function App() {
           <Route path="groups/:groupId/payments" element={<GroupPaymentsPage />} />
           <Route path="financial-report" element={<FinancialReportPage />} />
           <Route path="admin/users" element={<AdminUsersPage />} />
+          <Route path="admin/meals" element={<AdminMealsPage />} />
+          <Route path="admin/logs" element={<AdminLogsPage />} />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

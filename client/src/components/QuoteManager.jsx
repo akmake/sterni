@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import { Save, FolderOpen, Trash2, X, CalendarPlus, CheckCircle, Eye } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -10,14 +10,19 @@ import { toast } from 'react-hot-toast';
  *   currentData: { clientName, contactName, contactPhone, contactEmail, eventType, arrivalDate, departureDate, minPax, blocks }
  *   onLoadData: (data) => void
  *   containerRef: React ref to the quote container (for capturing HTML body)
+ *   getLatestBlocks: () => blocks[] — reads contentEditable DOM to get current text
  */
-const QuoteManager = ({ currentData, onLoadData, containerRef }) => {
+const QuoteManager = ({ currentData, onLoadData, containerRef, getLatestBlocks }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [mode, setMode] = useState(null); // 'save', 'load', or 'preview'
   const [saveName, setSaveName] = useState('');
   const [savedFiles, setSavedFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+
+  // ★ Keep a ref to the latest currentData so handleSave always reads fresh state
+  const currentDataRef = useRef(currentData);
+  useEffect(() => { currentDataRef.current = currentData; }, [currentData]);
   const [previewHtml, setPreviewHtml] = useState('');
 
   const fetchFiles = async () => {
@@ -62,6 +67,12 @@ const QuoteManager = ({ currentData, onLoadData, containerRef }) => {
 
     try {
       setLoading(true);
+
+      // ★ Read the ACTUAL content directly from the DOM — this captures all edits,
+      // even text typed in contentEditable fields that haven't been blurred yet
+      const latestBlocks = getLatestBlocks ? getLatestBlocks() : currentDataRef.current.blocks;
+      const data = currentDataRef.current;
+
       const { data: csrfData } = await api.get('/csrf-token');
 
       // ★ Capture HTML body before saving
@@ -69,19 +80,19 @@ const QuoteManager = ({ currentData, onLoadData, containerRef }) => {
 
       await api.post('/quotes', {
         name: saveName,
-        content: currentData.blocks,
-        clientName: currentData.clientName,
+        content: latestBlocks,
+        clientName: data.clientName,
         contactPerson: {
-          name: currentData.contactName,
-          phone: currentData.contactPhone,
-          email: currentData.contactEmail
+          name: data.contactName,
+          phone: data.contactPhone,
+          email: data.contactEmail
         },
         dates: {
-          from: currentData.arrivalDate,
-          to: currentData.departureDate
+          from: data.arrivalDate,
+          to: data.departureDate
         },
-        pax: currentData.minPax,
-        eventType: currentData.eventType,
+        pax: data.minPax,
+        eventType: data.eventType,
         htmlBody  // ★ Send the full HTML body
       }, {
         headers: { 'X-CSRF-Token': csrfData.csrfToken }

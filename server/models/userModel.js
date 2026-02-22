@@ -29,6 +29,10 @@ const userSchema = new mongoose.Schema(
       enum: ['user', 'admin'],
       default: 'user',
     },
+    tzitzitAccess: {
+      type: Boolean,
+      default: false,
+    },
     twoFactorEnabled: { type: Boolean, default: false },
     totpSecret:        { type: String,  default: '' },
     failedLoginAttempts: { type: Number, default: 0 },

@@ -3,9 +3,9 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AdminOnlyRoute from "@/components/AdminOnlyRoute";
+import TzitzitRoute from "@/components/TzitzitRoute";
 
 import LoginPage       from "@/pages/LoginPage";
-import RegisterPage    from "@/pages/RegisterPage";
 
 /* Project Pages */
 import ProjectsPage       from "@/pages/ProjectsPage";
@@ -50,7 +50,6 @@ export default function App() {
         <Route index element={<Navigate to="/tasks" replace />} />
 
         <Route path="login"    element={<LoginPage />}    />
-        <Route path="register" element={<RegisterPage />} />
 
         <Route element={<ProtectedRoute />}>
           {/* ★ FIX: Consistent paths — all relative (no leading slash) */}
@@ -86,6 +85,9 @@ export default function App() {
           <Route path="admin/users" element={<AdminUsersPage />} />
           <Route path="admin/meals" element={<AdminMealsPage />} />
           <Route path="admin/logs" element={<AdminLogsPage />} />
+        </Route>
+
+        <Route element={<TzitzitRoute />}>
           <Route path="admin/tzitzit" element={<TzitzitManagementPage />} />
         </Route>
 

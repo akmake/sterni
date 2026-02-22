@@ -5,7 +5,9 @@ import {
   updateUser,
   changeUserPassword,
   deleteUser,
-  changeUserRole
+  changeUserRole,
+  createUser,
+  toggleTzitzitAccess
 } from '../controllers/adminController.js';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import requireAdmin from '../middlewares/requireAdmin.js';
@@ -21,9 +23,11 @@ router.get('/users/:id', getUserById);
 
 // --- Admin-only operations ---
 router.use(requireAdmin);
+router.post('/users', createUser);
 router.patch('/users/:id', updateUser);
 router.patch('/users/:id/password', changeUserPassword);
 router.patch('/users/:id/role', changeUserRole);
+router.patch('/users/:id/tzitzit-access', toggleTzitzitAccess);
 router.delete('/users/:id', deleteUser);
 
 export default router;

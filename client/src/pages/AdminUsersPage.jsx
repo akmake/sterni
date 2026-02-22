@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Edit2, Trash2, Lock, Shield, User, Mail, Calendar, Save, X, Check } from 'lucide-react';
+import { Edit2, Trash2, Lock, Shield, User, Mail, Calendar, Save, X, Check, Plus, Scissors } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../api';
 
@@ -10,6 +10,9 @@ export default function AdminUsersPage() {
   const [editData, setEditData] = useState({});
   const [showPasswordModal, setShowPasswordModal] = useState(null);
   const [newPassword, setNewPassword] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createData, setCreateData] = useState({ name: '', email: '', password: '', role: 'user' });
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -89,6 +92,42 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleCreateUser = async () => {
+    if (!createData.name || !createData.email || !createData.password) {
+      toast.error('שם, אימייל וסיסמה הם שדות חובה');
+      return;
+    }
+    if (createData.password.length < 4) {
+      toast.error('הסיסמה חייבת להיות לפחות 4 תווים');
+      return;
+    }
+    setCreating(true);
+    try {
+      const response = await api.post('/admin/users', createData);
+      const newUser = response.data.data?.user;
+      if (newUser) setUsers([newUser, ...users]);
+      setShowCreateModal(false);
+      setCreateData({ name: '', email: '', password: '', role: 'user' });
+      toast.success('משתמש נוצר בהצלחה');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'שגיאה ביצירת משתמש');
+      console.error(error);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleToggleTzitzitAccess = async (userId, currentAccess) => {
+    try {
+      await api.patch(`/admin/users/${userId}/tzitzit-access`, { tzitzitAccess: !currentAccess });
+      setUsers(users.map(u => u._id === userId ? { ...u, tzitzitAccess: !currentAccess } : u));
+      toast.success(!currentAccess ? 'גישה לציציות הופעלה' : 'גישה לציציות בוטלה');
+    } catch (error) {
+      toast.error('שגיאה בעדכון הגישה');
+      console.error(error);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -96,8 +135,17 @@ export default function AdminUsersPage() {
           <h1 className="text-3xl font-bold text-gray-900">ניהול משתמשים</h1>
           <p className="text-gray-600 mt-1">ניהול משתמשים, הרשאות וסיסמאות</p>
         </div>
-        <div className="bg-blue-100 text-blue-800 px-4 py-2 rounded-lg font-semibold">
-          {users.length} משתמשים
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-sm"
+          >
+            <Plus size={18} />
+            יצירת משתמש
+          </button>
+          <div className="bg-blue-100 text-blue-800 px-4 py-2 rounded-lg font-semibold">
+            {users.length} משתמשים
+          </div>
         </div>
       </div>
 
@@ -118,6 +166,7 @@ export default function AdminUsersPage() {
                 <th className="px-4 py-3 text-right font-bold">שם</th>
                 <th className="px-4 py-3 text-right font-bold">מייל</th>
                 <th className="px-4 py-3 text-right font-bold">תפקיד</th>
+                <th className="px-4 py-3 text-right font-bold">ציציות</th>
                 <th className="px-4 py-3 text-right font-bold">הצטרפות</th>
                 <th className="px-4 py-3 text-right font-bold">פעולות</th>
               </tr>
@@ -153,6 +202,7 @@ export default function AdminUsersPage() {
                           <option value="admin">מנהל</option>
                         </select>
                       </td>
+                      <td className="px-4 py-3">-</td>
                       <td className="px-4 py-3">-</td>
                       <td className="px-4 py-3">
                         <div className="flex gap-2">
@@ -199,6 +249,20 @@ export default function AdminUsersPage() {
                             {user.role === 'admin' ? 'הורד' : 'הקדם'}
                           </button>
                         </div>
+                      </td>
+                      <td className="px-4 py-3">
+                          <button
+                            onClick={() => handleToggleTzitzitAccess(user._id, user.tzitzitAccess)}
+                            className={`inline-flex items-center gap-1 px-3 py-1 rounded text-sm font-medium transition-colors ${
+                              user.tzitzitAccess
+                                ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                            }`}
+                            title={user.tzitzitAccess ? 'לחץ לביטול גישה' : 'לחץ להפעלת גישה'}
+                          >
+                            <Scissors size={14} />
+                            {user.tzitzitAccess ? 'מופעל' : 'כבוי'}
+                          </button>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500">
                         {new Date(user.createdAt).toLocaleDateString('he-IL')}
@@ -265,6 +329,77 @@ export default function AdminUsersPage() {
                 onClick={() => {
                   setShowPasswordModal(null);
                   setNewPassword('');
+                }}
+                className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded font-semibold hover:bg-gray-300"
+              >
+                ביטול
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create User Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full space-y-4 p-6">
+            <h2 className="text-lg font-bold text-gray-900">יצירת משתמש חדש</h2>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">שם</label>
+                <input
+                  type="text"
+                  value={createData.name}
+                  onChange={(e) => setCreateData({ ...createData, name: e.target.value })}
+                  placeholder="שם מלא"
+                  className="w-full border border-gray-300 rounded px-3 py-2 outline-none focus:ring-2 focus:ring-blue-400"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">אימייל</label>
+                <input
+                  type="email"
+                  value={createData.email}
+                  onChange={(e) => setCreateData({ ...createData, email: e.target.value })}
+                  placeholder="user@example.com"
+                  className="w-full border border-gray-300 rounded px-3 py-2 outline-none focus:ring-2 focus:ring-blue-400"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">סיסמה</label>
+                <input
+                  type="password"
+                  value={createData.password}
+                  onChange={(e) => setCreateData({ ...createData, password: e.target.value })}
+                  placeholder="סיסמה (מינימום 4 תווים)"
+                  className="w-full border border-gray-300 rounded px-3 py-2 outline-none focus:ring-2 focus:ring-blue-400"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">תפקיד</label>
+                <select
+                  value={createData.role}
+                  onChange={(e) => setCreateData({ ...createData, role: e.target.value })}
+                  className="w-full border border-gray-300 rounded px-3 py-2 bg-white outline-none focus:ring-2 focus:ring-blue-400"
+                >
+                  <option value="user">משתמש</option>
+                  <option value="admin">מנהל</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3 pt-4">
+              <button
+                onClick={handleCreateUser}
+                disabled={creating}
+                className="flex-1 bg-blue-600 text-white px-4 py-2 rounded font-semibold hover:bg-blue-700 disabled:opacity-50"
+              >
+                {creating ? 'יוצר...' : 'צור משתמש'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setCreateData({ name: '', email: '', password: '', role: 'user' });
                 }}
                 className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded font-semibold hover:bg-gray-300"
               >

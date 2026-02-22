@@ -6,7 +6,7 @@ import bcrypt from 'bcrypt';
 // --- Get all users ---
 export const getAllUsers = catchAsync(async (req, res, next) => {
   const users = await User.find({})
-    .select('name email role createdAt')
+    .select('name email role tzitzitAccess createdAt')
     .sort('-createdAt');
 
   res.status(200).json({
@@ -150,6 +150,70 @@ export const changeUserRole = catchAsync(async (req, res, next) => {
   res.status(200).json({
     status: 'success',
     message: `תפקיד עודכן ל${role}`,
+    data: { user }
+  });
+});
+
+// --- Create new user (by admin) ---
+export const createUser = catchAsync(async (req, res, next) => {
+  const { name, email, password, role } = req.body;
+
+  if (!name || !email || !password) {
+    return next(new AppError('שם, אימייל וסיסמה הם שדות חובה', 400));
+  }
+
+  if (password.length < 4) {
+    return next(new AppError('הסיסמה חייבת להכיל לפחות 4 תווים', 400));
+  }
+
+  const exists = await User.findOne({ email });
+  if (exists) {
+    return next(new AppError('משתמש עם אימייל זה כבר קיים', 400));
+  }
+
+  const hash = await bcrypt.hash(password, 12);
+  const finalRole = (role && ['user', 'admin'].includes(role)) ? role : 'user';
+
+  const user = await User.create({
+    name,
+    email,
+    passwordHash: hash,
+    role: finalRole
+  });
+
+  const userPayload = {
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    tzitzitAccess: user.tzitzitAccess || false,
+    createdAt: user.createdAt
+  };
+
+  res.status(201).json({
+    status: 'success',
+    message: 'משתמש נוצר בהצלחה',
+    data: { user: userPayload }
+  });
+});
+
+// --- Toggle tzitzit access for user ---
+export const toggleTzitzitAccess = catchAsync(async (req, res, next) => {
+  const { tzitzitAccess } = req.body;
+  const userId = req.params.id;
+
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { tzitzitAccess: !!tzitzitAccess },
+    { new: true }
+  ).select('name email role tzitzitAccess createdAt');
+
+  if (!user) {
+    return next(new AppError('משתמש לא נמצא', 404));
+  }
+
+  res.status(200).json({
+    status: 'success',
     data: { user }
   });
 });

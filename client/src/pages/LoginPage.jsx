@@ -171,10 +171,7 @@ export default function LoginPage() {
             {/* פוטר */}
             <div className="mt-8 text-center">
                 <p className="text-slate-500 text-sm">
-                    אין לך חשבון?{" "}
-                    <Link to="/register" className="text-blue-600 font-bold hover:text-blue-700 transition-colors">
-                        הרשמה מהירה
-                    </Link>
+                    לקבלת גישה, פנה למנהל המערכת
                 </p>
             </div>
         </div>

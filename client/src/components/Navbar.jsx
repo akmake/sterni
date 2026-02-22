@@ -10,11 +10,11 @@ import {
 
 
 // --- נתוני ניווט מסודרים ---
-const getNavStructure = (isAuthenticated, isAdmin) => {
+const getNavStructure = (isAuthenticated, isAdmin, hasTzitzitAccess) => {
   const items = [];
 
-  // למנהל - ציציות בראש
-  if (isAdmin) {
+  // גישה לציציות – רק למי שיש לו הרשאה (כולל מנהלים)
+  if (hasTzitzitAccess) {
     items.push({ to: '/admin/tzitzit', label: 'ניהול ציציות', icon: Scissors, type: 'link' });
   }
 
@@ -74,7 +74,8 @@ export default function Navbar({ mobileOnly = false }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const { isAuthenticated, user, logout } = useAuthStore();
     const isAdmin = user?.role === 'admin';
-    const navItems = getNavStructure(isAuthenticated, isAdmin);
+    const hasTzitzitAccess = user?.tzitzitAccess || false;
+    const navItems = getNavStructure(isAuthenticated, isAdmin, hasTzitzitAccess);
 
     return (
         <>
@@ -169,9 +170,6 @@ function SidebarContent({ items, user, isAuthenticated, logout, onClose }) {
                     <div className="grid gap-3">
                         <Button variant="outline" asChild className="w-full justify-start border-slate-200">
                             <Link to="/login" onClick={onClose}><User className="ml-2 h-4 w-4" />התחברות</Link>
-                        </Button>
-                        <Button asChild className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200">
-                            <Link to="/register" onClick={onClose}>הרשמה</Link>
                         </Button>
                     </div>
                 )}

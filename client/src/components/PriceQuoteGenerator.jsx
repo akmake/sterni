@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Save, Printer, Trash2, Table as TableIcon, Type, FileDown, LoaderCircle, Bold, Italic, Underline, AlignRight, AlignCenter, AlignLeft, List, ListOrdered, MousePointerClick, Send, Mail, User, Phone, Calendar, Users, FileText } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
 import axios from 'axios';
+import api from '../api';
 import QuoteManager from './QuoteManager';
 import QuoteDatePicker from './QuoteDatePicker';
 
@@ -135,6 +137,7 @@ const RichTextMenu = ({ position, onClose, onAction, type }) => {
 };
 
 const PriceQuoteGenerator = () => {
+  const location = useLocation();
   const [clientName, setClientName] = useState('שם הלקוח / הקבוצה');
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
@@ -262,11 +265,11 @@ const PriceQuoteGenerator = () => {
   };
 
   const removeBlock = (id) => {
-    if(confirm('למחוק את החלק הזה?')) setBlocks(blocks.filter(b => b.id !== id));
+    if(confirm('למחוק את החלק הזה?')) setBlocks(prev => prev.filter(b => b.id !== id));
   };
 
   const updateBlock = (id, updates) => {
-    setBlocks(blocks.map(b => b.id === id ? { ...b, ...updates } : b));
+    setBlocks(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
   };
 
   const handleContextMenu = (e, type, blockId, rowIndex = null, colIndex = null) => {
@@ -369,6 +372,55 @@ const PriceQuoteGenerator = () => {
     blocks
   };
 
+  /**
+   * ★ Read the ACTUAL current content from the DOM's contentEditable elements.
+   * This ensures we capture every text change, even ones where onBlur hasn't fired yet.
+   */
+  const getLatestBlocks = () => {
+    return blocks.map(block => {
+      const el = blockRefs.current[block.id];
+      if (!el) return block;
+
+      if (block.type === 'text') {
+        const editableDiv = el.querySelector('[contenteditable]');
+        if (editableDiv) {
+          return { ...block, content: editableDiv.innerHTML };
+        }
+      } else if (block.type === 'table') {
+        // Read table title from the input
+        const titleInput = el.querySelector('input');
+        const title = titleInput ? titleInput.value : block.title;
+
+        // Read headers from DOM
+        const headers = [...block.headers];
+        const headerEls = el.querySelectorAll('thead [contenteditable]');
+        headerEls.forEach((headerEl, idx) => {
+          if (idx < headers.length) {
+            headers[idx] = { ...headers[idx], title: headerEl.innerText };
+          }
+        });
+
+        // Read cells from DOM
+        const rows = block.rows.map(r => [...r]);
+        const rowEls = el.querySelectorAll('tbody tr');
+        rowEls.forEach((rowEl, rIdx) => {
+          if (rIdx < rows.length) {
+            const cellEls = rowEl.querySelectorAll('[contenteditable]');
+            cellEls.forEach((cellEl, cIdx) => {
+              if (cIdx < rows[rIdx].length) {
+                rows[rIdx][cIdx] = cellEl.innerText;
+              }
+            });
+          }
+        });
+
+        return { ...block, title, headers, rows };
+      }
+
+      return block;
+    });
+  };
+
   const handleLoadData = (data) => {
     if (!data) return;
     if (data.clientName) setClientName(data.clientName);
@@ -411,6 +463,39 @@ const PriceQuoteGenerator = () => {
 
     toast.success('הצעה נטענה בהצלחה!');
   };
+
+  // ★ Auto-load quote when navigated from calendar or other page with loadQuote state
+  useEffect(() => {
+    const quoteName = location.state?.loadQuote;
+    if (!quoteName) return;
+
+    const autoLoad = async () => {
+      try {
+        const res = await api.get(`/quotes/${quoteName}`);
+        const fullQuote = res.data.data?.quote || res.data;
+
+        const dataToLoad = {
+          blocks: fullQuote.content,
+          clientName: fullQuote.clientName || fullQuote.name,
+          contactName: fullQuote.contactPerson?.name || '',
+          contactPhone: fullQuote.contactPerson?.phone || '',
+          contactEmail: fullQuote.contactPerson?.email || '',
+          dates: fullQuote.dates,
+          minPax: fullQuote.pax || 0,
+          eventType: fullQuote.eventType || ''
+        };
+
+        handleLoadData(dataToLoad);
+      } catch (err) {
+        console.error('Auto-load quote failed:', err);
+        toast.error('שגיאה בטעינת הצעת המחיר');
+      }
+    };
+
+    autoLoad();
+    // Clear the state so refreshing doesn't re-load
+    window.history.replaceState({}, document.title);
+  }, [location.state?.loadQuote]);
 
   const createPDFDocument = async () => {
     if (!containerRef.current) return null;
@@ -542,6 +627,7 @@ const PriceQuoteGenerator = () => {
                 currentData={dataToSave}
                 onLoadData={handleLoadData}
                 containerRef={containerRef}
+                getLatestBlocks={getLatestBlocks}
              />
 
              <div className="h-6 w-[1px] bg-gray-300 mx-2"></div>

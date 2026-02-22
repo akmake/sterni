@@ -7,7 +7,7 @@ import { requireAuth } from '../middlewares/authMiddleware.js';
 const router = express.Router();
 
 // Public routes
-router.post('/register', registerUser);
+// router.post('/register', registerUser); // הרשמה עצמית בוטלה – רק מנהל יוצר משתמשים
 router.post('/login', loginUser);
 router.post('/logout', logout);
 router.post('/refresh', refresh);

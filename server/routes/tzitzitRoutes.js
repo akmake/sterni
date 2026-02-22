@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { requireAdmin } from '../middlewares/authMiddleware.js';
+import { requireAuth } from '../middlewares/authMiddleware.js';
+import User from '../models/userModel.js';
 import {
   getSuppliers,
   createSupplier,
@@ -19,8 +20,18 @@ import {
 
 const router = Router();
 
-// כל המסלולים דורשים הרשאת מנהל
-router.use(requireAdmin);
+// מידלוור מותאם אישית – רק משתמש עם tzitzitAccess (כולל מנהלים)
+const requireTzitzitAccess = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id).select('tzitzitAccess');
+    if (user?.tzitzitAccess) return next();
+    return res.status(403).json({ message: 'אין לך הרשאה לדף זה' });
+  } catch (err) {
+    return res.status(500).json({ message: 'שגיאת הרשאות' });
+  }
+};
+
+router.use(requireTzitzitAccess);
 
 // ─── דשבורד ───
 router.get('/dashboard', getDashboard);

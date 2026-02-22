@@ -61,7 +61,7 @@ export const loginUser = async (req, res) => {
       return res.status(401).json({ message: 'סיסמה שגויה' });
     }
     await user.resetLoginAttempts();
-    const userPayload = { _id: user._id, name: user.name, email: user.email, role: user.role };
+    const userPayload = { _id: user._id, name: user.name, email: user.email, role: user.role, tzitzitAccess: user.tzitzitAccess || false };
     createAndSendTokens(user, res);
     return res.status(200).json({ message: "התחברת בהצלחה", user: userPayload });
   } catch (error) {
@@ -88,7 +88,7 @@ export const refresh = async (req, res) => {
       return res.status(403).json({ message: 'Forbidden. Please log in again.' });
     }
     createAndSendTokens(user, res);
-    const userPayload = { _id: user._id, name: user.name, email: user.email, role: user.role };
+    const userPayload = { _id: user._id, name: user.name, email: user.email, role: user.role, tzitzitAccess: user.tzitzitAccess || false };
     return res.status(200).json({ message: "Tokens refreshed successfully", user: userPayload });
   } catch (error) {
     return res.status(403).json({ message: 'Invalid or expired refresh token.' });
@@ -148,7 +148,7 @@ export const updateProfile = async (req, res) => {
     return res.status(200).json({ 
       status: 'success',
       message: 'הפרופיל עודכן בהצלחה',
-      data: { user: { _id: user._id, name: user.name, email: user.email, role: user.role } }
+      data: { user: { _id: user._id, name: user.name, email: user.email, role: user.role, tzitzitAccess: user.tzitzitAccess || false } }
     });
   } catch (error) {
     console.error('❌ [UPDATE_PROFILE] error:', error);

@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import useGroupsStore from '@/stores/groupsStore';
 import { Plus, Users, Calendar, Trash2, Archive, LayoutGrid, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import GroupsCalendarModal from '@/components/GroupsCalendarModal';
 
 export default function GroupsPage() {
   const { groups, fetchGroups, deleteGroup } = useGroupsStore();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState('active'); // 'active' or 'archive'
+  const [showCalendar, setShowCalendar] = useState(false);
 
   useEffect(() => {
     fetchGroups();
@@ -100,12 +102,20 @@ export default function GroupsPage() {
             <h1 className="text-3xl font-bold text-slate-800 tracking-tight">ניהול קבוצות</h1>
             <p className="text-slate-500 mt-1 text-lg">כל הקבוצות והאירועים במקום אחד</p>
           </div>
-          <Button 
-            onClick={() => navigate('/groups/new')}
-            className="bg-black hover:bg-slate-800 text-white rounded-2xl px-6 py-6 shadow-xl shadow-slate-200 flex items-center gap-2 transition-all duration-300 hover:scale-105"
-          >
-            <Plus size={20} /> קבוצה חדשה
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button 
+              onClick={() => setShowCalendar(true)}
+              className="bg-white hover:bg-slate-50 text-slate-700 rounded-2xl px-6 py-6 shadow-sm border border-slate-200 flex items-center gap-2 transition-all duration-300 hover:scale-105"
+            >
+              <Calendar size={20} /> לוח שנה
+            </Button>
+            <Button 
+              onClick={() => navigate('/groups/new')}
+              className="bg-black hover:bg-slate-800 text-white rounded-2xl px-6 py-6 shadow-xl shadow-slate-200 flex items-center gap-2 transition-all duration-300 hover:scale-105"
+            >
+              <Plus size={20} /> קבוצה חדשה
+            </Button>
+          </div>
         </div>
 
         {/* שורת חיפוש וטאבים */}
@@ -224,6 +234,10 @@ export default function GroupsPage() {
         </div>
 
       </div>
+
+      {showCalendar && (
+        <GroupsCalendarModal groups={groups} onClose={() => setShowCalendar(false)} />
+      )}
     </div>
   );
 }

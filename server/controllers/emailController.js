@@ -52,16 +52,29 @@ export const sendAttachmentEmail = async (req, res) => {
         });
 
         // 4. שליחת המייל בפועל
+        // ★ שם קובץ מכובד — מגיע כשדה נפרד ב-FormData כדי לשמור על עברית תקינה
+        const displayFilename = req.body.displayFilename || 'מסמך.pdf';
+
         const info = await transporter.sendMail({
-            from: `"${senderAccount.friendlyName}" <${senderAccount.user}>`, // השם שיוצג ללקוח
+            from: `"${senderAccount.friendlyName}" <${senderAccount.user}>`,
             to: email,
             subject: subject,
-            text: body, // גרסת טקסט
-            html: body.replace(/\n/g, '<br>'), // המרה פשוטה ל-HTML
+            text: body,
+            html: `<div dir="rtl" style="font-family: Arial, sans-serif; line-height: 1.8; color: #333;">
+              <div style="background-color: #f8f8f8; padding: 24px;">
+                <div style="background-color: #ffffff; border-radius: 10px; padding: 32px; max-width: 600px; margin: 0 auto; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                  ${body.replace(/\n/g, '<br>')}
+                </div>
+                <div style="text-align: center; margin-top: 16px; font-size: 11px; color: #aaa;">
+                  נשלח אוטומטית ממערכת ציפורי
+                </div>
+              </div>
+            </div>`,
             attachments: [
                 {
-                    filename: req.file.originalname || 'document.pdf', // השם המקורי (למשל payment_request_X.pdf)
-                    path: filePath // הנתיב בשרת
+                    filename: displayFilename,
+                    path: filePath,
+                    contentType: 'application/pdf'
                 }
             ]
         });

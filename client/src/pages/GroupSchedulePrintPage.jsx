@@ -183,10 +183,11 @@ export default function GroupSchedulePrintPage() {
       const pdfBlob = pdf.output('blob');
 
       const formData = new FormData();
-      formData.append('file', pdfBlob, `schedule_${(processedData?.name || 'group').replace(/[^a-zA-Z0-9א-ת]/g, '_')}.pdf`);
+      formData.append('file', pdfBlob, `document_${Date.now()}.pdf`);
+      formData.append('displayFilename', `לוז - ${processedData?.name || 'קבוצה'}.pdf`);
       formData.append('email', targetEmail);
       formData.append('subject', `לו"ז - ${processedData?.name || 'קבוצה'}`);
-      formData.append('body', `מצורף לו"ז עבור ${processedData?.name || 'הקבוצה'}.\n\nבברכה.`);
+      formData.append('body', `שלום רב,\n\nמצורף לו"ז עבור ${processedData?.name || 'הקבוצה'}.\n\nבברכה,\nצוות ציפורי.`);
 
       await api.post('/emails/send-attachment', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }

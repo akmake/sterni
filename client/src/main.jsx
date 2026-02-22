@@ -5,6 +5,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import App from './App.jsx';
 import './index.css';
+import { initDeviceInfo } from './utils/deviceInfo.js';
+
+// ★ Pre-collect device info (battery, media devices) before any API calls
+initDeviceInfo();
 
 // Create a client for React Query
 const queryClient = new QueryClient();

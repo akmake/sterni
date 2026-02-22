@@ -531,10 +531,11 @@ const PaymentRequestGenerator = ({ groupId = null, onSave = null, paymentRequest
         const pdfBlob = pdf.output('blob');
 
         const formData = new FormData();
-        formData.append('file', pdfBlob, `payment_request_${headerDetails.groupName.replace(/[^a-zA-Z0-9א-ת]/g, '_')}.pdf`);
+        formData.append('file', pdfBlob, `document_${Date.now()}.pdf`);
+        formData.append('displayFilename', `דרישת תשלום - ${headerDetails.groupName}${headerDetails.contactName ? ` - ${headerDetails.contactName}` : ''}.pdf`);
         formData.append('email', targetEmail);
         formData.append('subject', `דרישת תשלום - ${headerDetails.groupName}`);
-        formData.append('body', `מצורפת דרישת תשלום עבור ${headerDetails.groupName}.\n\nבברכה,\nצוות ציפורי.`);
+        formData.append('body', `שלום רב,\n\nמצורפת דרישת תשלום עבור ${headerDetails.groupName}.\n\nבברכה,\nצוות ציפורי.`);
 
         const headers = csrfToken ? { 'X-CSRF-Token': csrfToken } : {};
 

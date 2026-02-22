@@ -25,7 +25,6 @@ const logSchema = new mongoose.Schema(
       architecture: String,
     },
 
-    // ★ תיקון: device הוא string ישיר, לא אובייקט
     device: {
       type: String,
       enum: ['desktop', 'mobile', 'tablet', 'unknown'],
@@ -40,6 +39,7 @@ const logSchema = new mongoose.Schema(
       pixelDepth: Number,
       refreshRate: Number,
       isRetina: Boolean,
+      orientation: String,
     },
 
     // Processor info
@@ -72,6 +72,7 @@ const logSchema = new mongoose.Schema(
     // Headers & Request Info
     referer: String,
     userLanguage: String,
+    languages: [String],
     timezone: String,
 
     // Location (from IP geolocation)
@@ -95,6 +96,45 @@ const logSchema = new mongoose.Schema(
     platform: String,
     hardwareConcurrency: Number,
     deviceMemory: Number,
+
+    // ★ GPU Info
+    gpu: {
+      vendor: String,
+      renderer: String,
+    },
+
+    // ★ Battery Info
+    battery: {
+      level: Number,     // 0-100
+      charging: Boolean,
+    },
+
+    // ★ User Preferences
+    prefersDarkMode: Boolean,
+    prefersReducedMotion: Boolean,
+    doNotTrack: Boolean,
+    isTouchDevice: Boolean,
+
+    // ★ Session Tracking
+    session: {
+      pageViews: Number,
+      durationSeconds: Number,
+      isNewSession: Boolean,
+    },
+
+    // ★ Media Devices
+    mediaDevices: {
+      cameras: Number,
+      microphones: Number,
+      speakers: Number,
+    },
+
+    // ★ Detection Flags
+    adBlocker: Boolean,
+    webdriver: Boolean,          // automation/bot flag
+    isOnline: Boolean,
+    pdfViewerEnabled: Boolean,
+    pluginsCount: Number,
 
     timestamp: {
       type: Date,

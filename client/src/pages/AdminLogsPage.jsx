@@ -4,7 +4,8 @@ import { toast } from 'react-hot-toast';
 import {
   Eye, EyeOff, Download, Trash2, RefreshCw, Activity,
   Monitor, Smartphone, Tablet, HelpCircle, Globe, Clock,
-  Wifi, Cpu, ChevronDown, ChevronUp, Users, Zap, Search, X, Power, Cookie, MapPin
+  Wifi, Cpu, ChevronDown, ChevronUp, Users, Zap, Search, X, Power, Cookie, MapPin,
+  BatteryCharging, Shield, Fingerprint, MousePointer, Sun, Moon, Bot, Video, Mic, FileText, Layers
 } from 'lucide-react';
 
 // ============================================================
@@ -38,6 +39,15 @@ const timeAgo = (date) => {
   if (diff < 3600) return `לפני ${Math.floor(diff / 60)} דקות`;
   if (diff < 86400) return `לפני ${Math.floor(diff / 3600)} שעות`;
   return new Date(date).toLocaleDateString('he-IL') + ' ' + new Date(date).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+};
+
+const formatDuration = (seconds) => {
+  if (!seconds || seconds < 0) return '0 שנ׳';
+  if (seconds < 60) return `${seconds} שנ׳`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} דק׳`;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return `${h} שע׳ ${m} דק׳`;
 };
 
 // ============================================================
@@ -112,6 +122,60 @@ const LogRow = ({ log, isExpanded, onToggle }) => (
     </div>
     {isExpanded && (
       <div className="px-5 pb-4 pt-1 border-t border-slate-700/30">
+        {/* ★ Detection flags / badges */}
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {log.userId && (
+            <span className="inline-flex items-center gap-1 bg-blue-500/15 text-blue-300 border border-blue-500/25 px-2 py-0.5 rounded-full text-[10px] font-bold">
+              <Users size={10} /> {log.userId?.name || 'משתמש רשום'}
+            </span>
+          )}
+          {log.session?.isNewSession && (
+            <span className="inline-flex items-center gap-1 bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 px-2 py-0.5 rounded-full text-[10px] font-bold">
+              ✨ סשן חדש
+            </span>
+          )}
+          {log.isTouchDevice && (
+            <span className="inline-flex items-center gap-1 bg-purple-500/15 text-purple-300 border border-purple-500/25 px-2 py-0.5 rounded-full text-[10px] font-bold">
+              <MousePointer size={10} /> מסך מגע
+            </span>
+          )}
+          {log.prefersDarkMode && (
+            <span className="inline-flex items-center gap-1 bg-slate-500/20 text-slate-300 border border-slate-500/25 px-2 py-0.5 rounded-full text-[10px] font-bold">
+              <Moon size={10} /> מצב כהה
+            </span>
+          )}
+          {log.prefersDarkMode === false && (
+            <span className="inline-flex items-center gap-1 bg-amber-500/15 text-amber-300 border border-amber-500/25 px-2 py-0.5 rounded-full text-[10px] font-bold">
+              <Sun size={10} /> מצב בהיר
+            </span>
+          )}
+          {log.doNotTrack && (
+            <span className="inline-flex items-center gap-1 bg-rose-500/15 text-rose-300 border border-rose-500/25 px-2 py-0.5 rounded-full text-[10px] font-bold">
+              <Shield size={10} /> DNT
+            </span>
+          )}
+          {log.adBlocker && (
+            <span className="inline-flex items-center gap-1 bg-red-500/15 text-red-300 border border-red-500/25 px-2 py-0.5 rounded-full text-[10px] font-bold">
+              <Shield size={10} /> Ad Blocker
+            </span>
+          )}
+          {log.webdriver && (
+            <span className="inline-flex items-center gap-1 bg-orange-500/15 text-orange-300 border border-orange-500/25 px-2 py-0.5 rounded-full text-[10px] font-bold">
+              <Bot size={10} /> בוט/אוטומציה
+            </span>
+          )}
+          {log.battery?.charging && (
+            <span className="inline-flex items-center gap-1 bg-green-500/15 text-green-300 border border-green-500/25 px-2 py-0.5 rounded-full text-[10px] font-bold">
+              <BatteryCharging size={10} /> בטעינה
+            </span>
+          )}
+          {log.isOnline === false && (
+            <span className="inline-flex items-center gap-1 bg-red-500/15 text-red-300 border border-red-500/25 px-2 py-0.5 rounded-full text-[10px] font-bold">
+              <Wifi size={10} /> לא מחובר
+            </span>
+          )}
+        </div>
+
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 text-sm">
           {log.location?.country && (
             <Detail icon={<MapPin size={14} />} label="מיקום" value={`${log.location.city || ''} ${log.location.country ? `(${log.location.country})` : ''}`.trim()} />
@@ -121,7 +185,7 @@ const LogRow = ({ log, isExpanded, onToggle }) => (
           <Detail icon={<Globe size={14} />} label="דפדפן" value={`${log.browser?.name || '?'} ${log.browser?.version || ''}`} />
           <Detail icon={<DeviceIcon type={log.device} size={14} />} label="סוג התקן" value={log.device} />
           {log.screen?.width
-            ? <Detail icon={<Monitor size={14} />} label="רזולוציה" value={`${log.screen.width} × ${log.screen.height}${log.screen.isRetina ? ' ✦' : ''}`} />
+            ? <Detail icon={<Monitor size={14} />} label="רזולוציה" value={`${log.screen.width} × ${log.screen.height}${log.screen.isRetina ? ' ✦' : ''}${log.screen.orientation ? ` · ${log.screen.orientation.includes('landscape') ? 'לרוחב' : 'לאורך'}` : ''}`} />
             : <Detail icon={<Monitor size={14} />} label="רזולוציה" value="לא זמין" />
           }
           <Detail
@@ -136,8 +200,20 @@ const LogRow = ({ log, isExpanded, onToggle }) => (
           {log.deviceMemory && <Detail icon={<Cpu size={14} />} label="זיכרון" value={`${log.deviceMemory} GB`} />}
           {log.connection?.effectiveType && <Detail icon={<Wifi size={14} />} label="חיבור" value={log.connection.effectiveType.toUpperCase()} />}
           {log.connection?.rtt != null && <Detail icon={<Zap size={14} />} label="RTT" value={`${log.connection.rtt}ms`} mono />}
+          {log.connection?.downlink != null && <Detail icon={<Zap size={14} />} label="Downlink" value={`${log.connection.downlink} Mbps`} mono />}
+          {log.gpu?.renderer && <Detail icon={<Layers size={14} />} label="GPU" value={log.gpu.renderer} />}
+          {log.battery?.level != null && (
+            <Detail icon={<BatteryCharging size={14} />} label="סוללה" value={`${log.battery.level}%${log.battery.charging ? ' ⚡' : ''}`} />
+          )}
+          {log.session?.pageViews != null && (
+            <Detail icon={<FileText size={14} />} label="דפים בסשן" value={`${log.session.pageViews} דפים · ${formatDuration(log.session.durationSeconds)}`} />
+          )}
+          {log.mediaDevices && (
+            <Detail icon={<Video size={14} />} label="מדיה" value={`${log.mediaDevices.cameras || 0} מצלמות · ${log.mediaDevices.microphones || 0} מיקרופונים`} />
+          )}
+          {log.pluginsCount != null && <Detail icon={<Fingerprint size={14} />} label="תוספים" value={log.pluginsCount} />}
           {log.platform && <Detail label="פלטפורמה" value={log.platform} />}
-          {log.userLanguage && <Detail label="שפה" value={log.userLanguage} />}
+          {log.userLanguage && <Detail label="שפה" value={log.languages?.length > 1 ? log.languages.join(', ') : log.userLanguage} />}
           {log.timezone && <Detail icon={<Clock size={14} />} label="אזור זמן" value={log.timezone} />}
           <Detail icon={<Clock size={14} />} label="זמן מדויק" value={new Date(log.timestamp).toLocaleString('he-IL')} />
           {log.referer && <Detail label="הגיע מ-" value={log.referer} className="col-span-2" />}
@@ -237,9 +313,10 @@ const AdminLogsPage = () => {
 
   const handleExportCSV = () => {
     if (!logs.length) return toast.error('אין לוגים');
-    let csv = 'IP,Browser,OS,Device,Screen,CPU,Memory,Connection,Page,Method,Status,Response(ms),Time\n';
+    let csv = 'IP,Location,Browser,OS,Device,Screen,CPU,Memory,GPU,Battery,Connection,Dark Mode,Touch,Ad Blocker,Bot,Session Pages,Session Duration,Page,Method,Status,Response(ms),Time\n';
     logs.forEach((l) => {
-      csv += `"${l.ipAddress}","${l.browser?.name}","${l.os?.name}","${l.device}","${l.screen?.width||''}x${l.screen?.height||''}","${l.processor?.cores||''}","${l.deviceMemory||''}","${l.connection?.effectiveType||''}","${l.page}","${l.method}","${l.statusCode}","${l.responseTime}","${new Date(l.timestamp).toLocaleString('he-IL')}"\n`;
+      const yn = (v) => v === true ? 'Yes' : v === false ? 'No' : '';
+      csv += `"${l.ipAddress}","${l.location?.city || ''} ${l.location?.country || ''}","${l.browser?.name || ''}","${l.os?.name || ''}","${l.device}","${l.screen?.width||''}x${l.screen?.height||''}","${l.processor?.cores||''}","${l.deviceMemory||''}","${l.gpu?.renderer||''}","${l.battery?.level != null ? l.battery.level + '%' : ''}","${l.connection?.effectiveType||''}","${yn(l.prefersDarkMode)}","${yn(l.isTouchDevice)}","${yn(l.adBlocker)}","${yn(l.webdriver)}","${l.session?.pageViews || ''}","${l.session?.durationSeconds || ''}","${l.page}","${l.method}","${l.statusCode}","${l.responseTime}","${new Date(l.timestamp).toLocaleString('he-IL')}"\n`;
     });
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

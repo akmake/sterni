@@ -122,7 +122,21 @@ export const loggingMiddleware = async (req, res, next) => {
     }
 
     const userId = req.user?._id || null;
-    const clientData = req.body?.logData || {};
+
+    // ★ Read client device info from header (works for ALL methods including GET)
+    let clientData = {};
+    try {
+      const headerVal = req.headers['x-device-info'];
+      if (headerVal) {
+        clientData = JSON.parse(decodeURIComponent(escape(Buffer.from(headerVal, 'base64').toString('binary'))));
+      }
+    } catch (e) {
+      // Fallback: try body (for old clients)
+    }
+    // If header was empty, try body
+    if (!Object.keys(clientData).length && req.body?.logData) {
+      clientData = req.body.logData;
+    }
 
     const originalEnd = res.end;
     let isEnded = false;
@@ -163,7 +177,10 @@ export const loggingMiddleware = async (req, res, next) => {
                 architecture: parsed.cpu?.architecture || clientData.platform || 'Unknown',
               },
               device: deviceType,
-              screen: clientData.screen || {},
+              screen: {
+                ...(clientData.screen || {}),
+                orientation: clientData.screen?.orientation || null,
+              },
               processor: {
                 cores: clientData.processor?.cores || clientData.hardwareConcurrency || null,
                 threads: clientData.processor?.threads || null,
@@ -181,12 +198,27 @@ export const loggingMiddleware = async (req, res, next) => {
               responseTime,
               referer,
               userLanguage: clientData.userLanguage || req.get('accept-language')?.split(',')[0] || null,
+              languages: clientData.languages || [],
               timezone: clientData.timezone || null,
               connection: clientData.connection || {},
               platform: clientData.platform || parsed.os?.name || null,
               hardwareConcurrency: clientData.hardwareConcurrency || clientData.processor?.cores || null,
               deviceMemory: clientData.deviceMemory || null,
-              location, // Add geolocation data
+              location,
+              // ★ New fields
+              gpu: clientData.gpu || null,
+              battery: clientData.battery || null,
+              prefersDarkMode: clientData.prefersDarkMode ?? null,
+              prefersReducedMotion: clientData.prefersReducedMotion ?? null,
+              doNotTrack: clientData.doNotTrack ?? null,
+              isTouchDevice: clientData.isTouchDevice ?? null,
+              session: clientData.session || null,
+              mediaDevices: clientData.mediaDevices || null,
+              adBlocker: clientData.adBlocker ?? null,
+              webdriver: clientData.webdriver ?? null,
+              isOnline: clientData.isOnline ?? null,
+              pdfViewerEnabled: clientData.pdfViewerEnabled ?? null,
+              pluginsCount: clientData.pluginsCount ?? null,
             });
 
             await logEntry.save();

@@ -24,37 +24,30 @@ const getCsrfToken = async () => {
   }
 };
 
-// ★ Request interceptor - add CSRF token to POST, PATCH, DELETE
+// ★ Request interceptor — sends device info on ALL methods via header
 api.interceptors.request.use(
   async (config) => {
+    // ── CSRF for mutations ──
     if (['post', 'patch', 'delete'].includes(config.method?.toLowerCase())) {
       const token = await getCsrfToken();
       if (token) {
         config.headers['X-CSRF-Token'] = token;
       }
-      
-      // Add device info to request body (but NOT to FormData)
+
+      // FormData — don't touch Content-Type (browser sets boundary)
       if (config.data instanceof FormData) {
-        // FormData — don't modify, and let browser set Content-Type with boundary
         delete config.headers['Content-Type'];
-      } else {
-        const deviceInfo = collectDeviceInfo();
-        if (!config.data) {
-          config.data = { logData: deviceInfo };
-        } else if (typeof config.data === 'string') {
-          // retry — data already serialized to JSON string, parse and add if missing
-          try {
-            const parsed = JSON.parse(config.data);
-            if (!parsed.logData) {
-              parsed.logData = deviceInfo;
-              config.data = JSON.stringify(parsed);
-            }
-          } catch { /* not JSON, skip */ }
-        } else {
-          config.data.logData = deviceInfo;
-        }
       }
     }
+
+    // ── Device info — sent as header on EVERY request (GET, POST, etc.) ──
+    try {
+      const deviceInfo = collectDeviceInfo();
+      config.headers['X-Device-Info'] = btoa(unescape(encodeURIComponent(JSON.stringify(deviceInfo))));
+    } catch (e) {
+      // Silently fail — don't break the actual request
+    }
+
     return config;
   },
   (error) => Promise.reject(error)

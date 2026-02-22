@@ -565,10 +565,11 @@ const PriceQuoteGenerator = () => {
         const pdfBlob = pdf.output('blob');
 
         const formData = new FormData();
-        formData.append('file', pdfBlob, `quote_${clientName.replace(/[^a-zA-Z0-9א-ת]/g, '_')}.pdf`);
+        formData.append('file', pdfBlob, `document_${Date.now()}.pdf`);
+        formData.append('displayFilename', `הצעת מחיר - ${clientName}${contactName ? ` - ${contactName}` : ''}.pdf`);
         formData.append('email', targetEmail);
         formData.append('subject', `הצעת מחיר - ${clientName}`);
-        formData.append('body', `מצורפת הצעת מחיר עבור ${clientName}.\n\nבברכה,\nצוות ציפורי.`);
+        formData.append('body', `שלום רב,\n\nמצורפת הצעת מחיר עבור ${clientName}.\n\nבברכה,\nצוות ציפורי.`);
 
         await api.post('/emails/send-attachment', formData, {
             headers: { 'Content-Type': 'multipart/form-data' }

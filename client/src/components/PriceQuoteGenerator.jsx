@@ -570,9 +570,8 @@ const PriceQuoteGenerator = () => {
         formData.append('subject', `הצעת מחיר - ${clientName}`);
         formData.append('body', `מצורפת הצעת מחיר עבור ${clientName}.\n\nבברכה,\nצוות ציפורי.`);
 
-        await axios.post('/api/emails/send-attachment', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-            withCredentials: true
+        await api.post('/emails/send-attachment', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
         });
         toast.success('המייל נשלח בהצלחה!', { id: toastId });
 

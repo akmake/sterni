@@ -33,21 +33,26 @@ api.interceptors.request.use(
         config.headers['X-CSRF-Token'] = token;
       }
       
-      // Add device info to request body
-      const deviceInfo = collectDeviceInfo();
-      if (!config.data) {
-        config.data = { logData: deviceInfo };
-      } else if (typeof config.data === 'string') {
-        // retry — data already serialized to JSON string, parse and add if missing
-        try {
-          const parsed = JSON.parse(config.data);
-          if (!parsed.logData) {
-            parsed.logData = deviceInfo;
-            config.data = JSON.stringify(parsed);
-          }
-        } catch { /* not JSON, skip */ }
+      // Add device info to request body (but NOT to FormData)
+      if (config.data instanceof FormData) {
+        // FormData — don't modify, and let browser set Content-Type with boundary
+        delete config.headers['Content-Type'];
       } else {
-        config.data.logData = deviceInfo;
+        const deviceInfo = collectDeviceInfo();
+        if (!config.data) {
+          config.data = { logData: deviceInfo };
+        } else if (typeof config.data === 'string') {
+          // retry — data already serialized to JSON string, parse and add if missing
+          try {
+            const parsed = JSON.parse(config.data);
+            if (!parsed.logData) {
+              parsed.logData = deviceInfo;
+              config.data = JSON.stringify(parsed);
+            }
+          } catch { /* not JSON, skip */ }
+        } else {
+          config.data.logData = deviceInfo;
+        }
       }
     }
     return config;

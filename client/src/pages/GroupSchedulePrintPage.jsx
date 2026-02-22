@@ -4,7 +4,7 @@ import { he } from 'date-fns/locale';
 import { Printer, Download, Mail, ArrowRight, Loader2, Users, MapPin, Info } from 'lucide-react';
 import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
-import axios from 'axios';
+import api from '../api';
 import { toast } from 'react-hot-toast';
 
 // --- Helpers (זהה ל-FullScheduleReportPage) ---
@@ -188,9 +188,8 @@ export default function GroupSchedulePrintPage() {
       formData.append('subject', `לו"ז - ${processedData?.name || 'קבוצה'}`);
       formData.append('body', `מצורף לו"ז עבור ${processedData?.name || 'הקבוצה'}.\n\nבברכה.`);
 
-      await axios.post('/api/emails/send-attachment', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        withCredentials: true
+      await api.post('/emails/send-attachment', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
       toast.success('המייל נשלח בהצלחה!', { id: toastId });
       setShowEmailInput(false);

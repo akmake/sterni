@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Edit2, Trash2, Lock, Shield, User, Mail, Calendar, Save, X, Check } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import axios from 'axios';
+import api from '../api';
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState([]);
@@ -17,7 +17,7 @@ export default function AdminUsersPage() {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get('/api/admin/users');
+      const response = await api.get('/admin/users');
       setUsers(response.data.data?.users || []);
     } catch (error) {
       toast.error('שגיאה בטעינת משתמשים');
@@ -38,7 +38,7 @@ export default function AdminUsersPage() {
 
   const handleSaveEdit = async (userId) => {
     try {
-      await axios.patch(`/api/admin/users/${userId}`, editData);
+      await api.patch(`/admin/users/${userId}`, editData);
       setUsers(users.map(u => u._id === userId ? { ...u, ...editData } : u));
       setEditingId(null);
       toast.success('משתמש עודכן בהצלחה');
@@ -55,7 +55,7 @@ export default function AdminUsersPage() {
     }
 
     try {
-      await axios.patch(`/api/admin/users/${userId}/password`, { newPassword });
+      await api.patch(`/admin/users/${userId}/password`, { newPassword });
       setShowPasswordModal(null);
       setNewPassword('');
       toast.success('סיסמה התחדשה בהצלחה');
@@ -67,7 +67,7 @@ export default function AdminUsersPage() {
 
   const handleChangeRole = async (userId, newRole) => {
     try {
-      await axios.patch(`/api/admin/users/${userId}/role`, { role: newRole });
+      await api.patch(`/admin/users/${userId}/role`, { role: newRole });
       setUsers(users.map(u => u._id === userId ? { ...u, role: newRole } : u));
       toast.success(`תפקיד עודכן ל${newRole}`);
     } catch (error) {
@@ -80,7 +80,7 @@ export default function AdminUsersPage() {
     if (!window.confirm(`האם אתה בטוח שברצונך למחוק את ${userName}?`)) return;
 
     try {
-      await axios.delete(`/api/admin/users/${userId}`);
+      await api.delete(`/admin/users/${userId}`);
       setUsers(users.filter(u => u._id !== userId));
       toast.success('משתמש נמחק בהצלחה');
     } catch (error) {

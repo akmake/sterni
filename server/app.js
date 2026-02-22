@@ -26,6 +26,8 @@ import settingsRoutes from './routes/settingsRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import logsRoutes from './routes/logsRoutes.js';
 
+import tzitzitRoutes from './routes/tzitzitRoutes.js';
+
 import rateLimiter from './middlewares/rateLimiter.js';
 import { requireAuth } from './middlewares/authMiddleware.js';
 import { startEmailListener } from './services/emailListener.js';
@@ -103,6 +105,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/quotes', requireAuth, quoteRouter);
 app.use('/api/payments', requireAuth, paymentRoutes);
 app.use('/api/payment-requests', requireAuth, paymentRequestRoutes);
+app.use('/api/tzitzit', requireAuth, tzitzitRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Error Handling

@@ -55,6 +55,7 @@ const KitchenStaffManager = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [meals, setMeals] = useState([]);
+  const [mealDefinitions, setMealDefinitions] = useState({});
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 0 }));
   
   // ניהול עובדים
@@ -116,9 +117,37 @@ const KitchenStaffManager = () => {
     fetchData();
   }, [currentWeekStart]);
 
+  // Fetch meal definitions from API
+  const fetchMealDefinitions = async () => {
+    try {
+      const response = await api.get('/meals');
+      const fetchedMeals = response.data.data?.meals || [];
+      const definitions = {};
+      
+      fetchedMeals.forEach((meal) => {
+        definitions[meal._id] = {
+          label: meal.name,
+          kosherOptions: meal.kosherOptions || [],
+          menuOptions: meal.menuOptions || [],
+          _id: meal._id
+        };
+      });
+      
+      setMealDefinitions(definitions);
+      return definitions; // Return for immediate use
+    } catch (err) {
+      console.error('Failed to fetch meal definitions:', err);
+      return {};
+    }
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
+      // Fetch meal definitions first and get them directly
+      const mealDefs = await fetchMealDefinitions();
+
+      // Then fetch groups and meals
       const res = await api.get('/groups');
       const groups = res.data.data || res.data || [];
       const extracted = [];
@@ -137,6 +166,18 @@ const KitchenStaffManager = () => {
           if (!isWithinInterval(eventDate, { start: rangeStart, end: rangeEnd })) return;
 
           const uniqueId = `${group._id}_${event._id || idx}`;
+          
+          // Get meal definition to validate menu item and kosher options
+          const mealId = event.mealId || event.mealType;
+          const mealDef = mealDefs[mealId];
+          
+          // Validate menuItem against definition
+          let menuItem = getSmartMenuName(event);
+          if (mealDef && event.menuItem && !mealDef.menuOptions.includes(event.menuItem)) {
+            // If the menu item doesn't exist in the definition, use first available or dash
+            menuItem = mealDef.menuOptions[0] || '-';
+          }
+          
           extracted.push({
             uniqueId,
             groupName: group.name,
@@ -146,9 +187,11 @@ const KitchenStaffManager = () => {
             pax: event.pax || 0,
             kosherType: getKosherType(event.kosherType),
             kosherTypeRaw: event.kosherType,
-            menuItem: getSmartMenuName(event),
+            menuItem: menuItem,
             hall: event.hall?.name || event.locationText || '-',
-            requirements: event.requirements || event.notes || ''
+            requirements: event.requirements || event.notes || '',
+            mealId: mealId,
+            mealDef: mealDef
           });
         });
       });

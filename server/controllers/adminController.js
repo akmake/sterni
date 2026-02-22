@@ -41,12 +41,18 @@ export const updateUser = catchAsync(async (req, res, next) => {
     return next(new AppError('לא יכול להוריד את עצמך מנהל', 400));
   }
 
+  // Get current user data to check email changes
+  const currentUser = await User.findById(userId);
+  if (!currentUser) {
+    return next(new AppError('משתמש לא נמצא', 404));
+  }
+
   const updateData = {};
   if (name) updateData.name = name;
   if (role && ['user', 'admin'].includes(role)) updateData.role = role;
 
   // Check if email is unique (if changing)
-  if (email && email !== req.user.email) {
+  if (email && email !== currentUser.email) {
     const existing = await User.findOne({ email });
     if (existing) {
       return next(new AppError('אימייל זה כבר בשימוש', 400));

@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 
 import Layout from "@/components/Layout";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import AdminOnlyRoute from "@/components/AdminOnlyRoute";
 
 import LoginPage       from "@/pages/LoginPage";
 import RegisterPage    from "@/pages/RegisterPage";
@@ -37,6 +38,7 @@ import FinancialReportPage from '@/pages/Financialreportpage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import AdminMealsPage from './pages/AdminMealsPage';
 import AdminLogsPage from './pages/AdminLogsPage';
+import TzitzitManagementPage from './pages/TzitzitManagementPage';
 
 export default function App() {
   return (
@@ -76,9 +78,13 @@ export default function App() {
           <Route path="thai-schedule"         element={<ThaiSchedulePage />} />
           <Route path="groups/:groupId/payments" element={<GroupPaymentsPage />} />
           <Route path="financial-report" element={<FinancialReportPage />} />
+        </Route>
+
+        <Route element={<AdminOnlyRoute />}>
           <Route path="admin/users" element={<AdminUsersPage />} />
           <Route path="admin/meals" element={<AdminMealsPage />} />
           <Route path="admin/logs" element={<AdminLogsPage />} />
+          <Route path="admin/tzitzit" element={<TzitzitManagementPage />} />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

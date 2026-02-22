@@ -32,7 +32,7 @@ export default function Layout() {
       <button
         onClick={() => setIsCalcOpen(!isCalcOpen)}
         className={`
-          fixed bottom-8 left-8 z-50 
+          fixed bottom-8 left-8 z-[51] 
           p-4 rounded-full shadow-2xl 
           transition-all duration-300 hover:scale-110 active:scale-95
           flex items-center justify-center

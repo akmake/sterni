@@ -1,6 +1,6 @@
 import { useState, Fragment } from "react";
 import { Link, NavLink  } from "react-router-dom";
-import { Menu, X, LogOut, Home, Briefcase,Utensils,FileText, ChevronDown,MessageSquare, Settings,MapPin, UserCircle,ListTodo, User, Users,Mail,CalendarDays, CreditCard, Shield, BarChart3 } from "lucide-react";
+import { Menu, X, LogOut, Home, Briefcase,Utensils,FileText, ChevronDown,MessageSquare, Settings,MapPin, UserCircle,ListTodo, User, Users,Mail,CalendarDays, CreditCard, Shield, BarChart3, Scissors } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/stores/authStore";
 import { Button } from "@/components/ui/Button";
@@ -27,6 +27,7 @@ const navItems = [
     { to: '/admin/users', label: 'ניהול משתמשים', icon: Shield, type: 'link', auth: true, admin: true },
     { to: '/admin/meals', label: 'ניהול ארוחות', icon: Utensils, type: 'link', auth: true, admin: true },
     { to: '/admin/logs', label: 'דוח מבקרים', icon: BarChart3, type: 'link', auth: true, admin: true },
+    { to: '/admin/tzitzit', label: 'ניהול ציציות', icon: Scissors, type: 'link', auth: true, admin: true },
 ];
 
 const getVisibleItems = (isAuthenticated, user) => {

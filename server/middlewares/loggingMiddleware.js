@@ -1,18 +1,90 @@
 import Log from '../models/Log.js';
+import SystemConfig from '../models/SystemConfig.js';
 import { UAParser } from 'ua-parser-js';
+import axios from 'axios';
 
-// נתיבים שלא נרשום
+// Cache for geolocation data to avoid excessive API calls
+const geoCache = new Map();
+const GEO_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+// נתיבים שלא נרשום לעולם
 const SKIP_PREFIXES = ['/api/logs', '/api/csrf-token', '/uploads', '/favicon', '/opo.png'];
 
-// ★ ניקוי IP — מסיר את ה-prefix של IPv6 Mapped IPv4
+// ★ Cache של הגדרת loggingEnabled — כדי לא לפנות ל-DB בכל request
+let loggingEnabledCache = false;
+let cacheTimestamp = 0;
+const CACHE_TTL = 10_000; // רענון כל 10 שניות
+
+const isLoggingEnabled = async () => {
+  const now = Date.now();
+  if (now - cacheTimestamp < CACHE_TTL) return loggingEnabledCache;
+
+  try {
+    const config = await SystemConfig.findOne().lean();
+    loggingEnabledCache = config?.loggingEnabled === true;
+    cacheTimestamp = now;
+  } catch (err) {
+    // אם DB נפל — משתמשים ב-cache האחרון
+  }
+  return loggingEnabledCache;
+};
+
+// ★ פונקציה חיצונית שמאפשרת לרענן את ה-cache מיד (נקראת כשמשנים הגדרה)
+export const refreshLoggingCache = (value) => {
+  loggingEnabledCache = value;
+  cacheTimestamp = Date.now();
+};
+
+// ניקוי IP
 const cleanIP = (raw) => {
   if (!raw) return 'unknown';
   let ip = raw;
-  // ::ffff:192.168.1.1 → 192.168.1.1
   if (ip.startsWith('::ffff:')) ip = ip.slice(7);
-  // ::1 → localhost
   if (ip === '::1') ip = '127.0.0.1';
   return ip;
+};
+
+// Get geolocation from IP with caching
+const getGeolocation = async (ipAddress) => {
+  // Skip for localhost
+  if (ipAddress === '127.0.0.1' || ipAddress === 'unknown') {
+    return { country: 'Local', city: 'Localhost' };
+  }
+
+  // Check cache first
+  if (geoCache.has(ipAddress)) {
+    const cached = geoCache.get(ipAddress);
+    if (Date.now() - cached.timestamp < GEO_CACHE_TTL) {
+      return cached.data;
+    }
+    geoCache.delete(ipAddress);
+  }
+
+  try {
+    // Using ip-api.com free API (45 requests per minute limit)
+    const response = await axios.get(`http://ip-api.com/json/${ipAddress}?fields=country,city,region,lat,lon`, {
+      timeout: 2000, // 2 seconds timeout
+    });
+
+    if (response.data.status === 'success') {
+      const location = {
+        country: response.data.country || 'Unknown',
+        city: response.data.city || 'Unknown',
+        region: response.data.region || 'Unknown',
+        latitude: response.data.lat || null,
+        longitude: response.data.lon || null,
+      };
+
+      // Cache the result
+      geoCache.set(ipAddress, { data: location, timestamp: Date.now() });
+      return location;
+    }
+  } catch (err) {
+    // Silently fail and return default
+    console.warn(`Geolocation lookup failed for IP ${ipAddress}: ${err.message}`);
+  }
+
+  return { country: 'Unknown', city: 'Unknown' };
 };
 
 export const loggingMiddleware = async (req, res, next) => {
@@ -21,10 +93,14 @@ export const loggingMiddleware = async (req, res, next) => {
     SKIP_PREFIXES.some((p) => req.originalUrl.startsWith(p));
   if (skip) return next();
 
+  // ★ בדיקה: אם הלוגים כבויים — ממשיכים בלי לשמור כלום
+  const enabled = await isLoggingEnabled();
+  if (!enabled) return next();
+
   try {
     const startTime = Date.now();
 
-    // ★ תיקון: IP אמיתי מאחורי proxy (nginx/cloudflare)
+    // IP אמיתי מאחורי proxy
     const rawIP = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
                || req.headers['x-real-ip']
                || req.ip
@@ -37,7 +113,7 @@ export const loggingMiddleware = async (req, res, next) => {
     const cookieHeader = req.get('cookie') || '';
 
     // Parse user agent
-    let parsed = { browser: {}, os: {}, device: {} };
+    let parsed = { browser: {}, os: {}, device: {}, cpu: {} };
     try {
       const parser = new UAParser(userAgent);
       parsed = parser.getResult();
@@ -46,37 +122,32 @@ export const loggingMiddleware = async (req, res, next) => {
     }
 
     const userId = req.user?._id || null;
-
-    // ★ תיקון: נקרא logData גם מ-body וגם מ-query (ל-GET requests)
-    // deviceInfo נשלח מהקליינט רק ב-POST/PATCH/DELETE (דרך body).
-    // ב-GET זה ריק, אז אנחנו מסתמכים על ua-parser בלבד.
     const clientData = req.body?.logData || {};
 
-    // Store original end method
     const originalEnd = res.end;
     let isEnded = false;
 
     res.end = function (...args) {
       if (!isEnded) {
         isEnded = true;
-
         const responseTime = Date.now() - startTime;
 
-        // שמירה אסינכרונית
         setImmediate(async () => {
           try {
-            // ★ זיהוי device type — קודם ua-parser, fallback לנתוני הקליינט
+            // זיהוי device type
             let deviceType = 'unknown';
             if (parsed.device?.type === 'mobile') deviceType = 'mobile';
             else if (parsed.device?.type === 'tablet') deviceType = 'tablet';
             else if (parsed.device?.type) deviceType = parsed.device.type;
             else {
-              // ua-parser לפעמים לא מזהה desktop — אם אין device type, זה desktop
               const ua = userAgent.toLowerCase();
-              if (ua.includes('mobile') || ua.includes('android') && !ua.includes('tablet')) deviceType = 'mobile';
+              if (ua.includes('mobile') || (ua.includes('android') && !ua.includes('tablet'))) deviceType = 'mobile';
               else if (ua.includes('tablet') || ua.includes('ipad')) deviceType = 'tablet';
               else deviceType = 'desktop';
             }
+
+            // Get geolocation from IP
+            const location = await getGeolocation(ipAddress);
 
             const logEntry = new Log({
               userId,
@@ -115,11 +186,11 @@ export const loggingMiddleware = async (req, res, next) => {
               platform: clientData.platform || parsed.os?.name || null,
               hardwareConcurrency: clientData.hardwareConcurrency || clientData.processor?.cores || null,
               deviceMemory: clientData.deviceMemory || null,
+              location, // Add geolocation data
             });
 
             await logEntry.save();
           } catch (err) {
-            // שגיאת שמירה לא צריכה לקרוס את האפליקציה
             if (!err.message?.includes('buffering timed out')) {
               console.error('Error saving log:', err.message);
             }
@@ -133,7 +204,7 @@ export const loggingMiddleware = async (req, res, next) => {
     next();
   } catch (err) {
     console.error('Logging middleware error:', err.message);
-    next(); // תמיד ממשיכים — לוגים לא מפילים את האפליקציה
+    next();
   }
 };
 

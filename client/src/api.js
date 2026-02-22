@@ -35,10 +35,19 @@ api.interceptors.request.use(
       
       // Add device info to request body
       const deviceInfo = collectDeviceInfo();
-      if (config.data) {
-        config.data.logData = deviceInfo;
-      } else {
+      if (!config.data) {
         config.data = { logData: deviceInfo };
+      } else if (typeof config.data === 'string') {
+        // retry — data already serialized to JSON string, parse and add if missing
+        try {
+          const parsed = JSON.parse(config.data);
+          if (!parsed.logData) {
+            parsed.logData = deviceInfo;
+            config.data = JSON.stringify(parsed);
+          }
+        } catch { /* not JSON, skip */ }
+      } else {
+        config.data.logData = deviceInfo;
       }
     }
     return config;
@@ -62,6 +71,17 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    // אם 403 CSRF invalid — רענן טוקן ונסה שוב פעם אחת
+    if (error.response?.status === 403 && !originalRequest._csrfRetry) {
+      originalRequest._csrfRetry = true;
+      csrfToken = null; // פינוי cache
+      const newToken = await getCsrfToken();
+      if (newToken) {
+        originalRequest.headers['X-CSRF-Token'] = newToken;
+        return api(originalRequest);
+      }
+    }
 
     // If 401 and we haven't tried refreshing yet
     if (error.response?.status === 401 && !originalRequest._retry) {

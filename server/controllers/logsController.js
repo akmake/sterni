@@ -1,5 +1,39 @@
 import Log from '../models/Log.js';
+import SystemConfig from '../models/SystemConfig.js';
 import catchAsync from '../utils/catchAsync.js';
+import { refreshLoggingCache } from '../middlewares/loggingMiddleware.js';
+
+// ★ Toggle logging on/off
+export const toggleLogging = catchAsync(async (req, res) => {
+  const { enabled } = req.body;
+
+  let config = await SystemConfig.findOne();
+  if (!config) {
+    config = await SystemConfig.create({ loggingEnabled: !!enabled });
+  } else {
+    config.loggingEnabled = !!enabled;
+    await config.save();
+  }
+
+  // רענון מיידי של ה-cache ב-middleware — בלי לחכות 10 שניות
+  refreshLoggingCache(config.loggingEnabled);
+
+  console.log(`📊 Logging ${config.loggingEnabled ? 'ENABLED ✅' : 'DISABLED ❌'}`);
+
+  res.status(200).json({
+    status: 'success',
+    loggingEnabled: config.loggingEnabled,
+  });
+});
+
+// ★ Get logging status
+export const getLoggingStatus = catchAsync(async (req, res) => {
+  const config = await SystemConfig.findOne().lean();
+  res.status(200).json({
+    status: 'success',
+    loggingEnabled: config?.loggingEnabled === true,
+  });
+});
 
 // Get all logs (admin only)
 export const getAllLogs = catchAsync(async (req, res) => {
@@ -15,7 +49,7 @@ export const getAllLogs = catchAsync(async (req, res) => {
 
   if (userId) filter.userId = userId;
 
-  // ★ תיקון: חיפוש חלקי של IP (regex)
+  // חיפוש חלקי של IP
   if (ipAddress) {
     filter.ipAddress = { $regex: ipAddress.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
   }
@@ -55,44 +89,37 @@ export const getLogsSummary = catchAsync(async (req, res) => {
     Log.distinct('userId'),
   ]);
 
-  // Top browsers
   const topBrowsers = await Log.aggregate([
     { $group: { _id: '$browser.name', count: { $sum: 1 } } },
     { $sort: { count: -1 } },
     { $limit: 10 },
   ]);
 
-  // Top devices
   const topDevices = await Log.aggregate([
     { $group: { _id: '$device', count: { $sum: 1 } } },
     { $sort: { count: -1 } },
   ]);
 
-  // Top OS
   const topOS = await Log.aggregate([
     { $group: { _id: '$os.name', count: { $sum: 1 } } },
     { $sort: { count: -1 } },
     { $limit: 10 },
   ]);
 
-  // Top pages
   const topPages = await Log.aggregate([
     { $group: { _id: '$page', count: { $sum: 1 } } },
     { $sort: { count: -1 } },
     { $limit: 10 },
   ]);
 
-  // ★ חדש: מבקרים ייחודיים ב-24 שעות (לפי IP)
   const uniqueIPsToday = await Log.distinct('ipAddress', { timestamp: { $gte: last24Hours } });
 
-  // ★ חדש: ממוצע תגובה
   const avgResponseAgg = await Log.aggregate([
     { $match: { timestamp: { $gte: last24Hours } } },
     { $group: { _id: null, avg: { $avg: '$responseTime' } } },
   ]);
   const avgResponseTime = avgResponseAgg[0]?.avg || 0;
 
-  // ★ חדש: Top IPs (מי הכי פעיל)
   const topIPs = await Log.aggregate([
     { $match: { timestamp: { $gte: last7Days } } },
     { $group: { _id: '$ipAddress', count: { $sum: 1 }, lastSeen: { $max: '$timestamp' } } },
@@ -153,4 +180,15 @@ export const deleteOldLogs = catchAsync(async (req, res) => {
   });
 });
 
-export default { getAllLogs, getLogsSummary, getMyLogs, deleteOldLogs };
+// Delete ALL logs
+export const deleteAllLogs = catchAsync(async (req, res) => {
+  const result = await Log.deleteMany({});
+
+  res.status(200).json({
+    status: 'success',
+    message: `נמחקו ${result.deletedCount} לוגים`,
+    deletedCount: result.deletedCount,
+  });
+});
+
+export default { toggleLogging, getLoggingStatus, getAllLogs, getLogsSummary, getMyLogs, deleteOldLogs, deleteAllLogs };

@@ -5,18 +5,26 @@ import {
   getLogsSummary,
   getMyLogs,
   deleteOldLogs,
+  deleteAllLogs,
+  toggleLogging,
+  getLoggingStatus,
 } from '../controllers/logsController.js';
 
 const router = express.Router();
 
-// Admin routes - view all logs
+// ★ Toggle + Status — שליטה על הלוגים
+router.post('/admin/toggle', requireAuth, requireAdmin, toggleLogging);
+router.get('/admin/status', requireAuth, requireAdmin, getLoggingStatus);
+
+// Admin routes
 router.get('/admin/all', requireAuth, requireAdmin, getAllLogs);
 router.get('/admin/summary', requireAuth, requireAdmin, getLogsSummary);
 
-// User routes - view own logs
+// User routes
 router.get('/my-logs', requireAuth, getMyLogs);
 
-// Admin routes - cleanup
+// Cleanup
 router.delete('/admin/cleanup', requireAuth, requireAdmin, deleteOldLogs);
+router.delete('/admin/delete-all', requireAuth, requireAdmin, deleteAllLogs);
 
 export default router;

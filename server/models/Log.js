@@ -35,8 +35,13 @@ const logSchema = new mongoose.Schema(
     screen: {
       width: Number,
       height: Number,
+      availWidth: Number,
+      availHeight: Number,
+      viewportWidth: Number,
+      viewportHeight: Number,
       colorDepth: Number,
       pixelDepth: Number,
+      pixelRatio: Number,
       refreshRate: Number,
       isRetina: Boolean,
       orientation: String,

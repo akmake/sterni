@@ -50,24 +50,7 @@ const TransparentInput = ({ value, onChange, className, placeholder, style }) =>
 );
 
 // --- פונקציות עזר לתאריכים ---
-const toGematria = (num) => {
-  const letters = { 1:'א', 2:'ב', 3:'ג', 4:'ד', 5:'ה', 6:'ו', 7:'ז', 8:'ח', 9:'ט', 10:'י', 20:'כ', 30:'ל', 40:'מ', 50:'נ', 60:'ס', 70:'ע', 80:'פ', 90:'צ', 100:'ק', 200:'ר', 300:'ש', 400:'ת' };
-  let str = "";
-  if (num >= 400) { str += letters[400]; num -= 400; }
-  if (num >= 300) { str += letters[300]; num -= 300; }
-  if (num >= 200) { str += letters[200]; num -= 200; }
-  if (num >= 100) { str += letters[100]; num -= 100; }
-  if (num >= 10) {
-    if (num === 15) return str + "טו";
-    if (num === 16) return str + "טז";
-    const tens = Math.floor(num / 10) * 10;
-    str += letters[tens];
-    num -= tens;
-  }
-  if (num > 0) str += letters[num];
-  if (str.length === 1) return str + "'";
-  return str.slice(0, -1) + '"' + str.slice(-1);
-};
+import { toGematria } from '../utils/hebrewDate';
 
 const formatEventDateDayHebrew = (dateInput) => {
     if (!dateInput) return '-';
@@ -81,7 +64,7 @@ const formatEventDateDayHebrew = (dateInput) => {
     const hDayGematria = isNaN(hDay) ? hDay : toGematria(parseInt(hDay));
     const gregDate = date.toLocaleDateString('en-GB');
 
-    return `${dayName}, ${hDayGematria} ב${hMonth} (${gregDate})`;
+    return `${dayName}, ${hDayGematria} ${hMonth} (${gregDate})`;
 };
 
 // --- רכיב הוספה ---

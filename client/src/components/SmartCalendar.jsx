@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import api from '../api';
+import { formatShortHebrewDate } from '../utils/hebrewDate';
 
 /**
  * SmartCalendar v2
@@ -51,13 +52,7 @@ export default function SmartCalendar({ existingGroups = [], onSelectRange, show
   const getDaysInMonth = (date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   const getFirstDayOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1).getDay();
 
-  const getHebrewDate = (date) => {
-    try {
-      return new Intl.DateTimeFormat('he-u-ca-hebrew', { day: 'numeric', month: 'numeric' }).format(date);
-    } catch {
-      return '';
-    }
-  };
+  const getHebrewDate = (date) => formatShortHebrewDate(date);
 
   const changeMonth = (increment) => {
     const newDate = new Date(currentDate);

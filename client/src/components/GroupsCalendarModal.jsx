@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronRight, ChevronLeft, X, Users, FileText, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
+import { formatShortHebrewDate } from '../utils/hebrewDate';
 
 /**
  * GroupsCalendarModal — לוח שנה עם נקודות לקבוצות והצעות מחיר
@@ -78,11 +79,7 @@ export default function GroupsCalendarModal({ groups = [], onClose }) {
     setSelectedDay(null);
   };
 
-  const getHebrewDate = (date) => {
-    try {
-      return new Intl.DateTimeFormat('he-u-ca-hebrew', { day: 'numeric', month: 'numeric' }).format(date);
-    } catch { return ''; }
-  };
+  const getHebrewDate = (date) => formatShortHebrewDate(date);
 
   const handleDayClick = (day) => {
     const dateObj = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);

@@ -292,7 +292,8 @@ export default function GroupDetailsPage() {
       pax: event.pax,
       price: event.price || '',
       requirements: event.requirements || '',
-      mealType: event.mealType || 'breakfast',
+      mealId: event.mealId?._id || event.mealId || '',
+      mealType: event.mealType || '',
       kosherType: event.kosherType || 'parve',
       menuItem: finalMenu 
     });

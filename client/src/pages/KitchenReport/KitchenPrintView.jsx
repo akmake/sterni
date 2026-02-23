@@ -159,7 +159,7 @@ export default function KitchenPrintView({
                   </thead>
                   <tbody>
                     {dayEvents.map((ev, i) => {
-                      const mealLabel = MEAL_LABELS[ev.mealType] || ev.title || 'אירוע';
+                      const mealLabel = ev.mealId?.name || MEAL_LABELS[ev.mealType] || ev.title || 'אירוע';
                       const loc = ev.hall?.name || ev.locationText || '-';
                       const kosherMeta = getKosherMeta(ev.kosherType);
                       const kosherLabel = kosherMeta?.label || '';
@@ -239,7 +239,7 @@ export default function KitchenPrintView({
                     </thead>
                     <tbody>
                       {groupEvents.map((ev, i) => {
-                        const mealLabel = MEAL_LABELS[ev.mealType] || ev.title || 'אירוע';
+                        const mealLabel = ev.mealId?.name || MEAL_LABELS[ev.mealType] || ev.title || 'אירוע';
                         const loc = ev.hall?.name || ev.locationText || '-';
                         const kosher = getKosherMeta(ev.kosherType)?.label || '';
 

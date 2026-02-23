@@ -87,7 +87,7 @@ export default function KitchenScreenView({
                     if (kosherMeta?.tone === 'parve') barColor = 'bg-emerald-400';
                     if (kosherMeta?.tone === 'dairy') barColor = 'bg-blue-400';
 
-                    const mealLabel = MEAL_LABELS[event.mealType] || event.title || 'אירוע';
+                    const mealLabel = event.mealId?.name || MEAL_LABELS[event.mealType] || event.title || 'אירוע';
                     const location = event.hall?.name || event.locationText || '---';
                     const pax = Number(event.pax || 0);
                     const groupName = event.groupName || '—';
@@ -204,7 +204,7 @@ export default function KitchenScreenView({
                         </thead>
                         <tbody className="text-slate-800">
                           {groupData.events.map((ev, i) => {
-                            const mealLabel = MEAL_LABELS[ev.mealType] || ev.title || 'אירוע';
+                            const mealLabel = ev.mealId?.name || MEAL_LABELS[ev.mealType] || ev.title || 'אירוע';
                             const loc = ev.hall?.name || ev.locationText || '---';
                             return (
                               <tr

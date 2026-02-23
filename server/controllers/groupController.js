@@ -6,6 +6,7 @@ export const getGroups = async (req, res, next) => {
   try {
     const groups = await Group.find({})
       .populate('schedule.hall')
+      .populate('schedule.mealId')
       .sort({ startDate: 1 });
     res.json(groups);
   } catch (err) { next(err); }
@@ -14,7 +15,7 @@ export const getGroups = async (req, res, next) => {
 // --- קבלת קבוצה בודדת ---
 export const getGroup = async (req, res, next) => {
   try {
-    const group = await Group.findById(req.params.id || req.params.groupId).populate('schedule.hall');
+    const group = await Group.findById(req.params.id || req.params.groupId).populate('schedule.hall').populate('schedule.mealId');
     if (!group) return next(new AppError('Group not found', 404));
     res.json(group);
   } catch (err) { next(err); }
@@ -173,7 +174,7 @@ export const deleteGroup = async (req, res, next) => {
 export const addEventToGroup = async (req, res, next) => {
   try {
     const { groupId } = req.params;
-    const { title, date, startTime, endTime, hall, requirements, pax, eventType, mealType, mealId, kosherType, locationText } = req.body;
+    const { title, date, startTime, endTime, hall, requirements, pax, eventType, mealType, mealId, kosherType, locationText, menuItem } = req.body;
 
     const group = await Group.findById(groupId);
     if (!group) return next(new AppError('Group not found', 404));
@@ -181,7 +182,7 @@ export const addEventToGroup = async (req, res, next) => {
     // הוספת האירוע
     group.schedule.push({ 
         title, date, startTime, endTime, hall, requirements, pax,
-        eventType, mealType, mealId, kosherType, locationText
+        eventType, mealType, mealId, kosherType, locationText, menuItem
     });
     await group.save();
 
@@ -195,7 +196,7 @@ export const addEventToGroup = async (req, res, next) => {
 export const updateGroupEvent = async (req, res, next) => {
   try {
     const { groupId, eventId } = req.params;
-    const { title, date, startTime, endTime, hall, requirements, pax, eventType, mealType, mealId, kosherType, locationText } = req.body;
+    const { title, date, startTime, endTime, hall, requirements, pax, eventType, mealType, mealId, kosherType, locationText, menuItem } = req.body;
 
     // הכנת אובייקט העדכון
     const setFields = {
@@ -210,6 +211,7 @@ export const updateGroupEvent = async (req, res, next) => {
         "schedule.$.mealId": mealId || null,
         "schedule.$.kosherType": kosherType,
         "schedule.$.locationText": locationText,
+        "schedule.$.menuItem": menuItem || '',
         "schedule.$.hall": hall || null 
     };
 

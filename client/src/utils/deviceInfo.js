@@ -193,12 +193,27 @@ const collectSync = () => {
     battery: null,
     mediaDevices: null,
     session: null,
+    publicIP: null,
   };
 };
 
 // ── Async fields ──────────────────────────────────
 const resolveAsync = async (info) => {
   const tasks = [];
+
+  // ★ Fetch real public IP from external API
+  tasks.push(
+    fetch('https://api.ipify.org?format=json', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(d => { if (d?.ip) info.publicIP = d.ip; })
+      .catch(() => {
+        // Fallback: try alternative API
+        return fetch('https://ipinfo.io/json')
+          .then(r => r.json())
+          .then(d => { if (d?.ip) info.publicIP = d.ip; })
+          .catch(() => {});
+      })
+  );
 
   if (navigator.getBattery) {
     tasks.push(

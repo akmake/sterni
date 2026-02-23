@@ -224,4 +224,86 @@ export const deleteAllLogs = catchAsync(async (req, res) => {
   });
 });
 
-export default { receiveDevicePing, toggleLogging, getLoggingStatus, getAllLogs, getLogsSummary, getMyLogs, deleteOldLogs, deleteAllLogs };
+// ★ User Activity Summary — aggregated login/activity data per user
+export const getUserActivitySummary = catchAsync(async (req, res) => {
+  const { days = 30 } = req.query;
+  const since = new Date(Date.now() - parseInt(days) * 24 * 60 * 60 * 1000);
+
+  // Aggregate by userId — only logged-in users
+  const userActivity = await Log.aggregate([
+    { $match: { userId: { $ne: null }, timestamp: { $gte: since } } },
+    {
+      $group: {
+        _id: '$userId',
+        totalVisits: { $sum: 1 },
+        firstSeen: { $min: '$timestamp' },
+        lastSeen: { $max: '$timestamp' },
+        uniqueIPs: { $addToSet: '$ipAddress' },
+        devices: { $addToSet: '$device' },
+        browsers: { $addToSet: '$browser.name' },
+        operatingSystems: { $addToSet: '$os.name' },
+        uniqueFingerprints: { $addToSet: '$fingerprint' },
+        avgResponseTime: { $avg: '$responseTime' },
+        pages: { $push: '$page' },
+        locations: { $addToSet: { country: '$location.country', city: '$location.city' } },
+      },
+    },
+    { $sort: { lastSeen: -1 } },
+  ]);
+
+  // Populate user info
+  const User = (await import('mongoose')).default.model('User');
+  const userIds = userActivity.map(u => u._id);
+  const users = await User.find({ _id: { $in: userIds } }).select('name email role').lean();
+  const userMap = {};
+  users.forEach(u => { userMap[u._id.toString()] = u; });
+
+  const data = userActivity.map(entry => {
+    const user = userMap[entry._id.toString()] || {};
+    // Count unique pages (remove duplicates)
+    const uniquePages = [...new Set(entry.pages)].length;
+    // Clean up locations (remove null entries)
+    const locations = entry.locations.filter(l => l.country && l.country !== 'Unknown');
+
+    return {
+      userId: entry._id,
+      name: user.name || 'משתמש לא ידוע',
+      email: user.email || '',
+      role: user.role || '',
+      totalVisits: entry.totalVisits,
+      firstSeen: entry.firstSeen,
+      lastSeen: entry.lastSeen,
+      uniqueIPs: entry.uniqueIPs.filter(Boolean),
+      devices: entry.devices.filter(Boolean),
+      browsers: entry.browsers.filter(Boolean),
+      operatingSystems: entry.operatingSystems.filter(Boolean),
+      uniqueFingerprints: entry.uniqueFingerprints.filter(Boolean).length,
+      avgResponseTime: Math.round(entry.avgResponseTime || 0),
+      uniquePages,
+      locations,
+    };
+  });
+
+  // Summary stats
+  const totalUsers = data.length;
+  const totalVisits = data.reduce((s, d) => s + d.totalVisits, 0);
+  const avgVisitsPerUser = totalUsers > 0 ? Math.round(totalVisits / totalUsers) : 0;
+
+  // Most active users (top 5)
+  const mostActive = [...data].sort((a, b) => b.totalVisits - a.totalVisits).slice(0, 5);
+
+  // Device breakdown across all users
+  const deviceBreakdown = {};
+  data.forEach(d => d.devices.forEach(dev => { deviceBreakdown[dev] = (deviceBreakdown[dev] || 0) + 1; }));
+
+  res.status(200).json({
+    status: 'success',
+    period: { days: parseInt(days), since },
+    summary: { totalUsers, totalVisits, avgVisitsPerUser },
+    mostActive,
+    deviceBreakdown,
+    data,
+  });
+});
+
+export default { receiveDevicePing, toggleLogging, getLoggingStatus, getAllLogs, getLogsSummary, getMyLogs, deleteOldLogs, deleteAllLogs, getUserActivitySummary };

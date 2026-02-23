@@ -120,6 +120,8 @@ export const loggingMiddleware = async (req, res, next) => {
                || 'unknown';
     const ipAddress = cleanIP(rawIP);
 
+    let finalIP = ipAddress;
+
     const userAgent = req.get('user-agent') || '';
     const referer = req.get('referer') || '';
     const cookieHeader = req.get('cookie') || '';
@@ -165,6 +167,11 @@ export const loggingMiddleware = async (req, res, next) => {
       clientData = req.body?.logData || {};
     }
 
+    // ★ Use client-reported public IP when server-detected IP is localhost
+    if (clientData.publicIP && (finalIP === '127.0.0.1' || finalIP === 'unknown' || finalIP === '::1')) {
+      finalIP = cleanIP(clientData.publicIP);
+    }
+
     const originalEnd = res.end;
     let isEnded = false;
 
@@ -188,11 +195,11 @@ export const loggingMiddleware = async (req, res, next) => {
             }
 
             // Get geolocation from IP
-            const location = await getGeolocation(ipAddress);
+            const location = await getGeolocation(finalIP);
 
             const logEntry = new Log({
               userId,
-              ipAddress,
+              ipAddress: finalIP,
               userAgent,
               browser: {
                 name: parsed.browser?.name || 'Unknown',

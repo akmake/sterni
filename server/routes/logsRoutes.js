@@ -9,6 +9,7 @@ import {
   toggleLogging,
   getLoggingStatus,
   receiveDevicePing,
+  getUserActivitySummary,
 } from '../controllers/logsController.js';
 
 const router = express.Router();
@@ -23,6 +24,7 @@ router.get('/admin/status', requireAuth, requireAdmin, getLoggingStatus);
 // Admin routes
 router.get('/admin/all', requireAuth, requireAdmin, getAllLogs);
 router.get('/admin/summary', requireAuth, requireAdmin, getLogsSummary);
+router.get('/admin/user-activity', requireAuth, requireAdmin, getUserActivitySummary);
 
 // User routes
 router.get('/my-logs', requireAuth, getMyLogs);

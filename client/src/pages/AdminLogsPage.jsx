@@ -9,6 +9,7 @@ import {
   FileText, Layers, Bell, BellOff, Gauge, HardDrive,
   BarChart3, TrendingUp, Hash, Plug, ScreenShare
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 // ════════════════════════════════════════════════════════════
 //  HELPERS
@@ -625,6 +626,12 @@ const AdminLogsPage = () => {
               <span className="text-sm font-normal text-slate-500 hidden md:inline">Visitor Intelligence</span>
             </h1>
             <p className="text-slate-500 text-sm mt-1">ניטור מתקדם ואיסוף מודיעין על מבקרי המערכת</p>
+            <Link
+              to="/admin/user-activity"
+              className="inline-flex items-center gap-1.5 mt-2 text-xs text-blue-400 hover:text-blue-300 transition font-medium"
+            >
+              <Users size={14} /> סיכום פעילות לפי משתמש →
+            </Link>
           </div>
 
           <button

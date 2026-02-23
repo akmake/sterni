@@ -8,9 +8,13 @@ import {
   deleteAllLogs,
   toggleLogging,
   getLoggingStatus,
+  receiveDevicePing,
 } from '../controllers/logsController.js';
 
 const router = express.Router();
+
+// ★ Device ping — client sends device info once, stored in server cache
+router.post('/device-ping', receiveDevicePing);
 
 // ★ Toggle + Status — שליטה על הלוגים
 router.post('/admin/toggle', requireAuth, requireAdmin, toggleLogging);

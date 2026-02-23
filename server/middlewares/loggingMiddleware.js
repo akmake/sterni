@@ -2,6 +2,17 @@ import Log from '../models/Log.js';
 import SystemConfig from '../models/SystemConfig.js';
 import { UAParser } from 'ua-parser-js';
 import axios from 'axios';
+import crypto from 'crypto';
+
+// ★ Device info cache — filled by POST /api/logs/device-ping
+// Key = hash(ip + userAgent), Value = { data, timestamp }
+export const deviceInfoCache = new Map();
+const DEVICE_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+// Helper to create consistent cache key
+export const makeDeviceKey = (ip, ua) => {
+  return crypto.createHash('md5').update(`${ip}||${ua}`).digest('hex');
+};
 
 // Cache for geolocation data to avoid excessive API calls
 const geoCache = new Map();
@@ -123,19 +134,34 @@ export const loggingMiddleware = async (req, res, next) => {
 
     const userId = req.user?._id || null;
 
-    // ★ Read client device info from header (works for ALL methods including GET)
+    // ★ Read client device info from 3 sources (priority order):
+    // 1. X-Device-Info header (sent on every request)
+    // 2. Server-side device cache (filled by POST /api/logs/device-ping)
+    // 3. req.body.logData (legacy fallback)
     let clientData = {};
+
+    // Source 1: Header
     try {
       const headerVal = req.headers['x-device-info'];
       if (headerVal) {
         clientData = JSON.parse(decodeURIComponent(escape(Buffer.from(headerVal, 'base64').toString('binary'))));
       }
-    } catch (e) {
-      // Fallback: try body (for old clients)
+    } catch (e) { /* parsing error, try next source */ }
+
+    // Source 2: Device cache (from device-ping endpoint)
+    if (!clientData || !Object.keys(clientData).length) {
+      try {
+        const devKey = makeDeviceKey(ipAddress, userAgent);
+        const cached = deviceInfoCache.get(devKey);
+        if (cached && (Date.now() - cached.timestamp < DEVICE_CACHE_TTL)) {
+          clientData = cached.data;
+        }
+      } catch (e) { /* ignore */ }
     }
-    // If header was empty, try body
-    if (!Object.keys(clientData).length && req.body?.logData) {
-      clientData = req.body.logData;
+
+    // Source 3: Body fallback
+    if (!clientData || !Object.keys(clientData).length) {
+      clientData = req.body?.logData || {};
     }
 
     const originalEnd = res.end;
@@ -219,6 +245,14 @@ export const loggingMiddleware = async (req, res, next) => {
               isOnline: clientData.isOnline ?? null,
               pdfViewerEnabled: clientData.pdfViewerEnabled ?? null,
               pluginsCount: clientData.pluginsCount ?? null,
+              // ★ Fingerprinting
+              fingerprint: clientData.fingerprint || null,
+              canvasFingerprint: clientData.canvasFingerprint || null,
+              webglFingerprint: clientData.webglFingerprint || null,
+              // ★ Browser Capabilities
+              webGLSupported: clientData.webGLSupported ?? null,
+              serviceWorkerSupported: clientData.serviceWorkerSupported ?? null,
+              notificationPermission: clientData.notificationPermission || null,
             });
 
             await logEntry.save();

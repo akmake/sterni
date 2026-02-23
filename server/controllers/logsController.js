@@ -1,7 +1,39 @@
 import Log from '../models/Log.js';
 import SystemConfig from '../models/SystemConfig.js';
 import catchAsync from '../utils/catchAsync.js';
-import { refreshLoggingCache } from '../middlewares/loggingMiddleware.js';
+import { refreshLoggingCache, deviceInfoCache, makeDeviceKey } from '../middlewares/loggingMiddleware.js';
+
+// ★ Receive device info ping from client (called once on app load)
+export const receiveDevicePing = (req, res) => {
+  try {
+    const rawIP = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+               || req.headers['x-real-ip']
+               || req.ip
+               || req.connection?.remoteAddress
+               || 'unknown';
+    let ip = rawIP;
+    if (ip.startsWith('::ffff:')) ip = ip.slice(7);
+    if (ip === '::1') ip = '127.0.0.1';
+
+    const ua = req.get('user-agent') || '';
+    const key = makeDeviceKey(ip, ua);
+
+    deviceInfoCache.set(key, {
+      data: req.body || {},
+      timestamp: Date.now(),
+    });
+
+    // Cleanup old entries (older than 2 hours)
+    const now = Date.now();
+    for (const [k, v] of deviceInfoCache) {
+      if (now - v.timestamp > 2 * 60 * 60 * 1000) deviceInfoCache.delete(k);
+    }
+
+    res.status(200).json({ ok: true });
+  } catch (e) {
+    res.status(200).json({ ok: false });
+  }
+};
 
 // ★ Toggle logging on/off
 export const toggleLogging = catchAsync(async (req, res) => {
@@ -191,4 +223,4 @@ export const deleteAllLogs = catchAsync(async (req, res) => {
   });
 });
 
-export default { toggleLogging, getLoggingStatus, getAllLogs, getLogsSummary, getMyLogs, deleteOldLogs, deleteAllLogs };
+export default { receiveDevicePing, toggleLogging, getLoggingStatus, getAllLogs, getLogsSummary, getMyLogs, deleteOldLogs, deleteAllLogs };

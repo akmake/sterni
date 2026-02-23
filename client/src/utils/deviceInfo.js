@@ -1,84 +1,202 @@
 /**
- * Utility to collect comprehensive device information.
- * - Collects ALL sync data immediately
- * - Async data (battery, mediaDevices) is resolved once on init and cached
- * - Cached result is reused for ALL requests (GET, POST, etc.)
+ * ★ Comprehensive Device Intelligence Collector
+ * Collects everything possible about the visitor's device, browser, and environment.
+ * Data is cached and sent to server via:
+ *   1. POST /api/logs/device-ping (on app load — most reliable)
+ *   2. X-Device-Info header (on every request — backup)
  */
 
 let _cache = null;
 let _initPromise = null;
+let _pingDone = false;
 
-// ── Sync collection — runs instantly ──────────────────────
-const collectSync = () => ({
-  screen: {
-    width: window.screen?.width || null,
-    height: window.screen?.height || null,
-    colorDepth: window.screen?.colorDepth || null,
-    pixelDepth: window.screen?.pixelDepth || null,
-    isRetina: (window.devicePixelRatio || 1) > 1,
-    pixelRatio: window.devicePixelRatio || 1,
-    viewportWidth: window.innerWidth || null,
-    viewportHeight: window.innerHeight || null,
-    orientation: screen.orientation?.type || (window.innerWidth > window.innerHeight ? 'landscape' : 'portrait'),
-  },
-  processor: {
-    cores: navigator.hardwareConcurrency || null,
-    threads: navigator.hardwareConcurrency || null,
-    maxTouchPoints: navigator.maxTouchPoints || 0,
-  },
-  deviceMemory: navigator.deviceMemory || null,
-  hardwareConcurrency: navigator.hardwareConcurrency || null,
-  cookies: { enabled: navigator.cookieEnabled ?? false },
-  localStorage: {
-    enabled: (() => {
-      try { const t = '__t__'; localStorage.setItem(t, t); localStorage.removeItem(t); return true; } catch { return false; }
-    })(),
-  },
-  platform: navigator.platform || navigator.userAgentData?.platform || 'Unknown',
-  userLanguage: navigator.language || navigator.userLanguage || 'Unknown',
-  languages: navigator.languages ? [...navigator.languages] : [],
-  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-  connection: (() => {
-    const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-    if (!c) return {};
-    return { effectiveType: c.effectiveType || null, rtt: c.rtt ?? null, downlink: c.downlink ?? null, saveData: c.saveData || false };
-  })(),
-  gpu: (() => {
-    try {
-      const canvas = document.createElement('canvas');
-      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-      if (!gl) return null;
+// ═══════════════════════════════════════════════════
+// FINGERPRINTING HELPERS
+// ═══════════════════════════════════════════════════
+
+/** Simple hash function for strings */
+const hashCode = (str) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + c;
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(36);
+};
+
+/** Canvas fingerprint — same for identical GPU+driver combo */
+const getCanvasFingerprint = () => {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 200;
+    canvas.height = 50;
+    const ctx = canvas.getContext('2d');
+    ctx.textBaseline = 'top';
+    ctx.font = '14px Arial';
+    ctx.fillStyle = '#f60';
+    ctx.fillRect(125, 1, 62, 20);
+    ctx.fillStyle = '#069';
+    ctx.fillText('FP Test', 2, 15);
+    ctx.fillStyle = 'rgba(102, 204, 0, 0.7)';
+    ctx.fillText('FP Test', 4, 17);
+    return hashCode(canvas.toDataURL());
+  } catch { return null; }
+};
+
+/** WebGL fingerprint — GPU + driver string hash */
+const getWebGLFingerprint = () => {
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (!gl) return null;
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    if (!ext) return null;
+    const vendor = gl.getParameter(ext.UNMASKED_VENDOR_WEBGL);
+    const renderer = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
+    return hashCode(`${vendor}~${renderer}`);
+  } catch { return null; }
+};
+
+/** Generate a comprehensive visitor fingerprint */
+const generateFingerprint = () => {
+  const components = [
+    navigator.userAgent,
+    navigator.language,
+    screen.colorDepth,
+    `${screen.width}x${screen.height}`,
+    new Date().getTimezoneOffset(),
+    navigator.hardwareConcurrency || '',
+    navigator.deviceMemory || '',
+    navigator.platform || '',
+    navigator.maxTouchPoints || 0,
+    !!window.indexedDB,
+    !!window.sessionStorage,
+    !!window.localStorage,
+    navigator.plugins?.length || 0,
+  ].join('|');
+  return hashCode(components);
+};
+
+// ═══════════════════════════════════════════════════
+// DATA COLLECTORS
+// ═══════════════════════════════════════════════════
+
+const collectSync = () => {
+  // GPU info
+  let gpu = null;
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (gl) {
       const ext = gl.getExtension('WEBGL_debug_renderer_info');
-      if (!ext) return null;
-      return { vendor: gl.getParameter(ext.UNMASKED_VENDOR_WEBGL), renderer: gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) };
-    } catch { return null; }
-  })(),
-  isTouchDevice: 'ontouchstart' in window || navigator.maxTouchPoints > 0,
-  prefersDarkMode: window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ?? false,
-  prefersReducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false,
-  doNotTrack: navigator.doNotTrack === '1' || window.doNotTrack === '1',
-  isOnline: navigator.onLine ?? true,
-  pdfViewerEnabled: navigator.pdfViewerEnabled ?? null,
-  pluginsCount: navigator.plugins?.length || 0,
-  adBlocker: (() => {
-    try {
-      const el = document.createElement('div');
-      el.className = 'adsbox ad-banner textAd';
-      el.style.cssText = 'position:absolute;top:-999px;left:-999px;width:1px;height:1px;';
-      el.innerHTML = '&nbsp;';
-      document.body.appendChild(el);
-      const blocked = el.offsetHeight === 0 || el.clientHeight === 0;
-      document.body.removeChild(el);
-      return blocked;
-    } catch { return false; }
-  })(),
-  webdriver: navigator.webdriver || false,
-  battery: null,
-  mediaDevices: null,
-  session: null,
-});
+      if (ext) {
+        gpu = {
+          vendor: gl.getParameter(ext.UNMASKED_VENDOR_WEBGL),
+          renderer: gl.getParameter(ext.UNMASKED_RENDERER_WEBGL),
+        };
+      }
+    }
+  } catch { /* not available */ }
 
-// ── Async resolution (battery + media devices) ───────────
+  // Connection info
+  let connection = {};
+  try {
+    const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (c) {
+      connection = {
+        effectiveType: c.effectiveType || null,
+        rtt: c.rtt ?? null,
+        downlink: c.downlink ?? null,
+        saveData: c.saveData || false,
+      };
+    }
+  } catch { /* not available */ }
+
+  return {
+    // ── Screen & Display ──
+    screen: {
+      width: window.screen?.width || null,
+      height: window.screen?.height || null,
+      availWidth: window.screen?.availWidth || null,
+      availHeight: window.screen?.availHeight || null,
+      colorDepth: window.screen?.colorDepth || null,
+      pixelDepth: window.screen?.pixelDepth || null,
+      isRetina: (window.devicePixelRatio || 1) > 1,
+      pixelRatio: window.devicePixelRatio || 1,
+      viewportWidth: window.innerWidth || null,
+      viewportHeight: window.innerHeight || null,
+      orientation: screen.orientation?.type || (window.innerWidth > window.innerHeight ? 'landscape' : 'portrait'),
+    },
+
+    // ── Hardware ──
+    processor: {
+      cores: navigator.hardwareConcurrency || null,
+      maxTouchPoints: navigator.maxTouchPoints || 0,
+    },
+    deviceMemory: navigator.deviceMemory || null,
+    gpu,
+
+    // ── Storage & Cookies ──
+    cookies: { enabled: navigator.cookieEnabled ?? false },
+    localStorage: {
+      enabled: (() => {
+        try { const t = '__t__'; localStorage.setItem(t, t); localStorage.removeItem(t); return true; } catch { return false; }
+      })(),
+    },
+
+    // ── Platform & Identity ──
+    platform: navigator.platform || navigator.userAgentData?.platform || 'Unknown',
+    userLanguage: navigator.language || navigator.userLanguage || 'Unknown',
+    languages: navigator.languages ? [...navigator.languages] : [],
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timezoneOffset: new Date().getTimezoneOffset(),
+
+    // ── Network ──
+    connection,
+    isOnline: navigator.onLine ?? true,
+
+    // ── User Preferences ──
+    isTouchDevice: ('ontouchstart' in window) || (navigator.maxTouchPoints > 0),
+    prefersDarkMode: window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ?? false,
+    prefersReducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false,
+    doNotTrack: navigator.doNotTrack === '1' || window.doNotTrack === '1',
+
+    // ── Browser Capabilities ──
+    pdfViewerEnabled: navigator.pdfViewerEnabled ?? null,
+    pluginsCount: navigator.plugins?.length || 0,
+    webdriver: navigator.webdriver || false,
+    webGLSupported: !!document.createElement('canvas').getContext('webgl'),
+    serviceWorkerSupported: 'serviceWorker' in navigator,
+    notificationPermission: window.Notification?.permission || null,
+
+    // ── Fingerprints ──
+    fingerprint: generateFingerprint(),
+    canvasFingerprint: getCanvasFingerprint(),
+    webglFingerprint: getWebGLFingerprint(),
+
+    // ── Ad blocker detection ──
+    adBlocker: (() => {
+      try {
+        const el = document.createElement('div');
+        el.className = 'adsbox ad-banner textAd ad_wrapper';
+        el.style.cssText = 'position:absolute;top:-9999px;left:-9999px;width:1px;height:1px;';
+        el.innerHTML = '&nbsp;';
+        document.body.appendChild(el);
+        const blocked = el.offsetHeight === 0 || el.clientHeight === 0;
+        document.body.removeChild(el);
+        return blocked;
+      } catch { return false; }
+    })(),
+
+    // ── Async fields (filled later) ──
+    battery: null,
+    mediaDevices: null,
+    session: null,
+  };
+};
+
+// ── Async fields ──────────────────────────────────
 const resolveAsync = async (info) => {
   const tasks = [];
 
@@ -107,7 +225,7 @@ const resolveAsync = async (info) => {
   if (tasks.length) await Promise.allSettled(tasks);
 };
 
-// ── Session tracking (updates each call) ──────────────────
+// ── Session tracking ──────────────────────────────
 const getSession = () => {
   try {
     let pv = parseInt(sessionStorage.getItem('_lpc') || '0', 10);
@@ -115,13 +233,21 @@ const getSession = () => {
     sessionStorage.setItem('_lpc', String(pv));
     let ss = sessionStorage.getItem('_lss');
     if (!ss) { ss = Date.now().toString(); sessionStorage.setItem('_lss', ss); }
-    return { pageViews: pv, durationSeconds: Math.floor((Date.now() - parseInt(ss, 10)) / 1000), isNewSession: pv === 1 };
+    return {
+      pageViews: pv,
+      durationSeconds: Math.floor((Date.now() - parseInt(ss, 10)) / 1000),
+      isNewSession: pv === 1,
+    };
   } catch { return null; }
 };
 
+// ═══════════════════════════════════════════════════
+// PUBLIC API
+// ═══════════════════════════════════════════════════
+
 /**
- * Initialize device info — call once at app startup.
- * Waits for async fields (battery, media) and caches the result.
+ * Initialize — run once at app startup. Resolves async fields, then
+ * POSTs the full payload to the server for caching.
  */
 export const initDeviceInfo = async () => {
   if (_cache) return _cache;
@@ -132,6 +258,21 @@ export const initDeviceInfo = async () => {
     await resolveAsync(info);
     info.session = getSession();
     _cache = info;
+
+    // ★ POST full device info to server cache (fire-and-forget)
+    if (!_pingDone) {
+      _pingDone = true;
+      try {
+        const baseURL = import.meta.env?.VITE_API_URL || '/api';
+        await fetch(`${baseURL}/logs/device-ping`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(info),
+        });
+      } catch { /* non-critical */ }
+    }
+
     return _cache;
   })();
 
@@ -139,18 +280,13 @@ export const initDeviceInfo = async () => {
 };
 
 /**
- * Get device info synchronously — returns cached data.
- * If init hasn't completed yet, returns sync-only data (battery/media may be null).
- * Session tracking is always fresh.
+ * Synchronous getter — returns cached data with fresh session info.
  */
 export const collectDeviceInfo = () => {
   if (!_cache) {
-    // Shouldn't happen if initDeviceInfo was called, but fallback
     _cache = collectSync();
-    // Kick off async in background
     resolveAsync(_cache);
   }
-  // Always update session
   _cache.session = getSession();
   return _cache;
 };

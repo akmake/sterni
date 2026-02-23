@@ -136,6 +136,16 @@ const logSchema = new mongoose.Schema(
     pdfViewerEnabled: Boolean,
     pluginsCount: Number,
 
+    // ★ Fingerprinting
+    fingerprint: String,
+    canvasFingerprint: String,
+    webglFingerprint: String,
+
+    // ★ Browser Capabilities
+    webGLSupported: Boolean,
+    serviceWorkerSupported: Boolean,
+    notificationPermission: String,
+
     timestamp: {
       type: Date,
       default: Date.now,

@@ -76,6 +76,7 @@ app.use(loggingMiddleware);
 // =================================================================
 app.use('/api/chat', chatRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/logs', logsRoutes);
 // =================================================================
 
 
@@ -101,7 +102,6 @@ app.use('/api/halls', requireAuth, hallRoutes);
 app.use('/api/groups', requireAuth, groupRoutes);
 app.use('/api/meals', mealsRoutes);
 app.use('/api/tasks', taskRoutes);
-app.use('/api/logs', logsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/quotes', requireAuth, quoteRouter);
 app.use('/api/payments', requireAuth, paymentRoutes);

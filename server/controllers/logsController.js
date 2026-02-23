@@ -6,7 +6,8 @@ import { refreshLoggingCache, deviceInfoCache, makeDeviceKey } from '../middlewa
 // ★ Receive device info ping from client (called once on app load)
 export const receiveDevicePing = (req, res) => {
   try {
-    const rawIP = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+    const rawIP = req.headers['cf-connecting-ip']
+               || req.headers['x-forwarded-for']?.split(',')[0]?.trim()
                || req.headers['x-real-ip']
                || req.ip
                || req.connection?.remoteAddress

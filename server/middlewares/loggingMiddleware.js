@@ -3,6 +3,8 @@ import SystemConfig from '../models/SystemConfig.js';
 import { UAParser } from 'ua-parser-js';
 import axios from 'axios';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 
 // ★ Device info cache — filled by POST /api/logs/device-ping
 // Key = hash(ip + userAgent), Value = { data, timestamp }
@@ -137,6 +139,21 @@ export const loggingMiddleware = async (req, res, next) => {
 
     const userId = req.user?._id || null;
 
+    // ★ If req.user is not set yet (logging runs before auth middleware),
+    //   try to extract userId directly from the JWT cookie
+    let resolvedUserId = userId;
+    if (!resolvedUserId) {
+      try {
+        const token = req.cookies?.jwt;
+        if (token && process.env.JWT_ACCESS_SECRET) {
+          const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+          if (decoded?.id) {
+            resolvedUserId = new mongoose.Types.ObjectId(decoded.id);
+          }
+        }
+      } catch (e) { /* expired/invalid token — ignore */ }
+    }
+
     // ★ Read client device info from 3 sources (priority order):
     // 1. X-Device-Info header (sent on every request)
     // 2. Server-side device cache (filled by POST /api/logs/device-ping)
@@ -198,7 +215,7 @@ export const loggingMiddleware = async (req, res, next) => {
             const location = await getGeolocation(finalIP);
 
             const logEntry = new Log({
-              userId,
+              userId: resolvedUserId,
               ipAddress: finalIP,
               userAgent,
               browser: {

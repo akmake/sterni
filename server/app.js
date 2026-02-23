@@ -50,6 +50,9 @@ await connectDB();
 
 const app = express();
 
+// --- Trust Proxy (קריטי לזיהוי IP אמיתי מאחורי Nginx/Cloudflare) ---
+app.set('trust proxy', 1);
+
 // --- Security & Config ---
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'same-site' },

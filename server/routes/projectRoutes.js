@@ -16,6 +16,7 @@ import {
     addTask,
     toggleTask,
     deleteTask,
+    renameTask,
     convertTaskToProject,
     uploadProjectFile,
     deleteProjectFile,
@@ -68,6 +69,7 @@ router.delete('/:id/files/:fileId', deleteProjectFile);
 router.post('/:id/tasks', addTask);
 router.post('/:id/tasks/:taskId/convert', convertTaskToProject);
 router.patch('/:id/tasks/:taskId/toggle', toggleTask);
+router.patch('/:id/tasks/:taskId/rename', renameTask);
 router.delete('/:id/tasks/:taskId', deleteTask);
 
 // Collaboration

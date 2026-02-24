@@ -42,6 +42,11 @@ export const deleteTask = async (projectId, taskId) => {
   return data;
 };
 
+export const renameTask = async (projectId, taskId, name) => {
+  const { data } = await api.patch(`/projects/${projectId}/tasks/${taskId}/rename`, { name });
+  return data;
+};
+
 export const convertTaskToProject = async (projectId, taskId) => {
     const { data } = await api.post(`/projects/${projectId}/tasks/${taskId}/convert`);
     return data;

@@ -15,7 +15,9 @@ import {
     UploadCloud,
     X, 
     Play,
-    Share2
+    Share2,
+    Pencil,
+    Check as CheckIcon
 } from 'lucide-react';
 
 // כתובת השרת לתמונות - ודא שזה תואם לשרת שלך
@@ -27,9 +29,11 @@ export default function ProjectPage() {
   const { 
       activeProject, 
       fetchProject, 
+      updateProject,
       addTask, 
       toggleTask, 
       deleteTask, 
+      renameTask,
       convertTaskToProject,
       uploadFileToProject,
       deleteFileFromProject
@@ -38,6 +42,17 @@ export default function ProjectPage() {
   const [newTaskName, setNewTaskName] = useState('');
   const [sharingModalOpen, setSharingModalOpen] = useState(false);
   const fileInputRef = useRef(null);
+
+  // --- Inline editing state ---
+  const [editingName, setEditingName] = useState(false);
+  const [editNameValue, setEditNameValue] = useState('');
+  const [editingDesc, setEditingDesc] = useState(false);
+  const [editDescValue, setEditDescValue] = useState('');
+  const [editingTaskId, setEditingTaskId] = useState(null);
+  const [editTaskValue, setEditTaskValue] = useState('');
+  const nameInputRef = useRef(null);
+  const descInputRef = useRef(null);
+  const taskInputRef = useRef(null);
 
   useEffect(() => { fetchProject(id); }, [id]);
 
@@ -63,6 +78,45 @@ export default function ProjectPage() {
       if(window.confirm('האם להפוך משימה זו לפרויקט חדש? המשימה תוסר מכאן.')) {
           convertTaskToProject(id, taskId);
       }
+  };
+
+  // --- Inline editing handlers ---
+  const startEditName = () => {
+    setEditNameValue(activeProject.projectName);
+    setEditingName(true);
+    setTimeout(() => nameInputRef.current?.focus(), 50);
+  };
+  const saveName = () => {
+    const val = editNameValue.trim();
+    if (val && val !== activeProject.projectName) {
+      updateProject(id, { projectName: val });
+    }
+    setEditingName(false);
+  };
+  const startEditDesc = () => {
+    setEditDescValue(activeProject.description || '');
+    setEditingDesc(true);
+    setTimeout(() => descInputRef.current?.focus(), 50);
+  };
+  const saveDesc = () => {
+    const val = editDescValue.trim();
+    if (val !== (activeProject.description || '')) {
+      updateProject(id, { description: val });
+    }
+    setEditingDesc(false);
+  };
+  const startEditTask = (task) => {
+    setEditingTaskId(task._id);
+    setEditTaskValue(task.name);
+    setTimeout(() => taskInputRef.current?.focus(), 50);
+  };
+  const saveTaskName = () => {
+    const val = editTaskValue.trim();
+    if (val && editingTaskId) {
+      renameTask(id, editingTaskId, val);
+    }
+    setEditingTaskId(null);
+    setEditTaskValue('');
   };
 
   const handleFileSelect = (e) => {
@@ -164,13 +218,46 @@ export default function ProjectPage() {
         {/* --- Header Section --- */}
         <div className="bg-white/80 backdrop-blur-xl p-6 md:p-8 rounded-[2rem] shadow-sm border border-white/50 relative overflow-hidden">
            <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                <div>
-                    <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 leading-tight">
+                <div className="flex-1 min-w-0">
+                    {editingName ? (
+                      <input
+                        ref={nameInputRef}
+                        value={editNameValue}
+                        onChange={e => setEditNameValue(e.target.value)}
+                        onBlur={saveName}
+                        onKeyDown={e => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') setEditingName(false); }}
+                        className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 leading-tight bg-transparent border-b-2 border-blue-500 outline-none w-full"
+                      />
+                    ) : (
+                      <h1 
+                        className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 leading-tight group/name cursor-pointer"
+                        onClick={startEditName}
+                        title="לחץ לעריכה"
+                      >
                         {activeProject.projectName}
-                    </h1>
-                    <p className="text-slate-500 mt-2 text-lg font-light">
+                        <Pencil size={16} className="inline mr-2 opacity-0 group-hover/name:opacity-50 transition-opacity text-slate-400" />
+                      </h1>
+                    )}
+                    {editingDesc ? (
+                      <input
+                        ref={descInputRef}
+                        value={editDescValue}
+                        onChange={e => setEditDescValue(e.target.value)}
+                        onBlur={saveDesc}
+                        onKeyDown={e => { if (e.key === 'Enter') saveDesc(); if (e.key === 'Escape') setEditingDesc(false); }}
+                        placeholder="הוסף תיאור..."
+                        className="text-slate-500 mt-2 text-lg font-light bg-transparent border-b-2 border-blue-500 outline-none w-full"
+                      />
+                    ) : (
+                      <p 
+                        className="text-slate-500 mt-2 text-lg font-light group/desc cursor-pointer"
+                        onClick={startEditDesc}
+                        title="לחץ לעריכה"
+                      >
                         {activeProject.description || 'אין תיאור לפרויקט זה'}
-                    </p>
+                        <Pencil size={14} className="inline mr-2 opacity-0 group-hover/desc:opacity-50 transition-opacity text-slate-400" />
+                      </p>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -243,19 +330,44 @@ export default function ProjectPage() {
 
                 {activeProject.tasks.map(task => (
                     <div key={task._id} className="group relative bg-white hover:bg-slate-50 p-4 rounded-2xl transition-all duration-200 border border-transparent hover:border-slate-200 shadow-sm hover:shadow-md flex items-center justify-between">
-                        <div className="flex items-center gap-4 overflow-hidden">
+                        <div className="flex items-center gap-4 overflow-hidden flex-1">
                             <Checkbox
                                 checked={task.done}
                                 onCheckedChange={() => toggleTask(id, task._id)}
                                 className={`w-6 h-6 rounded-lg border-2 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500 transition-all ${task.done ? 'border-slate-300' : 'border-slate-300'}`}
                             />
-                            <span className={`text-lg truncate transition-all select-none ${task.done ? 'text-slate-400 line-through decoration-slate-300' : 'text-slate-700'}`}>
+                            {editingTaskId === task._id ? (
+                              <input
+                                ref={taskInputRef}
+                                value={editTaskValue}
+                                onChange={e => setEditTaskValue(e.target.value)}
+                                onBlur={saveTaskName}
+                                onKeyDown={e => { if (e.key === 'Enter') saveTaskName(); if (e.key === 'Escape') { setEditingTaskId(null); } }}
+                                className="text-lg flex-1 bg-transparent border-b-2 border-blue-500 outline-none"
+                              />
+                            ) : (
+                              <span 
+                                className={`text-lg truncate transition-all select-none cursor-pointer ${task.done ? 'text-slate-400 line-through decoration-slate-300' : 'text-slate-700'}`}
+                                onDoubleClick={() => startEditTask(task)}
+                                title="לחיצה כפולה לעריכה"
+                              >
                                 {task.name}
-                            </span>
+                              </span>
+                            )}
                         </div>
 
                         {/* Task Actions */}
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0 pl-2">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => startEditTask(task)}
+                                title="ערוך שם"
+                                className="w-9 h-9 rounded-full text-slate-400 hover:text-amber-600 hover:bg-amber-50"
+                            >
+                                <Pencil size={16} />
+                            </Button>
+
                             <Button
                                 variant="ghost"
                                 size="icon"

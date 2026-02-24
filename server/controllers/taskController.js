@@ -32,14 +32,19 @@ export const createTask = async (req, res) => {
   }
 };
 
-// עדכון סטטוס (בוצע/לא בוצע)
+// עדכון סטטוס (בוצע/לא בוצע) או טקסט
 export const updateTaskStatus = async (req, res) => {
   try {
-    const { isCompleted } = req.body;
-    const updateData = {
-      isCompleted,
-      completedAt: isCompleted ? new Date() : null
-    };
+    const { isCompleted, text } = req.body;
+    const updateData = {};
+    
+    if (typeof isCompleted === 'boolean') {
+      updateData.isCompleted = isCompleted;
+      updateData.completedAt = isCompleted ? new Date() : null;
+    }
+    if (text && text.trim()) {
+      updateData.text = text.trim();
+    }
     
     const task = await Task.findByIdAndUpdate(req.params.id, updateData, { new: true });
     res.json(task);
@@ -53,6 +58,30 @@ export const deleteTask = async (req, res) => {
   try {
     await Task.findByIdAndDelete(req.params.id);
     res.json({ message: 'Deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// המרת מטלה לפרויקט
+export const convertTaskToProject = async (req, res) => {
+  try {
+    const task = await Task.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+
+    // Dynamic import to avoid circular dependency
+    const Project = (await import('../models/Project.js')).default;
+
+    const newProject = await Project.create({
+      owner: req.user._id,
+      projectName: task.text,
+      description: 'נוצר ממטלה מהירה',
+      tasks: [{ name: 'הגדר משימות ראשונות', done: false }]
+    });
+
+    await Task.findByIdAndDelete(task._id);
+
+    res.json({ message: 'Task converted to project', newProject });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

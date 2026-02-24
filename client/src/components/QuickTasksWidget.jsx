@@ -1,12 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Plus, Trash2, Check, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Check, ChevronDown, ChevronUp, Loader2, ArrowUpRight, Pencil } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const QuickTasksWidget = () => {
+  const navigate = useNavigate();
   const [tasks, setTasks] = useState([]);
   const [newTask, setNewTask] = useState('');
   const [showCompleted, setShowCompleted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editValue, setEditValue] = useState('');
 
   // טעינת משימות
   const fetchTasks = async () => {
@@ -61,6 +65,38 @@ const QuickTasksWidget = () => {
     }
   };
 
+  // המרה לפרויקט
+  const convertToProject = async (id) => {
+    if (!window.confirm('להפוך מטלה זו לפרויקט חדש?')) return;
+    try {
+      const res = await axios.post(`http://localhost:5000/api/tasks/${id}/convert`);
+      setTasks(prev => prev.filter(t => t._id !== id));
+      navigate(`/projects/${res.data.newProject._id}`);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // עריכה
+  const startEditing = (task) => {
+    setEditingId(task._id);
+    setEditValue(task.text);
+  };
+  const saveEdit = async () => {
+    const val = editValue.trim();
+    if (val && editingId) {
+      setTasks(prev => prev.map(t => t._id === editingId ? { ...t, text: val } : t));
+      try {
+        await axios.patch(`http://localhost:5000/api/tasks/${editingId}`, { text: val });
+      } catch (err) {
+        console.error(err);
+        fetchTasks();
+      }
+    }
+    setEditingId(null);
+    setEditValue('');
+  };
+
   const activeTasks = tasks.filter(t => !t.isCompleted);
   const completedTasks = tasks.filter(t => t.isCompleted);
 
@@ -99,20 +135,50 @@ const QuickTasksWidget = () => {
         
         {activeTasks.map(task => (
           <div key={task._id} className="group flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg transition-colors text-sm">
-            <div className="flex items-center gap-3 overflow-hidden">
+            <div className="flex items-center gap-3 overflow-hidden flex-1">
               <button 
                 onClick={() => toggleTask(task._id, false)}
                 className="w-5 h-5 rounded-full border-2 border-gray-300 hover:border-blue-500 flex items-center justify-center transition-colors flex-shrink-0"
               >
               </button>
-              <span className="text-gray-700 truncate">{task.text}</span>
+              {editingId === task._id ? (
+                <input
+                  autoFocus
+                  value={editValue}
+                  onChange={e => setEditValue(e.target.value)}
+                  onBlur={saveEdit}
+                  onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingId(null); }}
+                  className="text-gray-700 text-sm bg-transparent border-b border-blue-500 outline-none flex-1"
+                />
+              ) : (
+                <span 
+                  className="text-gray-700 truncate cursor-pointer"
+                  onDoubleClick={() => startEditing(task)}
+                >{task.text}</span>
+              )}
             </div>
-            <button 
-              onClick={() => deleteTask(task._id)}
-              className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <Trash2 size={14} />
-            </button>
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={() => startEditing(task)}
+                title="ערוך"
+                className="text-gray-300 hover:text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <Pencil size={12} />
+              </button>
+              <button 
+                onClick={() => convertToProject(task._id)}
+                title="הפוך לפרויקט"
+                className="text-gray-300 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <ArrowUpRight size={14} />
+              </button>
+              <button 
+                onClick={() => deleteTask(task._id)}
+                className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
           </div>
         ))}
       </div>

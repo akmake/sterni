@@ -1,13 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 // 👇 השינוי הקריטי: משתמשים ב-api המוגדר שלך במקום ב-axios רגיל
 import api from '../utils/api'; 
-import { Plus, Trash2, Check, Circle, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Check, Circle, Loader2, ArrowUpRight, Pencil } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const TasksPage = () => {
+  const navigate = useNavigate();
   const [tasks, setTasks] = useState([]);
   const [newTask, setNewTask] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editValue, setEditValue] = useState('');
+  const editRef = useRef(null);
 
   const fetchTasks = async () => {
     setLoading(true);
@@ -68,6 +73,38 @@ const TasksPage = () => {
     }
   };
 
+  const convertToProject = async (id) => {
+    if (!window.confirm('להפוך מטלה זו לפרויקט חדש? המטלה תוסר מהרשימה.')) return;
+    try {
+      const res = await api.post(`/tasks/${id}/convert`);
+      setTasks(prev => prev.filter(t => t._id !== id));
+      navigate(`/projects/${res.data.newProject._id}`);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const startEditing = (task) => {
+    setEditingId(task._id);
+    setEditValue(task.text);
+    setTimeout(() => editRef.current?.focus(), 50);
+  };
+
+  const saveEdit = async () => {
+    const val = editValue.trim();
+    if (val && editingId) {
+      setTasks(prev => prev.map(t => t._id === editingId ? { ...t, text: val } : t));
+      try {
+        await api.patch(`/tasks/${editingId}`, { text: val });
+      } catch (err) {
+        console.error(err);
+        fetchTasks();
+      }
+    }
+    setEditingId(null);
+    setEditValue('');
+  };
+
   const activeTasks = tasks.filter(t => !t.isCompleted);
   const completedTasks = tasks.filter(t => t.isCompleted);
   const todayDate = new Date().toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -120,8 +157,41 @@ const TasksPage = () => {
                 </button>
                 
                 <div className="flex-1">
-                  <span className="text-lg text-gray-800 font-medium">{task.text}</span>
+                  {editingId === task._id ? (
+                    <input
+                      ref={editRef}
+                      value={editValue}
+                      onChange={e => setEditValue(e.target.value)}
+                      onBlur={saveEdit}
+                      onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditingId(null); }}
+                      className="text-lg text-gray-800 font-medium bg-transparent border-b-2 border-blue-500 outline-none w-full"
+                    />
+                  ) : (
+                    <span 
+                      className="text-lg text-gray-800 font-medium cursor-pointer"
+                      onDoubleClick={() => startEditing(task)}
+                      title="לחיצה כפולה לעריכה"
+                    >
+                      {task.text}
+                    </span>
+                  )}
                 </div>
+
+                <button
+                  onClick={() => startEditing(task)}
+                  title="ערוך"
+                  className="text-gray-300 hover:text-amber-500 opacity-0 group-hover:opacity-100 transition-all p-2 hover:bg-amber-50 rounded-lg"
+                >
+                  <Pencil size={16} strokeWidth={1.5} />
+                </button>
+
+                <button
+                  onClick={() => convertToProject(task._id)}
+                  title="הפוך לפרויקט"
+                  className="text-gray-300 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-all p-2 hover:bg-blue-50 rounded-lg"
+                >
+                  <ArrowUpRight size={18} strokeWidth={1.5} />
+                </button>
 
                 <button 
                   onClick={() => deleteTask(task._id)}

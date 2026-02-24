@@ -230,7 +230,32 @@ export const deleteTask = async (req, res, next) => {
   }
 };
 
-// 9. הטוויסט: המרת משימה לפרויקט חדש
+// 9. עדכון שם משימה בפרויקט
+export const renameTask = async (req, res, next) => {
+  try {
+    const project = await Project.findById(req.params.id);
+    if (!project) return next(new AppError('Project not found', 404));
+
+    const isOwner = project.owner.toString() === req.user._id.toString();
+    const collaborator = project.collaborators.find(
+      c => c.userId.toString() === req.user._id.toString()
+    );
+    const hasEditAccess = isOwner || (collaborator && collaborator.role === 'edit');
+    if (!hasEditAccess) return next(new AppError('Not authorized to edit this project', 403));
+
+    const task = project.tasks.id(req.params.taskId);
+    if (!task) return next(new AppError('Task not found', 404));
+
+    const { name } = req.body;
+    if (!name || !name.trim()) return next(new AppError('Task name is required', 400));
+
+    task.name = name.trim();
+    await project.save();
+    res.json(project);
+  } catch (err) { next(err); }
+};
+
+// 10. הטוויסט: המרת משימה לפרויקט חדש
 export const convertTaskToProject = async (req, res, next) => {
     try {
         const { id, taskId } = req.params;

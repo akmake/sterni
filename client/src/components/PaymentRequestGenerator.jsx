@@ -138,25 +138,8 @@ const PaymentRequestGenerator = ({ groupId = null, onSave = null, paymentRequest
   // --- טעינת נתונים ---
   useEffect(() => {
     if (!actualGroupId && !paymentRequestId) {
-      // Mode: דרישת תשלום חדשה ללא ייחוס לקבוצה
-      const savedDraft = localStorage.getItem(DRAFT_KEY);
-      if (savedDraft) {
-        try {
-          const draftData = JSON.parse(savedDraft);
-          setBlocks(draftData.blocks);
-          setOrderNumber(draftData.orderNumber);
-          setTargetEmail(draftData.targetEmail || '');
-          setTotalAmount(draftData.totalAmount || 0);
-          setCurrency(draftData.currency || 'ILS');
-          setHeaderDetails(draftData.headerDetails);
-          toast.success('טיוטה שלא נשמרה שוחזרה', { position: 'bottom-center', icon: '📝' });
-        } catch (e) {
-          console.error("Error parsing draft", e);
-          initializeDefaultPaymentRequest({});
-        }
-      } else {
-        initializeDefaultPaymentRequest({});
-      }
+      // Mode: דרישת תשלום חדשה ללא ייחוס לקבוצה - תמיד פותח טופס חדש ונקי
+      initializeDefaultPaymentRequest({});
     } else if (actualGroupId && group) {
       // Mode: דרישת תשלום של קבוצה
       const savedDraft = localStorage.getItem(DRAFT_KEY);
@@ -225,9 +208,9 @@ const PaymentRequestGenerator = ({ groupId = null, onSave = null, paymentRequest
     }
   }, [group, actualGroupId, paymentRequestId, DRAFT_KEY]);
 
-  // --- שמירה אוטומטית ---
+  // --- שמירה אוטומטית (רק עבור קבוצה או דרישה קיימת, לא בטופס חיצוני חדש) ---
   useEffect(() => {
-      if (blocks.length > 0) {
+      if (blocks.length > 0 && (actualGroupId || paymentRequestId)) {
           const draftData = {
               blocks,
               orderNumber,
@@ -239,7 +222,7 @@ const PaymentRequestGenerator = ({ groupId = null, onSave = null, paymentRequest
           };
           localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
       }
-  }, [blocks, orderNumber, targetEmail, headerDetails, totalAmount, currency, DRAFT_KEY]);
+  }, [blocks, orderNumber, targetEmail, headerDetails, totalAmount, currency, DRAFT_KEY, actualGroupId, paymentRequestId]);
 
   // --- פגינציה ---
   useLayoutEffect(() => {

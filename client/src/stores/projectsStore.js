@@ -9,6 +9,7 @@ import {
   addTask,
   toggleTask,
   deleteTask,
+  renameTask,
   convertTaskToProject,
   uploadFile,
   deleteFile
@@ -57,6 +58,24 @@ const useProjectsStore = create((set, get) => ({
     }
   },
 
+  updateProject: async (id, payload) => {
+    try {
+      const current = get().activeProject;
+      // עדכון אופטימי
+      if (current && current._id === id) {
+        set({ activeProject: { ...current, ...payload } });
+      }
+      const updated = await updateProject(id, payload);
+      set({ activeProject: updated });
+      // עדכון ברשימה
+      set({ projects: get().projects.map(p => p._id === id ? updated : p) });
+      toast.success('הפרויקט עודכן');
+    } catch (err) {
+      get()._fail(err);
+      get().fetchProject(id);
+    }
+  },
+
   deleteProject: async (id) => {
     get()._start();
     try {
@@ -99,6 +118,20 @@ const useProjectsStore = create((set, get) => ({
       set({ activeProject: { ...current, tasks: updatedTasks }});
       toast.success('המשימה נמחקה');
     } catch (err) { get()._fail(err); }
+  },
+
+  renameTask: async (projectId, taskId, name) => {
+    try {
+      const current = get().activeProject;
+      const updatedTasks = current.tasks.map(t =>
+        t._id === taskId ? { ...t, name } : t
+      );
+      set({ activeProject: { ...current, tasks: updatedTasks }});
+      await renameTask(projectId, taskId, name);
+    } catch (err) {
+      get()._fail(err);
+      get().fetchProject(projectId);
+    }
   },
 
   convertTaskToProject: async (projectId, taskId) => {

@@ -228,10 +228,10 @@ export default function GroupDetailsPage() {
       date: finalDate,
       
       isMeal: isMeal, 
-      mealId: isMeal ? data.mealId : '',
+      mealId: isMeal ? data.mealId : null,
       kosherType: isMeal ? data.kosherType : '',
       menuItem: isMeal ? data.menuItem : '', 
-      eventType: isMeal ? 'meal' : 'activity'
+      eventType: isMeal ? 'meal' : 'general'
     };
   };
 

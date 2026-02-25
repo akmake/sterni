@@ -181,8 +181,8 @@ export const addEventToGroup = async (req, res, next) => {
 
     // הוספת האירוע
     group.schedule.push({ 
-        title, date, startTime, endTime, hall, requirements, pax,
-        eventType, mealType, mealId, kosherType, locationText, menuItem
+        title, date, startTime, endTime, hall: hall || null, requirements, pax,
+        eventType, mealType: mealType || '', mealId: mealId || null, kosherType, locationText, menuItem
     });
     await group.save();
 

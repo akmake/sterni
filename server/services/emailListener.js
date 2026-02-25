@@ -14,6 +14,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const UPLOADS_DIR = path.join(__dirname, '../../client/public/uploads');
 
+// מונע עיבוד כפול של מיילים — שומר UID של מיילים שכבר בטיפול
+const processingEmails = new Set();
+
 if (!fs.existsSync(UPLOADS_DIR)){
     fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
@@ -135,6 +138,13 @@ const checkForNewEmails = async (systemEmail) => {
         for (const item of messages) {
             const all = item.parts.find(part => part.which === '');
             const id = item.attributes.uid;
+
+            // דילוג על מיילים שכבר בטיפול (מונע שליחה כפולה לוואצאפ)
+            if (processingEmails.has(id)) {
+                continue;
+            }
+            processingEmails.add(id);
+
             const idHeader = "Imap-Id: " + id + "\r\n";
             const parsed = await simpleParser(idHeader + all.body);
 
@@ -246,6 +256,7 @@ const checkForNewEmails = async (systemEmail) => {
                 await connection.addFlags(item.attributes.uid, ['\\Seen'], (err) => {
                     if (err) console.error('Error marking as seen:', err);
                 });
+                processingEmails.delete(id); // סיימנו — מוחקים מהסט
             }
         }
     } catch (err) {

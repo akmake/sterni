@@ -132,7 +132,7 @@ const ChatPage = () => {
           const time = new Date(msg.createdAt || msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
           return (
-            <div key={index} className={`flex w-full mb-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
+            <div key={msg._id || index} className={`flex w-full mb-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
               <div className={`relative max-w-[65%] min-w-[120px] rounded-lg p-2 shadow-[0_1px_0.5px_rgba(0,0,0,0.13)] text-[14.2px] text-[#111b21] leading-[19px]
                 ${isMe ? 'bg-[#d9fdd3] rounded-tr-none' : 'bg-white rounded-tl-none'}`}>
                 

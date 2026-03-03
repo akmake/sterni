@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import api from '../api';
+import api from '@/utils/api';
 import { Save, FolderOpen, Trash2, X, CalendarPlus, CheckCircle, Eye } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 

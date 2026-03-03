@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation } from "react-router-dom";
 import { Menu, X, LogOut, Briefcase, Utensils, FileText, ChevronDown, ChevronUp, Settings, UserCircle, ListTodo, User, Users, CalendarDays, CreditCard, Shield, BarChart3, Scissors, FolderPlus, ClipboardList } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/stores/authStore";
+import useLogout from "@/hooks/useLogout";
 import { Button } from "@/components/ui/Button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -72,7 +73,7 @@ const getNavStructure = (isAuthenticated, isAdmin, hasTzitzitAccess) => {
 
 export default function Navbar({ mobileOnly = false }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const { isAuthenticated, user, logout } = useAuthStore();
+    const { isAuthenticated, user } = useAuthStore();
     const isAdmin = user?.role === 'admin';
     const hasTzitzitAccess = user?.tzitzitAccess || false;
     const navItems = getNavStructure(isAuthenticated, isAdmin, hasTzitzitAccess);
@@ -94,7 +95,7 @@ export default function Navbar({ mobileOnly = false }) {
             {/* === תפריט צד לדסקטופ === */}
             {!mobileOnly && (
                 <div className="hidden md:flex md:flex-col h-full w-full">
-                    <SidebarContent items={navItems} user={user} isAuthenticated={isAuthenticated} logout={logout} />
+                    <SidebarContent items={navItems} user={user} isAuthenticated={isAuthenticated} />
                 </div>
             )}
 
@@ -121,7 +122,6 @@ export default function Navbar({ mobileOnly = false }) {
                                 items={navItems}
                                 user={user}
                                 isAuthenticated={isAuthenticated}
-                                logout={logout}
                                 onClose={() => setSidebarOpen(false)}
                             />
                         </motion.div>
@@ -133,9 +133,10 @@ export default function Navbar({ mobileOnly = false }) {
 }
 
 // --- תוכן התפריט (משותף) ---
-function SidebarContent({ items, user, isAuthenticated, logout, onClose }) {
+function SidebarContent({ items, user, isAuthenticated, onClose }) {
+    const { mutate: serverLogout } = useLogout();
     const handleLogout = () => {
-        logout();
+        serverLogout();
         if (onClose) onClose();
     };
 

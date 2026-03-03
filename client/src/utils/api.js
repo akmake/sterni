@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { collectDeviceInfo } from './deviceInfo.js';
 
 // משתנה להחזקת הפונקציות מה-Store כדי למנוע תלות מעגלית
 let authStoreApi = {
@@ -57,6 +58,20 @@ api.interceptors.request.use(async (config) => {
       // נמשיך בכל זאת כדי שהשרת יחזיר שגיאה מתאימה.
     }
   }
+  
+  // ── FormData — don't touch Content-Type (browser sets boundary) ──
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
+
+  // ── Device info — sent as header on every request ──
+  try {
+    const deviceInfo = collectDeviceInfo();
+    config.headers['X-Device-Info'] = btoa(unescape(encodeURIComponent(JSON.stringify(deviceInfo))));
+  } catch (e) {
+    // Silently fail — don't break the actual request
+  }
+
   return config;
 }, (error) => Promise.reject(error));
 
@@ -75,14 +90,28 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
-// Interceptor לתשובות - טיפול בשגיאות 401 וחידוש טוקן
+// Interceptor לתשובות - טיפול בשגיאות 401/403
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // אם קיבלנו 401 וזו לא בקשה שכבר ניסינו לחדש
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // ── 403 CSRF invalid — רענן טוקן ונסה שוב פעם אחת ──
+    if (error.response?.status === 403 && !originalRequest._csrfRetry) {
+      originalRequest._csrfRetry = true;
+      csrfTokenPromise = null; // פינוי cache
+      try {
+        await getCsrfToken();
+        return api(originalRequest);
+      } catch (e) {
+        return Promise.reject(error);
+      }
+    }
+
+    // ── 401 — חידוש טוקן ──
+    // דילוג על נתיבי auth (login/register/refresh) — 401 שם = אישורים שגויים, לא טוקן פג
+    const skipRefreshUrls = ['/auth/login', '/auth/register', '/auth/refresh'];
+    if (error.response?.status === 401 && !originalRequest._retry && !skipRefreshUrls.some(u => originalRequest.url?.includes(u))) {
       
       // אם אנחנו כבר באמצע תהליך חידוש, הכנס לתור
       if (isRefreshing) {

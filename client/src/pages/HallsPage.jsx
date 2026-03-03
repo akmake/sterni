@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/Input';
 import { Trash2, Plus, MapPin } from 'lucide-react';
 
 export default function HallsPage() {
-  const { halls, fetchHalls, createHall, deleteHall } = useGroupsStore();
+  const { halls, fetchHalls, createHall, deleteHall, loading } = useGroupsStore();
   const [newHallName, setNewHallName] = useState('');
 
   useEffect(() => {
@@ -48,8 +48,9 @@ export default function HallsPage() {
         </div>
 
         {/* רשימת אולמות */}
+        {loading && <div className="text-center py-10 text-slate-400">טוען אולמות...</div>}
         <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-            {halls.map(hall => (
+            {(halls || []).map(hall => (
                 <div key={hall._id} className="group bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-all flex justify-between items-center">
                     <span className="font-bold text-lg text-slate-800">{hall.name}</span>
                     <button 

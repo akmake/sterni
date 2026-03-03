@@ -10,13 +10,26 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, 'uploads/'),
   filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
 });
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|webp|pdf|doc|docx|xls|xlsx|csv|txt/;
+    const ext = path.extname(file.originalname).toLowerCase().replace('.', '');
+    if (allowedTypes.test(ext) || allowedTypes.test(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('סוג קובץ לא מורשה'), false);
+    }
+  }
+});
 
+// ⚠️ TODO: Replace with env vars — these are placeholder credentials
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: 'YOUR_EMAIL@gmail.com', 
-    pass: 'YOUR_APP_PASSWORD' 
+    user: process.env.GMAIL_USER || 'YOUR_EMAIL@gmail.com', 
+    pass: process.env.GMAIL_PASS || 'YOUR_APP_PASSWORD' 
   }
 });
 

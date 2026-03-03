@@ -1,7 +1,6 @@
 import express from 'express';
 import { getTasks, createTask, updateTaskStatus, deleteTask, convertTaskToProject } from '../controllers/taskController.js';
-// 👇 הייבוא הנכון מהקובץ ששלחת לי
-import requireAuth from '../middlewares/requireAuth.js'; 
+import { requireAuth } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 

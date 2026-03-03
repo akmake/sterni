@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import api from '../api';
+import api from '@/utils/api';
 
 const useMealsStore = create((set, get) => ({
   meals: [],

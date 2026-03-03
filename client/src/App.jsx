@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
+import React, { Suspense } from "react";
 
 import Layout from "@/components/Layout";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -23,7 +24,7 @@ import EmailsPage         from './pages/EmailsPage';
 import TasksPage          from './pages/TasksPage';
 import KitchenPrintPageA3 from './pages/KitchenPrintPageA3';
 import FullScheduleReportPage from '@/pages/FullScheduleReportPage';
-import NotFoundPage from "@/pages/NotFoundPage";
+const NotFoundPage = React.lazy(() => import("@/pages/NotFoundPage"));
 import ChatPage from './pages/ChatPage';
 import WhatsAppPage from './pages/WhatsAppPage';
 import PriceQuoteGenerator from './components/PriceQuoteGenerator';
@@ -93,7 +94,7 @@ export default function App() {
           <Route path="admin/tzitzit" element={<TzitzitManagementPage />} />
         </Route>
 
-        <Route path="*" element={<NotFoundPage />} />
+        <Route path="*" element={<Suspense fallback={<div className="flex items-center justify-center h-screen">...</div>}><NotFoundPage /></Suspense>} />
       </Route>
 
       {/* ─── Print pages (outside Layout) ─── */}

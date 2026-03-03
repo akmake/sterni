@@ -4,7 +4,7 @@ import { he } from 'date-fns/locale';
 import { Printer, Download, Mail, ArrowRight, Loader2, Users, MapPin, Info } from 'lucide-react';
 import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
-import api from '../api';
+import api from '@/utils/api';
 import { toast } from 'react-hot-toast';
 
 // --- Helpers (זהה ל-FullScheduleReportPage) ---

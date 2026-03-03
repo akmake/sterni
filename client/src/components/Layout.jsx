@@ -9,7 +9,7 @@ export default function Layout() {
   const [isCalcOpen, setIsCalcOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-800 overflow-hidden relative">
+    <div dir="rtl" className="flex h-screen bg-slate-50 text-slate-800 overflow-hidden relative">
       
       {/* תפריט צד - דסקטופ */}
       <aside className="hidden md:flex md:w-64 flex-shrink-0 md:border-l border-slate-200 bg-white z-20">

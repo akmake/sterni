@@ -60,8 +60,6 @@ export const getAccounts = async (req, res) => {
 // 4. עדכון הגדרות ניתוב (איזה מייל הולך לאן)
 export const updateRouting = async (req, res) => {
   try {
-    console.log('📥 קיבלתי בקשה לעדכון ניתוב:', req.body); // <--- בדיקה 1: מה מגיע מהלקוח?
-
     const { financeEmailId, opsEmailId, targetWhatsAppEmail } = req.body;
     
     let config = await SystemConfig.findOne();
@@ -80,7 +78,6 @@ export const updateRouting = async (req, res) => {
       await config.save();
     }
 
-    console.log('💾 נשמר במסד הנתונים:', config); // <--- בדיקה 2: מה נשמר בפועל?
     res.json({ success: true, config });
   } catch (error) {
     console.error('❌ שגיאה בעדכון:', error);

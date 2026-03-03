@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import axios from 'axios';
-import { Link } from 'react-router-dom';
+import api from '@/utils/api';
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function PaymentRequestsPage() {
   const [paymentRequests, setPaymentRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({});
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchPaymentRequests();
@@ -16,7 +17,7 @@ export default function PaymentRequestsPage() {
 
   const fetchPaymentRequests = async () => {
     try {
-      const response = await axios.get('/api/payment-requests');
+      const response = await api.get('/payment-requests');
       setPaymentRequests(response.data.data?.paymentRequests || []);
     } catch (error) {
       toast.error('שגיאה בטעינת דרישות התשלום');
@@ -30,7 +31,7 @@ export default function PaymentRequestsPage() {
     if (!window.confirm('האם אתה בטוח שברצונך למחוק?')) return;
     
     try {
-      await axios.delete(`/api/payment-requests/${id}`);
+      await api.delete(`/payment-requests/${id}`);
       setPaymentRequests(paymentRequests.filter(p => p._id !== id));
       toast.success('דרישה נמחקה בהצלחה');
     } catch (error) {
@@ -41,7 +42,7 @@ export default function PaymentRequestsPage() {
 
   const handleStatusChange = async (id, newStatus) => {
     try {
-      const response = await axios.patch(`/api/payment-requests/${id}/status`, {
+      const response = await api.patch(`/payment-requests/${id}/status`, {
         status: newStatus
       });
       setPaymentRequests(paymentRequests.map(p => 
@@ -118,7 +119,7 @@ export default function PaymentRequestsPage() {
                 <tr
                   key={request._id}
                   className="border-b hover:bg-blue-50 cursor-pointer transition-colors"
-                  onClick={() => window.location.href = `/payment-request/${request._id}`}
+                  onClick={() => navigate(`/payment-request/${request._id}`)}
                 >
                   <td className="px-4 py-3 font-semibold text-blue-700">{request.name}</td>
                   <td className="px-4 py-3">{request.clientName || '-'}</td>

@@ -160,13 +160,6 @@ const checkForNewEmails = async (systemEmail) => {
             // =========================================================
             if ((fromEmail === TARGET_EMAIL || fromEmail === systemEmail) && subject.includes('WA_MSG:')) {
 
-                console.log(`\n================= 🔍 DEBUG START =================`);
-                console.log(`📧 נושא: ${subject}`);
-                console.log(`📧 מאת: ${fromEmail}`);
-                console.log(`📝 תוכן גולמי:`, JSON.stringify(parsed.text));
-                console.log(`🧹 תוכן אחרי ניקוי:`, JSON.stringify(cleanContent));
-                console.log(`================= 🔍 DEBUG END ===================\n`);
-
                 // ★ שימוש ב-isConnected() במקום בדיקה ישירה של sock
                 if (!isConnected()) {
                     console.warn(`⏳ וואצאפ לא מחובר, לא מסמנים כנקרא — ננסה שוב בסבב הבא`);
@@ -182,9 +175,8 @@ const checkForNewEmails = async (systemEmail) => {
                         // שליחת טקסט עם התנהגות אנושית
                         if (cleanContent && cleanContent.length > 0) {
                             await sendMessageHuman(remoteJid, { text: cleanContent }, cleanContent);
-                            console.log(`📤 נשלחה תשובה ל-${phoneNumber}`);
                         } else {
-                            console.log(`⚠️ התוכן ריק אחרי ניקוי`);
+                            console.warn(`⚠️ תוכן ריק אחרי ניקוי ל-${phoneNumber}`);
                         }
 
                         // שליחת קבצים מצורפים
@@ -237,8 +229,6 @@ const checkForNewEmails = async (systemEmail) => {
                         else if (attachment.contentType.startsWith('video/')) fileType = 'video';
                         else fileType = 'file';
                     }
-
-                    console.log(`📥 הודעה חדשה לטיקט ${ticketId}.`);
 
                     await Message.create({
                         ticketId, sender: 'client', clientEmail: fromEmail, clientName: fromName,

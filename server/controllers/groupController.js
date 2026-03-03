@@ -115,8 +115,6 @@ export const updateGroupDetails = async (req, res, next) => {
         const isSameDuration = Math.abs(oldDuration - newDuration) < 1000 * 60 * 60 * 2; 
 
         if (isSameDuration) {
-          console.log(`Moving group schedule...`);
-          
           // חישוב ה"דלתא" - כמה להזיז את השעון (למשל: +1209600000 מילישניות לשבועיים)
           const timeDiff = newStart.getTime() - oldStart.getTime();
 

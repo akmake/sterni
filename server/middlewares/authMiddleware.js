@@ -12,8 +12,10 @@ export const requireAuth = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
     
     // ★ CRITICAL FIX: Convert string ID back to MongoDB ObjectId
+    const userId = new mongoose.Types.ObjectId(decoded.id);
     req.user = { 
-        _id: new mongoose.Types.ObjectId(decoded.id),
+        _id: userId,
+        id: decoded.id,  // string alias for compatibility
         role: decoded.role 
     };
     

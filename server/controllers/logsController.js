@@ -51,8 +51,6 @@ export const toggleLogging = catchAsync(async (req, res) => {
   // רענון מיידי של ה-cache ב-middleware — בלי לחכות 10 שניות
   refreshLoggingCache(config.loggingEnabled);
 
-  console.log(`📊 Logging ${config.loggingEnabled ? 'ENABLED ✅' : 'DISABLED ❌'}`);
-
   res.status(200).json({
     status: 'success',
     loggingEnabled: config.loggingEnabled,

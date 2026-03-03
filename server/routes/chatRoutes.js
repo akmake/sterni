@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { sendMessageToClient, getConversations } from '../controllers/chatController.js';
 import { handleIncomingEmail } from '../controllers/webhookController.js';
 import { getConnectionStatus } from '../services/whatsappService.js';
+import { requireAuth } from '../middlewares/authMiddleware.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,13 +27,32 @@ const storage = multer.diskStorage({
         cb(null, uniqueSuffix + '-' + cleanName);
     }
 });
+const ALLOWED_TYPES = /jpeg|jpg|png|gif|webp|pdf|doc|docx|xls|xlsx|csv|txt|mp4|mp3|wav/;
+
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 50 * 1024 * 1024 }
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase().replace('.', '');
+        if (ALLOWED_TYPES.test(ext) || ALLOWED_TYPES.test(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('סוג קובץ לא מורשה'), false);
+        }
+    }
 });
 const router = express.Router();
 
+// ⚠️ Webhook — must be public (external email services POST here)
+router.post('/webhook', upload.any(), handleIncomingEmail);
+
+// — Protected routes (require login) —
+router.use(requireAuth);
+
 router.get('/conversations', getConversations);
+router.get('/whatsapp-status', (req, res) => {
+    res.json(getConnectionStatus());
+});
 
 // שליחת הודעה + העלאת קובץ
 router.post('/send', upload.any(), (req, res, next) => {
@@ -42,13 +62,6 @@ router.post('/send', upload.any(), (req, res, next) => {
     }
     next();
 }, sendMessageToClient);
-
-router.post('/webhook', upload.any(), handleIncomingEmail);
-
-// סטטוס חיבור וואצאפ — שימושי לממשק הניהול
-router.get('/whatsapp-status', (req, res) => {
-    res.json(getConnectionStatus());
-});
 
 import { Message } from '../models/Message.js';
 router.get('/:ticketId', async (req, res) => {

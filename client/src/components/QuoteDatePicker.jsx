@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar as CalendarIcon, X } from 'lucide-react';
 import SmartCalendar from './SmartCalendar';
-import api from '../api';
+import api from '@/utils/api';
 
 /**
  * QuoteDatePicker

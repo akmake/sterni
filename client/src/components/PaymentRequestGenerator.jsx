@@ -5,7 +5,7 @@ import useGroupsStore from '@/stores/groupsStore';
 import { toast } from 'react-hot-toast';
 import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
-import axios from 'axios';
+import api from '@/utils/api';
 
 // --- הגדרות A4 ---
 const A4_HEIGHT_PX = 1123;
@@ -113,21 +113,7 @@ const PaymentRequestGenerator = ({ groupId = null, onSave = null, paymentRequest
 
   const blockRefs = useRef({});
   const containerRef = useRef(null);
-  const DRAFT_KEY = `draft_payment_${actualGroupId || paymentRequestId}`; 
-  const [csrfToken, setCsrfToken] = useState(null);
-
-  // --- טעינת CSRF token ---
-  useEffect(() => {
-    const fetchCSRFToken = async () => {
-      try {
-        const response = await axios.get('/api/csrf-token');
-        setCsrfToken(response.data.csrfToken);
-      } catch (err) {
-        console.error('Failed to fetch CSRF token:', err);
-      }
-    };
-    fetchCSRFToken();
-  }, []);
+  const DRAFT_KEY = `draft_payment_${actualGroupId || paymentRequestId}`;
 
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
@@ -504,12 +490,7 @@ const PaymentRequestGenerator = ({ groupId = null, onSave = null, paymentRequest
         formData.append('subject', `דרישת תשלום - ${headerDetails.groupName}`);
         formData.append('body', `שלום רב,\n\nמצורפת דרישת תשלום עבור ${headerDetails.groupName}.\n\nבברכה,\nצוות ציפורי.`);
 
-        const headers = csrfToken ? { 'X-CSRF-Token': csrfToken } : {};
-
-        await axios.post('/api/emails/send-attachment', formData, {
-            headers,
-            withCredentials: true 
-        });
+        await api.post('/emails/send-attachment', formData);
         toast.success('המייל נשלח בהצלחה!', { id: toastId });
         
         localStorage.removeItem(DRAFT_KEY);
@@ -525,8 +506,6 @@ const PaymentRequestGenerator = ({ groupId = null, onSave = null, paymentRequest
   const handleSave = async (showToast = true) => {
       setIsSavingToServer(true);
       try {
-        const headers = csrfToken ? { 'X-CSRF-Token': csrfToken } : {};
-        
         if (actualGroupId && group) {
           // שמירה לקבוצה + עדכון billing profile וטעינת תשלום
           await updateGroup(group._id, { 
@@ -542,13 +521,13 @@ const PaymentRequestGenerator = ({ groupId = null, onSave = null, paymentRequest
           
           // עדכון Billing Profile אם יש סכום כולל
           if (totalAmount > 0) {
-            await axios.put(`/payments/groups/${actualGroupId}/billing`, {
+            await api.put(`/payments/groups/${actualGroupId}/billing`, {
               totalExpected: totalAmount,
               currency: currency
-            }, { headers });
+            });
             
             // יצירת Payment record (charge) אם עדיין לא קיים במצב זה
-            await axios.post(`/payments/groups/${actualGroupId}/payments`, {
+            await api.post(`/payments/groups/${actualGroupId}/payments`, {
               type: 'invoice',
               amount: totalAmount,
               currency: currency,
@@ -556,14 +535,14 @@ const PaymentRequestGenerator = ({ groupId = null, onSave = null, paymentRequest
               description: `דרישת תשלום - ${headerDetails.groupName}`,
               status: 'pending',
               referenceNumber: `PR-${actualGroupId.substring(0, 8)}-${Date.now()}`
-            }, { headers });
+            });
           }
           
           if(showToast) toast.success("נשמר בשרת ותשלום נוצר בקבוצה");
         } else if (paymentRequestId) {
           // עדכון דרישת תשלום קיימת
           const htmlBody = containerRef.current?.innerHTML || '';
-          await axios.patch(`/api/payment-requests/${paymentRequestId}`, {
+          await api.patch(`/payment-requests/${paymentRequestId}`, {
             content: blocks,
             htmlBody,
             name: headerDetails.groupName,
@@ -575,12 +554,12 @@ const PaymentRequestGenerator = ({ groupId = null, onSave = null, paymentRequest
               phone: headerDetails.contactPhone,
               email: headerDetails.contactEmail
             }
-          }, { headers });
+          });
           if(showToast) toast.success("נשמר בשרת");
         } else {
           // שמירת דרישת תשלום חדשה
           const htmlBody = containerRef.current?.innerHTML || '';
-          const response = await axios.post('/api/payment-requests', {
+          const response = await api.post('/payment-requests', {
             content: blocks,
             htmlBody,
             name: headerDetails.groupName || `דרישה - ${new Date().toLocaleDateString('he-IL')}`,
@@ -592,7 +571,7 @@ const PaymentRequestGenerator = ({ groupId = null, onSave = null, paymentRequest
               phone: headerDetails.contactPhone,
               email: headerDetails.contactEmail
             }
-          }, { headers });
+          });
           if(showToast) toast.success("נשמר בשרת");
           if (onSave) onSave(response.data.data?.paymentRequest);
         }

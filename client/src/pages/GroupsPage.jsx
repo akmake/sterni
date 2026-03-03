@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import GroupsCalendarModal from '@/components/GroupsCalendarModal';
 
 export default function GroupsPage() {
-  const { groups, fetchGroups, deleteGroup } = useGroupsStore();
+  const { groups, fetchGroups, deleteGroup, loading } = useGroupsStore();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState('active'); // 'active' or 'archive'
@@ -149,6 +149,9 @@ export default function GroupsPage() {
         </div>
 
         {/* --- רשימת הקבוצות מחולקת לפי שבועות --- */}
+        {loading && groups.length === 0 && (
+          <div className="text-center py-20 text-slate-400 text-lg">טוען קבוצות...</div>
+        )}
         <div className="space-y-12">
           {sortedWeeks.length > 0 ? (
             sortedWeeks.map((weekStart) => (

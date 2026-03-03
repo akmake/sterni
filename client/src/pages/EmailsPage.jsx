@@ -1,30 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 // 👇 התיקון: שימוש ב-api המרכזי של הפרויקט
 import api from '../utils/api'; 
 import { Mail, Clock, CheckCircle, RefreshCw, Search } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const EmailsPage = () => {
   const [emails, setEmails] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const mountedRef = useRef(true);
 
   const fetchEmails = async () => {
     setLoading(true);
     try {
-      // ✅ קריאה נקייה דרך api.js (כולל קוקיז אוטומטי)
       const res = await api.get('/emails');
-      setEmails(res.data);
+      if (mountedRef.current) setEmails(res.data);
     } catch (err) {
+      if (!mountedRef.current) return;
       console.error("Error fetching emails:", err);
+      toast.error('שגיאה בטעינת מיילים');
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   };
 
   useEffect(() => {
+    mountedRef.current = true;
     fetchEmails();
     const interval = setInterval(fetchEmails, 15000); 
-    return () => clearInterval(interval);
+    return () => {
+      mountedRef.current = false;
+      clearInterval(interval);
+    };
   }, []);
 
   const updateStatus = async (id, newStatus) => {
@@ -39,6 +46,7 @@ const EmailsPage = () => {
     
     } catch (err) {
       console.error("Error updating status:", err);
+      toast.error('שגיאה בעדכון סטטוס');
       // במקרה שגיאה נרענן את הנתונים
       fetchEmails();
       // ה-api.js שלך כבר יקפיץ את המשתמש ללוגין אם ה-Token פג תוקף (401)
@@ -65,8 +73,8 @@ const EmailsPage = () => {
 
   // סינון לפי חיפוש
   const filteredEmails = emails.filter(email => 
-    email.fromName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    email.subject.toLowerCase().includes(searchTerm.toLowerCase())
+    (email.fromName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (email.subject || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -115,7 +123,7 @@ const EmailsPage = () => {
             <div className="flex justify-between items-start mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-gray-100 to-gray-200 flex items-center justify-center text-gray-600 font-bold text-sm shadow-inner">
-                  {email.fromName.charAt(0).toUpperCase()}
+                  {(email.fromName || '?').charAt(0).toUpperCase()}
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900 text-sm leading-tight">{email.fromName}</h3>

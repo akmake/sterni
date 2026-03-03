@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Edit2, Trash2, Lock, Shield, User, Mail, Calendar, Save, X, Check, Plus, Scissors } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import api from '../api';
+import api from '@/utils/api';
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState([]);

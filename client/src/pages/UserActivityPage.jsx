@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import api from '../api';
+import api from '@/utils/api';
 import { toast } from 'react-hot-toast';
 import {
   Users, Monitor, Smartphone, Tablet, HelpCircle, Globe, Clock,

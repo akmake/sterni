@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import axios from 'axios';
+import api from '@/utils/api';
 import { useNavigate, useParams } from 'react-router-dom';
 import PaymentRequestGenerator from '@/components/PaymentRequestGenerator';
 
@@ -18,7 +18,7 @@ export default function PaymentRequestEditorPage() {
 
   const fetchPaymentRequest = async () => {
     try {
-      const response = await axios.get(`/api/payment-requests/${id}`);
+      const response = await api.get(`/payment-requests/${id}`);
       // רק להעמיס לך נוודא שה-payment request קיים
       return response.data.data?.paymentRequest;
     } catch (error) {

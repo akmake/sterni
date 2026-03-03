@@ -79,8 +79,6 @@ export const sendAttachmentEmail = async (req, res) => {
             ]
         });
 
-        console.log('Message sent: %s', info.messageId);
-
         // 5. ניקוי הקובץ הזמני
         fs.unlink(filePath, (err) => {
             if (err) console.error('Failed to delete temp file:', err);

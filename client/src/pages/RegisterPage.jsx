@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import axios from "axios";
+import api from "@/utils/api";
 import { Button } from "@/components/ui/Button";
 
 export default function RegisterPage() {
@@ -18,8 +18,8 @@ export default function RegisterPage() {
 
   // ברגע שהעמוד עולה – החלץ את ה-CSRF token והשרת יציב אותו בעוגייה XSRF-TOKEN
   useEffect(() => {
-    axios
-      .get("/csrf-token", { withCredentials: true }) // <-- התיקון כאן, ללא /api
+    api
+      .get("/csrf-token")
       .catch((err) => console.error("Can't fetch CSRF token:", err));
   }, []);
 
@@ -37,25 +37,11 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      await axios.post(
-        "/api/auth/register",
-        {
-          name: form.name,
-          email: form.email,
-          password: form.password,
-        },
-        {
-          withCredentials: true,              // שולח עוגיות (כולל XSRF-TOKEN)
-          headers: {
-            // axios ייקרא אוטומטית ל־X-XSRF-TOKEN מתוך העוגייה, 
-            // אבל אם הסווג שלך ייחודי אפשר כאן למפות ידנית:
-            // "X-CSRF-Token": document.cookie
-            //   .split("; ")
-            //   .find((c) => c.startsWith("XSRF-TOKEN="))
-            //   ?.split("=")[1],
-          },
-        }
-      );
+      await api.post("/auth/register", {
+        name: form.name,
+        email: form.email,
+        password: form.password,
+      });
       navigate("/tzitzit");
     } catch (err) {
       setError(err.response?.data?.message || "שגיאה בהרשמה, נסה שוב");

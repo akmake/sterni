@@ -1,7 +1,10 @@
 import crypto from 'crypto';
 
-// מפתח הצפנה ראשי - זה הדבר היחיד שחייב להישאר קבוע בקוד או ב-.env
+// מפתח הצפנה ראשי - חובה להגדיר ב-ENCRYPTION_KEY ב-.env
 // אם אתה משנה את המפתח הזה - כל הסיסמאות ב-DB לא יהיו ניתנות לפענוח!
+if (!process.env.ENCRYPTION_KEY) {
+  console.error('⚠️ WARNING: ENCRYPTION_KEY not set in .env — using insecure default!');
+}
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'vOVH6sdmpNWjRRIqCc7rdxs01lwHzfr3'; // 32 chars
 const ALGORITHM = 'aes-256-cbc';
 

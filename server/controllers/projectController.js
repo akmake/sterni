@@ -347,7 +347,6 @@ export const deleteProjectFile = async (req, res, next) => {
             const filePath = path.join(__dirname, '../../uploads', fileName);
             fs.unlink(filePath, (err) => {
                 if (err) console.error("Failed to delete local file:", err.message);
-                else console.log("Local file deleted:", fileName);
             });
         }
     }

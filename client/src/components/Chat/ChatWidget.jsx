@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import api from '@/utils/api';
 import { Send, Paperclip, Phone, Mail, MessageCircle } from 'lucide-react';
 
 const ChatWidget = ({ ticketId, clientEmail, clientPhone, existingMessages }) => {
@@ -20,7 +20,7 @@ const ChatWidget = ({ ticketId, clientEmail, clientPhone, existingMessages }) =>
     formData.append('file', fileToUpload);
     
     // הנחה: יש לך ראוט להעלאת קבצים שמחזיר { fileUrl: '/uploads/...' }
-    const res = await axios.post('/api/upload', formData, {
+    const res = await api.post('/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
     return res.data.fileUrl;
@@ -53,7 +53,7 @@ const ChatWidget = ({ ticketId, clientEmail, clientPhone, existingMessages }) =>
         fileUrl
       };
 
-      const { data } = await axios.post('/api/chat', payload);
+      const { data } = await api.post('/chat', payload);
       
       // עדכון התצוגה (אופטימי או מהשרת)
       setMessages([...messages, data.data]);

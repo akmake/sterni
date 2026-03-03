@@ -7,7 +7,7 @@ import {
   updatePaymentRequestStatus,
   sendPaymentRequest
 } from '../controllers/PaymentRequestController.js';
-import requireAuth from '../middlewares/requireAuth.js';
+import { requireAuth } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 

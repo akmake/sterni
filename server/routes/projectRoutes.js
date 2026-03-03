@@ -44,7 +44,19 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|webp|pdf|doc|docx|xls|xlsx|csv|txt/;
+    const ext = path.extname(file.originalname).toLowerCase().replace('.', '');
+    if (allowedTypes.test(ext) || allowedTypes.test(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('סוג קובץ לא מורשה'), false);
+    }
+  }
+});
 
 // Routes
 // ⚠️ Important: PUT SPECIFIC ROUTES BEFORE GENERIC /:id ROUTES

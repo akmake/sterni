@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { chatService } from '../services/chatService';
-import api from '../api';
+import api from '@/utils/api';
 import { 
   Search, MoreVertical, Plus, X,
   CheckCheck, Loader2, FileText, 

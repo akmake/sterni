@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Search, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import api from '../api.js';
+import api from '@/utils/api';
 
 export default function ProjectSharingModal({ projectId, isOpen, onClose, onUpdate }) {
   const [allUsers, setAllUsers] = useState([]);

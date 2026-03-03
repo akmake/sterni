@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import api from '@/utils/api';
 import { Plus, Trash2, Check, ChevronDown, ChevronUp, Loader2, ArrowUpRight, Pencil } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -15,7 +15,7 @@ const QuickTasksWidget = () => {
   // טעינת משימות
   const fetchTasks = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/tasks');
+      const res = await api.get('/tasks');
       setTasks(res.data);
     } catch (err) {
       console.error("Failed to load tasks", err);
@@ -31,7 +31,7 @@ const QuickTasksWidget = () => {
     if (e.key === 'Enter' && newTask.trim()) {
       setLoading(true);
       try {
-        const res = await axios.post('http://localhost:5000/api/tasks', { text: newTask });
+        const res = await api.post('/tasks', { text: newTask });
         setTasks([res.data, ...tasks]);
         setNewTask('');
       } catch (err) {
@@ -48,7 +48,7 @@ const QuickTasksWidget = () => {
     setTasks(prev => prev.map(t => t._id === id ? { ...t, isCompleted: !currentStatus } : t));
     
     try {
-      await axios.patch(`http://localhost:5000/api/tasks/${id}`, { isCompleted: !currentStatus });
+      await api.patch(`/tasks/${id}`, { isCompleted: !currentStatus });
     } catch (err) {
       console.error(err);
       fetchTasks(); // שחזור במקרה שגיאה
@@ -59,7 +59,7 @@ const QuickTasksWidget = () => {
   const deleteTask = async (id) => {
     setTasks(prev => prev.filter(t => t._id !== id));
     try {
-      await axios.delete(`http://localhost:5000/api/tasks/${id}`);
+      await api.delete(`/tasks/${id}`);
     } catch (err) {
       console.error(err);
     }
@@ -69,7 +69,7 @@ const QuickTasksWidget = () => {
   const convertToProject = async (id) => {
     if (!window.confirm('להפוך מטלה זו לפרויקט חדש?')) return;
     try {
-      const res = await axios.post(`http://localhost:5000/api/tasks/${id}/convert`);
+      const res = await api.post(`/tasks/${id}/convert`);
       setTasks(prev => prev.filter(t => t._id !== id));
       navigate(`/projects/${res.data.newProject._id}`);
     } catch (err) {
@@ -87,7 +87,7 @@ const QuickTasksWidget = () => {
     if (val && editingId) {
       setTasks(prev => prev.map(t => t._id === editingId ? { ...t, text: val } : t));
       try {
-        await axios.patch(`http://localhost:5000/api/tasks/${editingId}`, { text: val });
+        await api.patch(`/tasks/${editingId}`, { text: val });
       } catch (err) {
         console.error(err);
         fetchTasks();

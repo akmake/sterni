@@ -86,7 +86,6 @@ export const sendMessageToClient = async (req, res, next) => {
                     }
                 } else {
                     await sendMessageHuman(jid, { text: content }, content);
-                    console.log(`📤 נשלחה הודעת וואצפ ל-${contact.phone}`);
                 }
             } catch (waError) {
                 console.error('❌ שגיאה בשליחה לוואצפ:', waError.message);
@@ -110,7 +109,6 @@ export const sendMessageToClient = async (req, res, next) => {
                 emailHtml
             );
 
-            console.log(`📧 נשלח מייל ל-${clientEmail}`);
         }
 
         res.status(201).json({ status: 'success', data: newMessage, contact });

@@ -1,4 +1,4 @@
-import api from '../api'; // מניח שיש לך כבר instance של axios מוגדר ב-api.js
+import api from '@/utils/api';
 
 export const chatService = {
   // קבלת היסטוריית שיחה לפי מספר פנייה
@@ -19,11 +19,7 @@ export const chatService = {
       formData.append('file', messageData.file);
     }
 
-    const response = await api.post('/chat/send', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    const response = await api.post('/chat/send', formData);
     return response.data;
   }
 };

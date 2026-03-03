@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Mail, Shield, Calendar, Edit2, Save, X, Lock, Eye, EyeOff, Check } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import api from '../api';
+import api from '@/utils/api';
 import { useAuthStore } from '@/stores/authStore';
 
 export default function ProfilePage() {

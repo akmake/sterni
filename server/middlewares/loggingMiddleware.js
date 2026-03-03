@@ -74,8 +74,8 @@ const getGeolocation = async (ipAddress) => {
   }
 
   try {
-    // Using ip-api.com free API (45 requests per minute limit)
-    const response = await axios.get(`http://ip-api.com/json/${ipAddress}?fields=country,city,region,lat,lon`, {
+    // Using ip-api.com (HTTPS pro endpoint or fallback)
+    const response = await axios.get(`https://pro.ip-api.com/json/${ipAddress}?fields=country,city,region,lat,lon&key=${process.env.IP_API_KEY || ''}`, {
       timeout: 2000, // 2 seconds timeout
     });
 

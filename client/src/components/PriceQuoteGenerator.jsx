@@ -4,8 +4,7 @@ import { Save, Printer, Trash2, Table as TableIcon, Type, FileDown, LoaderCircle
 import { toast } from 'react-hot-toast';
 import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
-import axios from 'axios';
-import api from '../api';
+import api from '@/utils/api';
 import QuoteManager from './QuoteManager';
 import QuoteDatePicker from './QuoteDatePicker';
 

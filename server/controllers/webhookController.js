@@ -8,8 +8,6 @@ export const handleIncomingEmail = async (req, res) => {
     const { subject, text, from, html } = req.body;
     const files = req.files; // מגיע מ-Multer
 
-    console.log('Incoming email received:', subject);
-
     // 1. חילוץ ה-Ticket ID מהנושא
     // מחפש תבנית של #ואחריו מספרים
     const ticketIdMatch = subject ? subject.match(/#(\d+)/) : null;

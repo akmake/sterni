@@ -1,11 +1,26 @@
+import FinanceCategoryRule from '../models/FinanceCategoryRule.js';
+import FinanceTransaction from '../models/FinanceTransaction.js';
 import MerchantMap from '../models/MerchantMap.js';
-import CategoryRule from '../models/CategoryRule.js';
 
 function parseDate(dateInput) {
   if (dateInput instanceof Date && !isNaN(dateInput.getTime())) return dateInput;
   if (!dateInput) return null;
 
   const dateStr = String(dateInput).trim();
+
+  // DD.MM.YY or DD.MM.YYYY (isracard format)
+  const dotParts = dateStr.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
+  if (dotParts) {
+    const day = parseInt(dotParts[1], 10);
+    const month = parseInt(dotParts[2], 10);
+    let year = parseInt(dotParts[3], 10);
+    if (year < 100) year += 2000;
+    if (year > 1900 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      const date = new Date(Date.UTC(year, month - 1, day));
+      if (!isNaN(date.getTime())) return date;
+    }
+  }
+
   const parts = dateStr.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
   if (parts) {
     const day = parseInt(parts[1], 10);
@@ -23,21 +38,31 @@ function parseDate(dateInput) {
   return null;
 }
 
-const createTransactionObject = (row, userId, type) => {
-    // פונקציית עזר למציאת ערך לפי רשימת מפתחות אפשריים
-    const getValue = (keys) => {
-        for (const key of keys) {
-            if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') {
-                return row[key];
+const createTransactionObject = (row, familyId, addedBy, type) => {
+    // --- פונקציית עזר חכמה שעוקפת רווחים נסתרים באקסל ---
+    const getValue = (keyPhrases) => {
+        for (const actualKey of Object.keys(row)) {
+            for (const phrase of keyPhrases) {
+                if (actualKey.includes(phrase)) {
+                    const val = row[actualKey];
+                    if (val !== undefined && val !== null && String(val).trim() !== '') {
+                        return val;
+                    }
+                }
             }
         }
         return null;
     };
 
-    const date = parseDate(getValue(['תאריך עסקה', 'תאריך', 'Date', 'date']));
-    const description = getValue(['שם בית העסק', 'שם בית עסק', 'תיאור', 'Description', 'description']);
+    const dateVal = getValue(['תאריך עסקה', 'תאריך רכישה', 'תאריך', 'Date', 'date']);
+    const date = parseDate(dateVal);
     
-    if (!date || !description) return null;
+    const descriptionVal = getValue(['שם בית העסק', 'שם בית עסק', 'תיאור', 'Description', 'description']);
+    
+    // סינון שורות "זבל" - אם אין תאריך או תיאור, מתעלמים מהשורה
+    if (!date || !descriptionVal) return null;
+    
+    const description = String(descriptionVal).trim();
 
     let amount, transactionType;
     if (type === 'max') {
@@ -54,8 +79,15 @@ const createTransactionObject = (row, userId, type) => {
             amount = Math.abs(creditAmount);
             transactionType = 'הכנסה';
         } else {
-            return null;
+            return null; // אם אין סכום, מדלגים
         }
+    } else if (type === 'isracard') {
+        const amountValue = getValue(['סכום חיוב']);
+        if (amountValue == null) return null;
+        amount = parseFloat(String(amountValue).replace(/,/g, ''));
+        if (isNaN(amount)) return null;
+        transactionType = amount < 0 ? 'הכנסה' : 'הוצאה';
+        amount = Math.abs(amount);
     } else { // 'cal'
         const amountValue = getValue(["סכום בש\"ח", "סכום עסקה", "סכום חיוב"]);
         if (amountValue == null) return null;
@@ -76,7 +108,8 @@ const createTransactionObject = (row, userId, type) => {
     ]) || 'כללי';
 
     return {
-        user: userId,
+        family: familyId,
+        addedBy,
         date,
         description: description,
         rawDescription: description,
@@ -87,54 +120,89 @@ const createTransactionObject = (row, userId, type) => {
     };
 };
 
-export async function parseTransactions(cleanedData, fileType, userId) {
-    const mapper = (row) => createTransactionObject(row, userId, fileType);
+export async function parseTransactions(cleanedData, fileType, familyId, addedBy) {
+    const mapper = (row) => createTransactionObject(row, familyId, addedBy, fileType);
     const initialTransactions = cleanedData.map(mapper).filter(Boolean);
 
-    const [merchantMaps, categoryRules] = await Promise.all([
+    const genericNames = ['כללי', 'שונות', '', 'null', 'undefined'];
+
+    const [merchantMaps, categoryRules, existingTxns] = await Promise.all([
         MerchantMap.find({}).populate('category').lean(),
-        CategoryRule.find({}).populate('category').lean(),
+        FinanceCategoryRule.find({ family: familyId }).populate('category').lean(),
+        FinanceTransaction.find(
+            { family: familyId, category: { $exists: true, $nin: genericNames } },
+            { description: 1, category: 1 }
+        ).lean(),
     ]);
 
     const merchantMapCache = new Map(merchantMaps.map(m => [m.originalName, m]));
+
+    // Build a name → category map from existing transactions (first occurrence wins)
+    const existingCategoryByName = new Map();
+    for (const t of existingTxns) {
+        if (t.description && !existingCategoryByName.has(t.description)) {
+            existingCategoryByName.set(t.description, t.category);
+        }
+    }
+
     const merchantsThatNeedMapping = new Set();
 
     const transactions = initialTransactions.map(trx => {
         let finalDescription = trx.description;
         let finalCategoryName = trx.category;
-        
-        // --- התיקון הקריטי כאן ---
-        // בודקים האם הקטגוריה שהגיעה מהקובץ היא "קטגוריה אמיתית" ולא סתם "כללי"
-        const genericNames = ['כללי', 'שונות', '', 'null', 'undefined'];
-        let categoryIsGeneric = genericNames.includes(finalCategoryName);
-        
-        // אם הקטגוריה לא גנרית (כלומר היא "עיצוב הבית" או "מזון"), אז מצאנו קטגוריה!
-        let categoryFound = !categoryIsGeneric; 
 
-        // שלב 1: מיפוי ידני (גובר על הכל - אם המשתמש קבע אחרת בעבר)
+        // שלב 0: האם הקטגוריה מהקובץ היא אמיתית?
+        let categoryFound = !genericNames.includes(finalCategoryName);
+
+        // שלב 1: מיפוי ידני (MerchantMap)
         const mapping = merchantMapCache.get(trx.rawDescription);
         if (mapping) {
             finalDescription = mapping.newName;
             if (mapping.category) {
                 finalCategoryName = mapping.category.name;
                 categoryFound = true;
+            } else if (mapping.categoryName) {
+                finalCategoryName = mapping.categoryName;
+                categoryFound = true;
             }
         }
 
-        // שלב 2: חוקים אוטומטיים (רק אם לא מצאנו קטגוריה טובה עדיין)
+        // שלב 2: חוקים אוטומטיים
         if (!categoryFound) {
             for (const rule of categoryRules) {
-                if (finalDescription.toLowerCase().includes(rule.keyword.toLowerCase())) {
+                const keyword = rule.searchString || rule.keyword || '';
+                if (!keyword) continue;
+
+                let isMatch = false;
+                const desc = (trx.rawDescription || trx.description).toLowerCase();
+                const kw = keyword.toLowerCase();
+
+                if (rule.matchType === 'exact') isMatch = desc === kw;
+                else if (rule.matchType === 'starts_with') isMatch = desc.startsWith(kw);
+                else isMatch = desc.includes(kw);
+
+                if (isMatch) {
                     if (rule.category) {
                         finalCategoryName = rule.category.name;
                         categoryFound = true;
                         break;
                     }
+                    if (rule.newName) finalDescription = rule.newName;
                 }
             }
         }
 
-        // שלב 3: רק אם בסוף באמת אין קטגוריה (לא מהקובץ, לא ממיפוי ולא מחוקים) - תוסיף למיפוי
+        // שלב 3: בדיקה בעסקאות קיימות של המשפחה (לפי שם מוצג או שם מקורי)
+        if (!categoryFound) {
+            const existingCat = existingCategoryByName.get(finalDescription)
+                             || existingCategoryByName.get(trx.rawDescription);
+            if (existingCat && !genericNames.includes(existingCat)) {
+                finalCategoryName = existingCat;
+                categoryFound = true;
+            }
+        }
+
+        // שלב 4: אם עדיין אין קטגוריה - דורש מיפוי ידני
         if (!categoryFound) {
             merchantsThatNeedMapping.add(trx.rawDescription);
         }

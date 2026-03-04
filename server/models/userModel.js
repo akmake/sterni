@@ -33,6 +33,15 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    householdAccess: {
+      type: Boolean,
+      default: false,
+    },
+    preferredView: {
+      type: String,
+      enum: ['management', 'household'],
+      default: 'management',
+    },
     twoFactorEnabled: { type: Boolean, default: false },
     totpSecret:        { type: String,  default: '' },
     failedLoginAttempts: { type: Number, default: 0 },

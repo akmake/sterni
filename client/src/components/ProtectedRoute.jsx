@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 
 /**
@@ -13,12 +13,9 @@ const ProtectedRoute = () => {
   const { isAuthenticated } = useAuthStore();
 
   if (!isAuthenticated) {
-    // Redirect them to the /login page, but save the current location they were
-    // trying to go to so we can send them there after login.
     return <Navigate to="/login" replace />;
   }
 
-  // If authenticated, render the child route component via the Outlet.
   return <Outlet />;
 };
 

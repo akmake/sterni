@@ -7,7 +7,8 @@ import {
   deleteUser,
   changeUserRole,
   createUser,
-  toggleTzitzitAccess
+  toggleTzitzitAccess,
+  toggleHouseholdAccess
 } from '../controllers/adminController.js';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import requireAdmin from '../middlewares/requireAdmin.js';
@@ -28,6 +29,7 @@ router.patch('/users/:id', updateUser);
 router.patch('/users/:id/password', changeUserPassword);
 router.patch('/users/:id/role', changeUserRole);
 router.patch('/users/:id/tzitzit-access', toggleTzitzitAccess);
+router.patch('/users/:id/household-access', toggleHouseholdAccess);
 router.delete('/users/:id', deleteUser);
 
 export default router;

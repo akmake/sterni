@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Edit2, Trash2, Lock, Shield, User, Mail, Calendar, Save, X, Check, Plus, Scissors } from 'lucide-react';
+import { Edit2, Trash2, Lock, Shield, User, Mail, Calendar, Save, X, Check, Plus, Scissors, Home } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '@/utils/api';
 
@@ -128,6 +128,17 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleToggleHouseholdAccess = async (userId, currentValue) => {
+    try {
+      await api.patch(`/admin/users/${userId}/household-access`, { householdAccess: !currentValue });
+      setUsers(users.map(u => u._id === userId ? { ...u, householdAccess: !currentValue } : u));
+      toast.success(!currentValue ? 'גישת משק בית הופעלה' : 'גישת משק בית בוטלה');
+    } catch (error) {
+      toast.error('שגיאה בעדכון הגישה');
+      console.error(error);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -167,6 +178,7 @@ export default function AdminUsersPage() {
                 <th className="px-4 py-3 text-right font-bold">מייל</th>
                 <th className="px-4 py-3 text-right font-bold">תפקיד</th>
                 <th className="px-4 py-3 text-right font-bold">ציציות</th>
+                <th className="px-4 py-3 text-right font-bold">משק בית</th>
                 <th className="px-4 py-3 text-right font-bold">הצטרפות</th>
                 <th className="px-4 py-3 text-right font-bold">פעולות</th>
               </tr>
@@ -202,6 +214,7 @@ export default function AdminUsersPage() {
                           <option value="admin">מנהל</option>
                         </select>
                       </td>
+                      <td className="px-4 py-3">-</td>
                       <td className="px-4 py-3">-</td>
                       <td className="px-4 py-3">-</td>
                       <td className="px-4 py-3">
@@ -262,6 +275,20 @@ export default function AdminUsersPage() {
                           >
                             <Scissors size={14} />
                             {user.tzitzitAccess ? 'מופעל' : 'כבוי'}
+                          </button>
+                      </td>
+                      <td className="px-4 py-3">
+                          <button
+                            onClick={() => handleToggleHouseholdAccess(user._id, user.householdAccess)}
+                            className={`inline-flex items-center gap-1 px-3 py-1 rounded text-sm font-medium transition-colors ${
+                              user.householdAccess
+                                ? 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                            }`}
+                            title={user.householdAccess ? 'לחץ לביטול גישה' : 'לחץ להפעלת גישת משק בית'}
+                          >
+                            <Home size={14} />
+                            {user.householdAccess ? 'מופעל' : 'כבוי'}
                           </button>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500">

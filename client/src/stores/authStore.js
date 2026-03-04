@@ -8,15 +8,16 @@ import { injectAuthStore } from '../utils/api';
 const getInitialState = () => {
   try {
     const user = JSON.parse(localStorage.getItem('user'));
-    return { user, isAuthenticated: !!user };
+    const activeView = localStorage.getItem('activeView') || user?.preferredView || 'management';
+    return { user, isAuthenticated: !!user, activeView };
   } catch (error) {
-    return { user: null, isAuthenticated: false };
+    return { user: null, isAuthenticated: false, activeView: 'management' };
   }
 };
 
 export const useAuthStore = create(
   devtools(
-    (set) => ({
+    (set, get) => ({
       ...getInitialState(),
 
       login: (userData) => {
@@ -25,12 +26,33 @@ export const useAuthStore = create(
           return;
         }
         localStorage.setItem('user', JSON.stringify(userData));
-        set({ user: userData, isAuthenticated: true }, false, 'LOGIN_ACTION');
+        const activeView = userData.preferredView || 'management';
+        localStorage.setItem('activeView', activeView);
+        set({ user: userData, isAuthenticated: true, activeView }, false, 'LOGIN_ACTION');
       },
 
       logout: () => {
         localStorage.removeItem('user');
-        set({ user: null, isAuthenticated: false }, false, 'LOGOUT_ACTION');
+        localStorage.removeItem('activeView');
+        set({ user: null, isAuthenticated: false, activeView: 'management' }, false, 'LOGOUT_ACTION');
+      },
+
+      setActiveView: (view) => {
+        localStorage.setItem('activeView', view);
+        set({ activeView: view }, false, 'SET_ACTIVE_VIEW');
+      },
+
+      toggleView: () => {
+        const current = get().activeView;
+        const next = current === 'household' ? 'management' : 'household';
+        localStorage.setItem('activeView', next);
+        set({ activeView: next }, false, 'TOGGLE_VIEW');
+        return next;
+      },
+
+      updateUser: (userData) => {
+        localStorage.setItem('user', JSON.stringify(userData));
+        set({ user: userData }, false, 'UPDATE_USER');
       },
     }),
     { name: "Auth Store" }

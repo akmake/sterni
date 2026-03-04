@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Shield, Calendar, Edit2, Save, X, Lock, Eye, EyeOff, Check } from 'lucide-react';
+import { User, Mail, Shield, Calendar, Edit2, Save, X, Lock, Eye, EyeOff, Check, Home, Briefcase } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '@/utils/api';
 import { useAuthStore } from '@/stores/authStore';
 
 export default function ProfilePage() {
-  const { user: authUser, login } = useAuthStore();
+  const { user: authUser, login, setActiveView, updateUser } = useAuthStore();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -24,6 +24,7 @@ export default function ProfilePage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [savingPreferredView, setSavingPreferredView] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -101,6 +102,25 @@ export default function ProfilePage() {
       console.error(error);
     } finally {
       setChangingPassword(false);
+    }
+  };
+
+  const handleChangePreferredView = async (newView) => {
+    setSavingPreferredView(true);
+    try {
+      const response = await api.patch('/auth/preferred-view', { preferredView: newView });
+      const updatedUser = response.data.data?.user;
+      if (updatedUser) {
+        login(updatedUser);
+        setActiveView(newView);
+        setProfile(prev => ({ ...prev, preferredView: newView }));
+      }
+      toast.success(newView === 'household' ? 'תצוגת ברירת מחדל: משק בית' : 'תצוגת ברירת מחדל: ניהול');
+    } catch (error) {
+      toast.error('שגיאה בעדכון העדפה');
+      console.error(error);
+    } finally {
+      setSavingPreferredView(false);
     }
   };
 
@@ -273,6 +293,64 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Preferred View Setting - only for users with household access */}
+      {authUser?.householdAccess && (
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+          <div className="p-8">
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">תצוגת ברירת מחדל</h3>
+            <p className="text-sm text-gray-500 mb-6">בחר איזה ממשק ייפתח כשתיכנס לאתר</p>
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={() => handleChangePreferredView('management')}
+                disabled={savingPreferredView}
+                className={`flex flex-col items-center gap-3 p-6 rounded-xl border-2 transition-all duration-200 ${
+                  (profile?.preferredView || 'management') === 'management'
+                    ? 'border-blue-500 bg-blue-50 shadow-md'
+                    : 'border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100'
+                }`}
+              >
+                <div className={`h-14 w-14 rounded-full flex items-center justify-center ${
+                  (profile?.preferredView || 'management') === 'management'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-200 text-gray-500'
+                }`}>
+                  <Briefcase className="h-7 w-7" />
+                </div>
+                <span className={`font-semibold ${
+                  (profile?.preferredView || 'management') === 'management' ? 'text-blue-700' : 'text-gray-600'
+                }`}>ניהול</span>
+                {(profile?.preferredView || 'management') === 'management' && (
+                  <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full">נבחר</span>
+                )}
+              </button>
+              <button
+                onClick={() => handleChangePreferredView('household')}
+                disabled={savingPreferredView}
+                className={`flex flex-col items-center gap-3 p-6 rounded-xl border-2 transition-all duration-200 ${
+                  profile?.preferredView === 'household'
+                    ? 'border-orange-500 bg-orange-50 shadow-md'
+                    : 'border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100'
+                }`}
+              >
+                <div className={`h-14 w-14 rounded-full flex items-center justify-center ${
+                  profile?.preferredView === 'household'
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-gray-200 text-gray-500'
+                }`}>
+                  <Home className="h-7 w-7" />
+                </div>
+                <span className={`font-semibold ${
+                  profile?.preferredView === 'household' ? 'text-orange-700' : 'text-gray-600'
+                }`}>משק בית</span>
+                {profile?.preferredView === 'household' && (
+                  <span className="text-xs bg-orange-500 text-white px-2 py-0.5 rounded-full">נבחר</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Password Change Section */}
       <div className="bg-white rounded-2xl shadow-lg overflow-hidden">

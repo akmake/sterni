@@ -91,7 +91,10 @@ const useProjectsStore = create((set, get) => ({
   addTask: async (projectId, task) => {
     try {
       const updated = await addTask(projectId, task);
-      set({ activeProject: updated });
+      set({
+        activeProject: updated,
+        projects: get().projects.map(p => p._id === projectId ? updated : p),
+      });
     } catch (err) { get()._fail(err); }
   },
 
@@ -102,7 +105,11 @@ const useProjectsStore = create((set, get) => ({
       const updatedTasks = current.tasks.map(t =>
           t._id === taskId ? { ...t, done: !t.done } : t
       );
-      set({ activeProject: { ...current, tasks: updatedTasks }});
+      const optimistic = { ...current, tasks: updatedTasks };
+      set({
+        activeProject: optimistic,
+        projects: get().projects.map(p => p._id === projectId ? optimistic : p),
+      });
       await toggleTask(projectId, taskId);
     } catch (err) {
         get()._fail(err);
@@ -115,7 +122,11 @@ const useProjectsStore = create((set, get) => ({
       await deleteTask(projectId, taskId);
       const current = get().activeProject;
       const updatedTasks = current.tasks.filter(t => t._id !== taskId);
-      set({ activeProject: { ...current, tasks: updatedTasks }});
+      const updated = { ...current, tasks: updatedTasks };
+      set({
+        activeProject: updated,
+        projects: get().projects.map(p => p._id === projectId ? updated : p),
+      });
       toast.success('המשימה נמחקה');
     } catch (err) { get()._fail(err); }
   },

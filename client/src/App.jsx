@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import React, { Suspense } from "react";
+import { useAuthStore } from "@/stores/authStore";
 
 import Layout from "@/components/Layout";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -43,13 +44,44 @@ import UserActivityPage from './pages/UserActivityPage';
 import TzitzitManagementPage from './pages/TzitzitManagementPage';
 import ProfilePage from './pages/ProfilePage';
 
+/* Household Pages */
+import HouseholdDashboard from './pages/HouseholdDashboard';
+import ShoppingListPage from './pages/ShoppingListPage';
+import HouseholdTasksPage from './pages/HouseholdTasksPage';
+import HouseholdExpensesPage from './pages/HouseholdExpensesPage';
+import FamilySettingsPage from './pages/FamilySettingsPage';
+import HouseholdProjectsPage from './pages/HouseholdProjectsPage';
+import HouseholdProjectPage from './pages/HouseholdProjectPage';
+import NewHouseholdProjectPage from './pages/NewHouseholdProjectPage';
+
+/* Finance Pages */
+import FinanceDashboardPage from './pages/FinanceDashboardPage';
+import FinanceTransactionsPage from './pages/FinanceTransactionsPage';
+import FinanceBudgetPage from './pages/FinanceBudgetPage';
+import FinanceRecurringPage from './pages/FinanceRecurringPage';
+import FinanceAnalyticsPage from './pages/FinanceAnalyticsPage';
+import FinanceDepositsPage from './pages/FinanceDepositsPage';
+import FinanceImportPage from './pages/FinanceImportPage';
+import FinanceCategoriesPage from './pages/FinanceCategoriesPage';
+import FinanceAutomationPage from './pages/FinanceAutomationPage';
+
+// דף בית דינמי לפי תצוגה מועדפת
+function DefaultRedirect() {
+  const { activeView, user } = useAuthStore();
+  const hasHouseholdAccess = user?.householdAccess || false;
+  if (activeView === 'household' && hasHouseholdAccess) {
+    return <Navigate to="/household/shopping" replace />;
+  }
+  return <Navigate to="/tasks" replace />;
+}
+
 export default function App() {
   return (
     <Routes>
       {/* ─── Main app area (with Layout) ─── */}
       <Route path="/" element={<Layout />}>
 
-        <Route index element={<Navigate to="/tasks" replace />} />
+        <Route index element={<DefaultRedirect />} />
 
         <Route path="login"    element={<LoginPage />}    />
 
@@ -81,6 +113,27 @@ export default function App() {
           <Route path="thai-schedule"         element={<ThaiSchedulePage />} />
           <Route path="groups/:groupId/payments" element={<GroupPaymentsPage />} />
           <Route path="financial-report" element={<FinancialReportPage />} />
+
+          {/* Household Management */}
+          <Route path="household"             element={<HouseholdDashboard />} />
+          <Route path="household/shopping"     element={<ShoppingListPage />} />
+          <Route path="household/tasks"        element={<HouseholdTasksPage />} />
+          <Route path="household/expenses"     element={<HouseholdExpensesPage />} />
+          <Route path="household/family"       element={<FamilySettingsPage />} />
+          <Route path="household/projects"     element={<HouseholdProjectsPage />} />
+          <Route path="household/projects/new" element={<NewHouseholdProjectPage />} />
+          <Route path="household/projects/:id" element={<HouseholdProjectPage />} />
+
+          {/* Finance Management */}
+          <Route path="household/finance"              element={<FinanceDashboardPage />} />
+          <Route path="household/finance/transactions"  element={<FinanceTransactionsPage />} />
+          <Route path="household/finance/budget"        element={<FinanceBudgetPage />} />
+          <Route path="household/finance/recurring"     element={<FinanceRecurringPage />} />
+          <Route path="household/finance/analytics"     element={<FinanceAnalyticsPage />} />
+          <Route path="household/finance/deposits"      element={<FinanceDepositsPage />} />
+          <Route path="household/finance/import"        element={<FinanceImportPage />} />
+          <Route path="household/finance/categories"    element={<FinanceCategoriesPage />} />
+          <Route path="household/finance/automation"    element={<FinanceAutomationPage />} />
         </Route>
 
         <Route element={<AdminOnlyRoute />}>

@@ -61,7 +61,7 @@ export const loginUser = async (req, res) => {
       return res.status(401).json({ message: 'סיסמה שגויה' });
     }
     await user.resetLoginAttempts();
-    const userPayload = { _id: user._id, name: user.name, email: user.email, role: user.role, tzitzitAccess: user.tzitzitAccess || false };
+    const userPayload = { _id: user._id, name: user.name, email: user.email, role: user.role, tzitzitAccess: user.tzitzitAccess || false, householdAccess: user.householdAccess || false, preferredView: user.preferredView || 'management' };
     createAndSendTokens(user, res);
     return res.status(200).json({ message: "התחברת בהצלחה", user: userPayload });
   } catch (error) {
@@ -88,7 +88,7 @@ export const refresh = async (req, res) => {
       return res.status(403).json({ message: 'Forbidden. Please log in again.' });
     }
     createAndSendTokens(user, res);
-    const userPayload = { _id: user._id, name: user.name, email: user.email, role: user.role, tzitzitAccess: user.tzitzitAccess || false };
+    const userPayload = { _id: user._id, name: user.name, email: user.email, role: user.role, tzitzitAccess: user.tzitzitAccess || false, householdAccess: user.householdAccess || false, preferredView: user.preferredView || 'management' };
     return res.status(200).json({ message: "Tokens refreshed successfully", user: userPayload });
   } catch (error) {
     return res.status(403).json({ message: 'Invalid or expired refresh token.' });
@@ -113,6 +113,28 @@ export const getProfile = async (req, res) => {
 };
 
 // --- Update user profile (name, email) ---
+export const updatePreferredView = async (req, res) => {
+  try {
+    const { preferredView } = req.body;
+    if (!['management', 'household'].includes(preferredView)) {
+      return res.status(400).json({ message: 'ערך לא תקין' });
+    }
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { preferredView },
+      { new: true }
+    ).select('-passwordHash -tokenVersion -__v');
+    if (!user) return res.status(404).json({ message: 'משתמש לא נמצא' });
+    return res.status(200).json({
+      status: 'success',
+      data: { user: { _id: user._id, name: user.name, email: user.email, role: user.role, tzitzitAccess: user.tzitzitAccess || false, householdAccess: user.householdAccess || false, preferredView: user.preferredView || 'management' } }
+    });
+  } catch (error) {
+    console.error('❌ [UPDATE_PREFERRED_VIEW] error:', error);
+    return res.status(500).json({ message: 'שגיאה בעדכון' });
+  }
+};
+
 export const updateProfile = async (req, res) => {
   try {
     const { name, email } = req.body;
@@ -148,7 +170,7 @@ export const updateProfile = async (req, res) => {
     return res.status(200).json({ 
       status: 'success',
       message: 'הפרופיל עודכן בהצלחה',
-      data: { user: { _id: user._id, name: user.name, email: user.email, role: user.role, tzitzitAccess: user.tzitzitAccess || false } }
+      data: { user: { _id: user._id, name: user.name, email: user.email, role: user.role, tzitzitAccess: user.tzitzitAccess || false, householdAccess: user.householdAccess || false, preferredView: user.preferredView || 'management' } }
     });
   } catch (error) {
     console.error('❌ [UPDATE_PROFILE] error:', error);

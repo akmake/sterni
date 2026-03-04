@@ -6,7 +6,7 @@ import bcrypt from 'bcrypt';
 // --- Get all users ---
 export const getAllUsers = catchAsync(async (req, res, next) => {
   const users = await User.find({})
-    .select('name email role tzitzitAccess createdAt')
+    .select('name email role tzitzitAccess householdAccess preferredView createdAt')
     .sort('-createdAt');
 
   res.status(200).json({
@@ -187,6 +187,8 @@ export const createUser = catchAsync(async (req, res, next) => {
     email: user.email,
     role: user.role,
     tzitzitAccess: user.tzitzitAccess || false,
+    householdAccess: user.householdAccess || false,
+    preferredView: user.preferredView || 'management',
     createdAt: user.createdAt
   };
 
@@ -206,7 +208,28 @@ export const toggleTzitzitAccess = catchAsync(async (req, res, next) => {
     userId,
     { tzitzitAccess: !!tzitzitAccess },
     { new: true }
-  ).select('name email role tzitzitAccess createdAt');
+  ).select('name email role tzitzitAccess householdAccess preferredView createdAt');
+
+  if (!user) {
+    return next(new AppError('משתמש לא נמצא', 404));
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: { user }
+  });
+});
+
+// --- Toggle household access for user ---
+export const toggleHouseholdAccess = catchAsync(async (req, res, next) => {
+  const { householdAccess } = req.body;
+  const userId = req.params.id;
+
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { householdAccess: !!householdAccess },
+    { new: true }
+  ).select('name email role tzitzitAccess householdAccess preferredView createdAt');
 
   if (!user) {
     return next(new AppError('משתמש לא נמצא', 404));

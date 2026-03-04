@@ -1,5 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
@@ -27,6 +29,20 @@ import adminRoutes from './routes/adminRoutes.js';
 import logsRoutes from './routes/logsRoutes.js';
 
 import tzitzitRoutes from './routes/tzitzitRoutes.js';
+import familyRoutes from './routes/familyRoutes.js';
+import shoppingRoutes from './routes/shoppingRoutes.js';
+import householdTaskRoutes from './routes/householdTaskRoutes.js';
+import expenseRoutes from './routes/expenseRoutes.js';
+import householdProjectRoutes from './routes/householdProjectRoutes.js';
+import financeTransactionRoutes from './routes/financeTransactionRoutes.js';
+import financeCategoryRoutes from './routes/financeCategoryRoutes.js';
+import financeRecurringRoutes from './routes/financeRecurringRoutes.js';
+import financeBudgetRoutes from './routes/financeBudgetRoutes.js';
+import financeDepositRoutes from './routes/financeDepositRoutes.js';
+import financeAnalyticsRoutes from './routes/financeAnalyticsRoutes.js';
+import financeDashboardRoutes from './routes/financeDashboardRoutes.js';
+import financeImportRoutes from './routes/financeImportRoutes.js';
+import { setupSocketIO } from './services/socketService.js';
 
 import rateLimiter from './middlewares/rateLimiter.js';
 import { requireAuth } from './middlewares/authMiddleware.js';
@@ -49,6 +65,17 @@ const connectDB = async () => {
 await connectDB();
 
 const app = express();
+const httpServer = createServer(app);
+
+// --- Socket.IO Setup ---
+const io = new Server(httpServer, {
+  cors: {
+    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    credentials: true,
+  },
+});
+app.set('io', io);
+setupSocketIO(io);
 
 // --- Trust Proxy (קריטי לזיהוי IP אמיתי מאחורי Nginx/Cloudflare) ---
 app.set('trust proxy', 1);
@@ -110,6 +137,19 @@ app.use('/api/quotes', requireAuth, quoteRouter);
 app.use('/api/payments', requireAuth, paymentRoutes);
 app.use('/api/payment-requests', requireAuth, paymentRequestRoutes);
 app.use('/api/tzitzit', requireAuth, tzitzitRoutes);
+app.use('/api/family', requireAuth, familyRoutes);
+app.use('/api/shopping', requireAuth, shoppingRoutes);
+app.use('/api/household-tasks', requireAuth, householdTaskRoutes);
+app.use('/api/expenses', requireAuth, expenseRoutes);
+app.use('/api/household-projects', requireAuth, householdProjectRoutes);
+app.use('/api/finance/transactions', requireAuth, financeTransactionRoutes);
+app.use('/api/finance/categories', requireAuth, financeCategoryRoutes);
+app.use('/api/finance/recurring', requireAuth, financeRecurringRoutes);
+app.use('/api/finance/budgets', requireAuth, financeBudgetRoutes);
+app.use('/api/finance/deposits', requireAuth, financeDepositRoutes);
+app.use('/api/finance/analytics', requireAuth, financeAnalyticsRoutes);
+app.use('/api/finance/dashboard', requireAuth, financeDashboardRoutes);
+app.use('/api/finance/import', requireAuth, financeImportRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Error Handling
@@ -129,6 +169,6 @@ startEmailListener();
 connectToWhatsApp();
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+httpServer.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 
 export default app;

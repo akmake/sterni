@@ -56,6 +56,11 @@ export default defineConfig({
         changeOrigin: true,
         xfwd: true,
       },
+      '/socket.io': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
 });

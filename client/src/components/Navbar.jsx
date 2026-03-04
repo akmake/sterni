@@ -1,6 +1,6 @@
 import { useState, Fragment } from "react";
-import { Link, NavLink, useLocation } from "react-router-dom";
-import { Menu, X, LogOut, Briefcase, Utensils, FileText, ChevronDown, ChevronUp, Settings, UserCircle, ListTodo, User, Users, CalendarDays, CreditCard, Shield, BarChart3, Scissors, FolderPlus, ClipboardList } from "lucide-react";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Menu, X, LogOut, Briefcase, Utensils, FileText, ChevronDown, ChevronUp, Settings, UserCircle, ListTodo, User, Users, CalendarDays, CreditCard, Shield, BarChart3, Scissors, FolderPlus, ClipboardList, Home, ArrowLeftRight, ShoppingCart, ClipboardCheck, Wallet, FolderKanban, Landmark } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/stores/authStore";
 import useLogout from "@/hooks/useLogout";
@@ -10,23 +10,35 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 
-// --- נתוני ניווט מסודרים ---
-const getNavStructure = (isAuthenticated, isAdmin, hasTzitzitAccess) => {
+// --- פריטי ניווט לפי תצוגה ---
+const getHouseholdNav = (hasTzitzitAccess) => {
+  const items = [
+    { to: '/household/shopping', label: 'קניות', icon: ShoppingCart, type: 'link' },
+    { to: '/household/tasks', label: 'משימות בית', icon: ClipboardCheck, type: 'link' },
+    { to: '/household/expenses', label: 'הוצאות', icon: Wallet, type: 'link' },
+    { to: '/household/finance/transactions', label: 'כספים', icon: Landmark, type: 'link' },
+    { to: '/household/family', label: 'משפחה', icon: Users, type: 'link' },
+  ];
+  if (hasTzitzitAccess) {
+    items.push({ to: '/admin/tzitzit', label: 'ציציות', icon: Scissors, type: 'link' });
+  }
+  items.push({ to: '/household/projects', label: 'פרויקטים', icon: FolderKanban, type: 'link' });
+  return items;
+};
+
+const getManagementNav = (isAuthenticated, isAdmin, hasTzitzitAccess) => {
   const items = [];
 
-  // גישה לציציות – רק למי שיש לו הרשאה (כולל מנהלים)
   if (hasTzitzitAccess) {
     items.push({ to: '/admin/tzitzit', label: 'ניהול ציציות', icon: Scissors, type: 'link' });
   }
 
-  // פריטים רגילים
   items.push(
     { to: '/tasks', label: 'מטלות מהירות', icon: ListTodo, type: 'link' },
     { to: '/projects', label: 'פרויקטים', icon: Briefcase, type: 'link' },
     { to: '/groups', label: 'ניהול קבוצות', icon: Users, type: 'link' },
   );
 
-  // תפריט יצירת קבצים
   items.push({
     label: 'יצירת קבצים',
     icon: FolderPlus,
@@ -37,7 +49,6 @@ const getNavStructure = (isAuthenticated, isAdmin, hasTzitzitAccess) => {
     ]
   });
 
-  // תפריט דוחות
   items.push({
     label: 'דוחות',
     icon: ClipboardList,
@@ -50,7 +61,6 @@ const getNavStructure = (isAuthenticated, isAdmin, hasTzitzitAccess) => {
     ]
   });
 
-  // תפריט ניהול (רק למנהל)
   if (isAdmin) {
     items.push({
       label: 'ניהול מערכת',
@@ -64,7 +74,6 @@ const getNavStructure = (isAuthenticated, isAdmin, hasTzitzitAccess) => {
       ]
     });
   } else if (isAuthenticated) {
-    // למשתמש רגיל - הגדרות בלבד
     items.push({ to: '/settings', label: 'הגדרות מערכת', icon: Settings, type: 'link' });
   }
 
@@ -73,10 +82,22 @@ const getNavStructure = (isAuthenticated, isAdmin, hasTzitzitAccess) => {
 
 export default function Navbar({ mobileOnly = false }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const { isAuthenticated, user } = useAuthStore();
+    const navigate = useNavigate();
+    const { isAuthenticated, user, activeView, toggleView } = useAuthStore();
     const isAdmin = user?.role === 'admin';
     const hasTzitzitAccess = user?.tzitzitAccess || false;
-    const navItems = getNavStructure(isAuthenticated, isAdmin, hasTzitzitAccess);
+    const hasHouseholdAccess = user?.householdAccess || false;
+    const canSwitch = hasHouseholdAccess; // יכול לעבור בין תצוגות אם יש לו גישת משק בית
+
+    const navItems = activeView === 'household' && hasHouseholdAccess
+      ? getHouseholdNav(hasTzitzitAccess)
+      : getManagementNav(isAuthenticated, isAdmin, hasTzitzitAccess);
+
+    const handleSwitchView = () => {
+      const nextView = toggleView();
+      setSidebarOpen(false);
+      navigate(nextView === 'household' ? '/household/shopping' : '/tasks');
+    };
 
     return (
         <>
@@ -95,7 +116,7 @@ export default function Navbar({ mobileOnly = false }) {
             {/* === תפריט צד לדסקטופ === */}
             {!mobileOnly && (
                 <div className="hidden md:flex md:flex-col h-full w-full">
-                    <SidebarContent items={navItems} user={user} isAuthenticated={isAuthenticated} />
+                    <SidebarContent items={navItems} user={user} isAuthenticated={isAuthenticated} canSwitch={canSwitch} activeView={activeView} onSwitchView={handleSwitchView} />
                 </div>
             )}
 
@@ -123,6 +144,9 @@ export default function Navbar({ mobileOnly = false }) {
                                 user={user}
                                 isAuthenticated={isAuthenticated}
                                 onClose={() => setSidebarOpen(false)}
+                                canSwitch={canSwitch}
+                                activeView={activeView}
+                                onSwitchView={handleSwitchView}
                             />
                         </motion.div>
                     </Fragment>
@@ -133,7 +157,7 @@ export default function Navbar({ mobileOnly = false }) {
 }
 
 // --- תוכן התפריט (משותף) ---
-function SidebarContent({ items, user, isAuthenticated, onClose }) {
+function SidebarContent({ items, user, isAuthenticated, onClose, canSwitch, activeView, onSwitchView }) {
     const { mutate: serverLogout } = useLogout();
     const handleLogout = () => {
         serverLogout();
@@ -153,6 +177,19 @@ function SidebarContent({ items, user, isAuthenticated, onClose }) {
                     </Button>
                 )}
             </div>
+
+            {/* כפתור מעבר בין תצוגות */}
+            {canSwitch && (
+                <div className="px-4 pt-4">
+                    <button
+                        onClick={onSwitchView}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 bg-gradient-to-r from-indigo-50 to-blue-50 text-indigo-700 hover:from-indigo-100 hover:to-blue-100 border border-indigo-200 shadow-sm"
+                    >
+                        <ArrowLeftRight className="h-4 w-4" />
+                        {activeView === 'household' ? 'עבור לניהול' : 'עבור למשק בית'}
+                    </button>
+                </div>
+            )}
 
             {/* רשימת הלינקים */}
             <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2">

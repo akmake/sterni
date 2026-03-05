@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, Plus, Trash2 } from 'lucide-react';
+import { X, Search, UserPlus, Trash2, Shield, Eye, Pencil } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '@/utils/api';
 
-export default function ProjectSharingModal({ projectId, isOpen, onClose, onUpdate }) {
+export default function ProjectSharingModal({ projectId, isOpen, onClose, onUpdate, apiBase = '/projects' }) {
   const [allUsers, setAllUsers] = useState([]);
   const [collaborators, setCollaborators] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -13,18 +13,20 @@ export default function ProjectSharingModal({ projectId, isOpen, onClose, onUpda
 
   useEffect(() => {
     if (isOpen) {
-      fetchUsersAndCollaborators();
+      setLoading(true);
+      setSearchTerm('');
+      setSelectedUser(null);
+      fetchData();
     }
   }, [isOpen, projectId]);
 
-  const fetchUsersAndCollaborators = async () => {
+  const fetchData = async () => {
     try {
       const [usersRes, projectRes] = await Promise.all([
         api.get('/admin/users'),
-        api.get(`/projects/${projectId}`)
+        api.get(`${apiBase}/${projectId}`)
       ]);
-      
-      setAllUsers(usersRes.data.data?.users || []);
+      setAllUsers(usersRes.data.data?.users || usersRes.data || []);
       setCollaborators(projectRes.data.collaborators || []);
     } catch (error) {
       toast.error('שגיאה בטעינת נתונים');
@@ -34,206 +36,228 @@ export default function ProjectSharingModal({ projectId, isOpen, onClose, onUpda
     }
   };
 
-  const handleAddCollaborator = async () => {
-    if (!selectedUser) {
-      toast.error('בחר משתמש');
-      return;
-    }
-
+  const handleAdd = async () => {
+    if (!selectedUser) return;
     try {
-      const response = await api.post(`/projects/${projectId}/collaborators`, {
+      const res = await api.post(`${apiBase}/${projectId}/collaborators`, {
         userId: selectedUser._id,
-        role: selectedRole
+        role: selectedRole,
       });
-      
-      setCollaborators(response.data.collaborators || response.data.data?.project?.collaborators || []);
+      setCollaborators(res.data.collaborators || []);
       setSelectedUser(null);
-      setSelectedRole('view');
       setSearchTerm('');
-      toast.success('משתתף נוסף בהצלחה');
-      onUpdate && onUpdate();
+      setSelectedRole('view');
+      toast.success('משתתף נוסף');
+      onUpdate?.();
     } catch (error) {
-      if (error.response?.data?.message?.includes('already')) {
-        toast.error('משתמש זה כבר משתתף בפרויקט');
-      } else {
-        toast.error('שגיאה בהוספת משתתף');
-      }
+      toast.error(error.response?.data?.message?.includes('already') ? 'כבר משתתף' : 'שגיאה');
       console.error(error);
     }
   };
 
-  const handleRemoveCollaborator = async (collaboratorId) => {
+  const handleRemove = async (collabId) => {
     try {
-      const response = await api.delete(
-        `/projects/${projectId}/collaborators/${collaboratorId}`
-      );
-      
-      setCollaborators(response.data.collaborators || []);
-      toast.success('משתתף הוסר בהצלחה');
-      onUpdate && onUpdate();
+      const res = await api.delete(`${apiBase}/${projectId}/collaborators/${collabId}`);
+      setCollaborators(res.data.collaborators || []);
+      toast.success('משתתף הוסר');
+      onUpdate?.();
     } catch (error) {
-      toast.error('שגיאה בהסרת משתתף');
+      toast.error('שגיאה בהסרה');
       console.error(error);
     }
   };
 
-  const handleChangeRole = async (collaboratorId, newRole) => {
+  const handleRoleChange = async (collabId, newRole) => {
     try {
-      const response = await api.patch(
-        `/projects/${projectId}/collaborators/${collaboratorId}`,
-        { role: newRole }
-      );
-      
-      setCollaborators(response.data.collaborators || []);
-      toast.success('הרשאות עודכנו');
-      onUpdate && onUpdate();
+      const res = await api.patch(`${apiBase}/${projectId}/collaborators/${collabId}`, { role: newRole });
+      setCollaborators(res.data.collaborators || []);
+      toast.success('הרשאה עודכנה');
+      onUpdate?.();
     } catch (error) {
-      toast.error('שגיאה בעדכון הרשאות');
+      toast.error('שגיאה בעדכון');
       console.error(error);
     }
   };
 
-  const filteredUsers = allUsers.filter(user =>
-    user.name.includes(searchTerm) || user.email.includes(searchTerm)
-  ).filter(user => 
-    !collaborators.some(c => c.userId._id === user._id)
-  );
+  const filteredUsers = allUsers
+    .filter(u => (u.name || '').includes(searchTerm) || (u.email || '').includes(searchTerm))
+    .filter(u => !collaborators.some(c => (c.userId?._id || c.userId) === u._id));
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-96 flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Modal */}
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col">
+
         {/* Header */}
-        <div className="flex justify-between items-center border-b p-6">
-          <h2 className="text-2xl font-bold text-gray-800">שתף פרויקט</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            <X size={24} />
+        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">שיתוף פרויקט</h2>
+            <p className="text-xs text-slate-400 mt-0.5">הוסף אנשים שיוכלו לצפות או לערוך</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+            <X size={20} className="text-slate-400" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 grid grid-cols-2 gap-6">
-          {/* Left: Add Users */}
-          <div className="border-l pl-6">
-            <h3 className="font-bold text-lg mb-4">הוסף משתמש</h3>
-            
+        {/* Content — scrollable */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+
+          {/* --- Add User Section --- */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+              <UserPlus size={16} className="text-blue-500" />
+              הוסף משתתף
+            </h3>
+
             {/* Search */}
-            <div className="mb-4">
-              <div className="relative">
-                <Search size={18} className="absolute right-3 top-2.5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="חפש שם או אימייל..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-4 py-2 pr-10 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
+            <div className="relative">
+              <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="חפש לפי שם או אימייל..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-slate-50 px-4 py-2.5 pr-10 rounded-xl text-sm border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+              />
             </div>
 
-            {/* Users List */}
-            <div className="space-y-2 max-h-40 overflow-y-auto mb-4">
-              {filteredUsers.length > 0 ? (
-                filteredUsers.map(user => (
-                  <button
-                    key={user._id}
-                    onClick={() => setSelectedUser(user)}
-                    className={`w-full text-right p-3 rounded-lg border-2 transition ${
-                      selectedUser?._id === user._id
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="font-semibold text-sm">{user.name}</div>
-                    <div className="text-xs text-gray-500">{user.email}</div>
-                  </button>
-                ))
-              ) : (
-                <div className="text-center text-gray-500 py-4">
-                  {searchTerm ? 'לא נמצאו משתמשים' : 'כל המשתמשים כבר משתתפים'}
-                </div>
-              )}
-            </div>
-
-            {/* Role Selection */}
-            {selectedUser && (
-              <div className="mb-4">
-                <label className="text-sm font-semibold mb-2 block">הרשאות:</label>
-                <select
-                  value={selectedRole}
-                  onChange={(e) => setSelectedRole(e.target.value)}
-                  className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="view">צפייה בלבד</option>
-                  <option value="edit">עריכה</option>
-                </select>
+            {/* User results */}
+            {searchTerm && (
+              <div className="bg-slate-50 rounded-xl border border-slate-100 max-h-40 overflow-y-auto">
+                {loading ? (
+                  <p className="text-center text-sm text-slate-400 py-6">טוען...</p>
+                ) : filteredUsers.length === 0 ? (
+                  <p className="text-center text-sm text-slate-400 py-6">לא נמצאו משתמשים</p>
+                ) : (
+                  filteredUsers.map(user => (
+                    <button
+                      key={user._id}
+                      onClick={() => { setSelectedUser(user); setSearchTerm(''); }}
+                      className={`w-full flex items-center gap-3 p-3 hover:bg-white transition-colors text-right border-b border-slate-100 last:border-0 ${
+                        selectedUser?._id === user._id ? 'bg-blue-50' : ''
+                      }`}
+                    >
+                      <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold shrink-0">
+                        {(user.name || '?')[0]}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-800 truncate">{user.name}</p>
+                        <p className="text-xs text-slate-400 truncate">{user.email}</p>
+                      </div>
+                    </button>
+                  ))
+                )}
               </div>
             )}
 
-            {/* Add Button */}
-            <button
-              onClick={handleAddCollaborator}
-              disabled={!selectedUser}
-              className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition"
-            >
-              <Plus size={18} />
-              הוסף משתתף
-            </button>
+            {/* Selected user + role + add */}
+            {selectedUser && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-bold shrink-0">
+                    {(selectedUser.name || '?')[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800">{selectedUser.name}</p>
+                    <p className="text-xs text-slate-500">{selectedUser.email}</p>
+                  </div>
+                  <button onClick={() => setSelectedUser(null)} className="text-slate-400 hover:text-red-500 p-1">
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex bg-white rounded-lg border border-slate-200 overflow-hidden flex-1">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRole('view')}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors ${
+                        selectedRole === 'view' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Eye size={13} />
+                      צפייה
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRole('edit')}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors ${
+                        selectedRole === 'edit' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Pencil size={13} />
+                      עריכה
+                    </button>
+                  </div>
+                  <button
+                    onClick={handleAdd}
+                    className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors"
+                  >
+                    הוסף
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Right: Collaborators */}
-          <div>
-            <h3 className="font-bold text-lg mb-4">משתתפים</h3>
-            
-            <div className="space-y-2 max-h-80 overflow-y-auto">
-              {collaborators.length > 0 ? (
-                collaborators.map(collab => (
+          {/* --- Current Collaborators --- */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+              <Shield size={16} className="text-emerald-500" />
+              משתתפים ({collaborators.length})
+            </h3>
+
+            {collaborators.length === 0 ? (
+              <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                <p className="text-sm text-slate-400">עדיין אין משתתפים בפרויקט</p>
+                <p className="text-xs text-slate-300 mt-1">חפש משתמש למעלה כדי להוסיף</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {collaborators.map(collab => (
                   <div
                     key={collab._id}
-                    className="flex items-center justify-between gap-2 p-3 bg-gray-50 rounded-lg"
+                    className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100 hover:bg-white transition-colors group"
                   >
-                    <div className="flex-1 text-right">
-                      <div className="font-semibold text-sm">
-                        {collab.userId?.name || 'משתמש'}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {collab.userId?.email}
-                      </div>
+                    <div className="w-9 h-9 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-sm font-bold shrink-0">
+                      {(collab.userId?.name || '?')[0]}
                     </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-800">{collab.userId?.name || 'משתמש'}</p>
+                      <p className="text-xs text-slate-400">{collab.userId?.email}</p>
+                    </div>
+
                     <select
                       value={collab.role}
-                      onChange={(e) => handleChangeRole(collab._id, e.target.value)}
-                      className="border rounded px-2 py-1 text-xs focus:ring-2 focus:ring-blue-500"
+                      onChange={(e) => handleRoleChange(collab._id, e.target.value)}
+                      className="bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-600 outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
                     >
                       <option value="view">צפייה</option>
                       <option value="edit">עריכה</option>
                     </select>
+
                     <button
-                      onClick={() => handleRemoveCollaborator(collab._id)}
-                      className="text-red-600 hover:bg-red-50 p-1 rounded transition"
+                      onClick={() => handleRemove(collab._id)}
+                      className="text-slate-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={15} />
                     </button>
                   </div>
-                ))
-              ) : (
-                <div className="text-center text-gray-500 py-8">
-                  עדיין אין משתתפים
-                </div>
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Footer */}
-        <div className="border-t p-6 flex justify-end">
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50">
           <button
             onClick={onClose}
-            className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition"
+            className="w-full bg-slate-800 text-white py-2.5 rounded-xl text-sm font-bold hover:bg-slate-900 transition-colors"
           >
             סגור
           </button>

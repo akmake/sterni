@@ -144,6 +144,15 @@ const useHouseholdStore = create(
         }
       },
 
+      updateShoppingItem: async (id, data) => {
+        try {
+          const res = await api.patch(`/shopping/${id}`, data);
+          return res.data;
+        } catch (err) {
+          throw err.response?.data || err;
+        }
+      },
+
       clearBoughtItems: async () => {
         try {
           await api.delete('/shopping/bought/clear');

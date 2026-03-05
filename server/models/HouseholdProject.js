@@ -6,11 +6,29 @@ const taskSchema = new mongoose.Schema({
   done: { type: Boolean, default: false },
 });
 
+const fileSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  url:  { type: String, required: true },
+  type: { type: String },
+  uploadedAt: { type: Date, default: Date.now },
+});
+
 const fundSchema = new mongoose.Schema({
   amount: { type: Number, required: true },
   destination: { type: String, default: '' },
   date: { type: Date, default: Date.now },
   addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+});
+
+const collaboratorSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  role: {
+    type: String,
+    enum: ['view', 'edit'],
+    default: 'view',
+    required: true,
+  },
+  addedAt: { type: Date, default: Date.now },
 });
 
 const householdProjectSchema = new mongoose.Schema({
@@ -31,7 +49,7 @@ const householdProjectSchema = new mongoose.Schema({
   },
   projectType: {
     type: String,
-    enum: ['goal', 'task'],
+    enum: ['goal', 'task', 'simple'],
     required: true,
   },
   targetAmount: {
@@ -44,6 +62,8 @@ const householdProjectSchema = new mongoose.Schema({
   },
   tasks: [taskSchema],
   funds: [fundSchema],
+  files: [fileSchema],
+  collaborators: [collaboratorSchema],
   dueDate: {
     type: Date,
   },
@@ -65,6 +85,7 @@ householdProjectSchema.pre('save', function (next) {
       .filter((t) => t.done)
       .reduce((sum, t) => sum + t.amount, 0);
   }
+  // 'simple' type — no amount calculations needed
   next();
 });
 

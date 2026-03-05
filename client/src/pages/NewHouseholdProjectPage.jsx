@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowRight, Target, CheckSquare } from 'lucide-react';
+import { ArrowRight, Target, CheckSquare, FolderOpen } from 'lucide-react';
 import useHouseholdProjectStore from '@/stores/householdProjectStore';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -61,7 +61,7 @@ export default function NewHouseholdProjectPage() {
               {/* Type selector */}
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-gray-700">סוג הפרויקט</label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <button
                     type="button"
                     onClick={() => set('projectType', 'goal')}
@@ -90,10 +90,27 @@ export default function NewHouseholdProjectPage() {
                   >
                     <CheckSquare className={`h-8 w-8 ${form.projectType === 'task' ? 'text-emerald-600' : 'text-gray-400'}`} />
                     <span className={`font-semibold text-sm ${form.projectType === 'task' ? 'text-emerald-700' : 'text-gray-600'}`}>
-                      רשימת משימות
+                      משימות + כסף
                     </span>
                     <span className="text-xs text-gray-500 text-center">
-                      צ'קליסט של פעולות לביצוע
+                      צ'קליסט עם עלויות
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => set('projectType', 'simple')}
+                    className={`flex flex-col items-center gap-2 p-5 rounded-xl border-2 transition-all ${
+                      form.projectType === 'simple'
+                        ? 'border-indigo-500 bg-indigo-50 shadow-sm'
+                        : 'border-gray-200 hover:border-gray-300 bg-white'
+                    }`}
+                  >
+                    <FolderOpen className={`h-8 w-8 ${form.projectType === 'simple' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                    <span className={`font-semibold text-sm ${form.projectType === 'simple' ? 'text-indigo-700' : 'text-gray-600'}`}>
+                      פרויקט פשוט
+                    </span>
+                    <span className="text-xs text-gray-500 text-center">
+                      משימות בלי כסף
                     </span>
                   </button>
                 </div>
@@ -124,7 +141,8 @@ export default function NewHouseholdProjectPage() {
                 />
               </div>
 
-              {/* Target amount (relevant for goal, optional for task) */}
+              {/* Target amount (relevant for goal, optional for task, hidden for simple) */}
+              {form.projectType !== 'simple' && (
               <div className="space-y-1">
                 <label className="text-sm font-semibold text-gray-700">
                   {form.projectType === 'goal' ? 'סכום יעד (₪)' : 'תקציב כולל (אופציונלי)'}
@@ -138,6 +156,7 @@ export default function NewHouseholdProjectPage() {
                   {...(form.projectType === 'goal' ? { required: true, min: 1 } : {})}
                 />
               </div>
+              )}
 
               {/* Due date */}
               <div className="space-y-1">

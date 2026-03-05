@@ -1,5 +1,6 @@
 import HouseholdProject from '../models/HouseholdProject.js';
 import Family from '../models/Family.js';
+import User from '../models/userModel.js';
 
 // Helper: get user's family ID
 const getUserFamilyId = async (userId) => {
@@ -37,6 +38,7 @@ export const getHouseholdProject = async (req, res) => {
     const project = await assertFamilyProject(req.user._id, req.params.id);
     await project.populate('createdBy', 'name');
     await project.populate('funds.addedBy', 'name');
+    await project.populate('collaborators.userId', 'name email');
     res.json(project);
   } catch (error) {
     res.status(error.message === 'פרויקט לא נמצא' ? 404 : 500).json({ error: error.message });
@@ -51,7 +53,7 @@ export const createHouseholdProject = async (req, res) => {
 
     const { projectName, description, projectType, targetAmount, dueDate } = req.body;
     if (!projectName?.trim()) return res.status(400).json({ error: 'שם הפרויקט נדרש' });
-    if (!['goal', 'task'].includes(projectType)) return res.status(400).json({ error: 'סוג פרויקט לא תקין' });
+    if (!['goal', 'task', 'simple'].includes(projectType)) return res.status(400).json({ error: 'סוג פרויקט לא תקין' });
 
     const project = await HouseholdProject.create({
       family: familyId,
@@ -143,12 +145,12 @@ export const addFund = async (req, res) => {
 export const addProjectTask = async (req, res) => {
   try {
     const project = await assertFamilyProject(req.user._id, req.params.id);
-    if (project.projectType !== 'task') return res.status(400).json({ error: 'משימות רלוונטיות רק לפרויקטי משימות' });
+    if (project.projectType === 'goal') return res.status(400).json({ error: 'משימות לא רלוונטיות לפרויקטי יעד' });
 
     const { name, amount } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'שם המשימה נדרש' });
 
-    project.tasks.push({ name: name.trim(), amount: Number(amount) || 0 });
+    project.tasks.push({ name: name.trim(), amount: project.projectType === 'task' ? (Number(amount) || 0) : 0 });
     await project.save();
     await project.populate('createdBy', 'name');
 
@@ -194,6 +196,195 @@ export const deleteProjectTask = async (req, res) => {
     if (io) io.to(`family:${familyId}`).emit('householdProject:updated', project);
 
     res.json(project);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ===== UPDATE TASK (name + amount) =====
+export const renameProjectTask = async (req, res) => {
+  try {
+    const project = await assertFamilyProject(req.user._id, req.params.id);
+    const task = project.tasks.id(req.params.taskId);
+    if (!task) return res.status(404).json({ error: 'משימה לא נמצאה' });
+
+    const { name, amount } = req.body;
+    if (name !== undefined) {
+      if (!name?.trim()) return res.status(400).json({ error: 'שם חדש נדרש' });
+      task.name = name.trim();
+    }
+    if (amount !== undefined) task.amount = Number(amount) || 0;
+    await project.save();
+    await project.populate('createdBy', 'name');
+
+    const io = req.app.get('io');
+    const familyId = await getUserFamilyId(req.user._id);
+    if (io) io.to(`family:${familyId}`).emit('householdProject:updated', project);
+
+    res.json(project);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ===== UPDATE FUND =====
+export const updateFund = async (req, res) => {
+  try {
+    const project = await assertFamilyProject(req.user._id, req.params.id);
+    const fund = project.funds.id(req.params.fundId);
+    if (!fund) return res.status(404).json({ error: 'הפקדה לא נמצאה' });
+
+    const { amount, destination } = req.body;
+    if (amount !== undefined) {
+      if (Number(amount) <= 0) return res.status(400).json({ error: 'סכום לא תקין' });
+      fund.amount = Number(amount);
+    }
+    if (destination !== undefined) fund.destination = destination;
+    await project.save();
+    await project.populate('createdBy', 'name');
+    await project.populate('funds.addedBy', 'name');
+
+    const io = req.app.get('io');
+    const familyId = await getUserFamilyId(req.user._id);
+    if (io) io.to(`family:${familyId}`).emit('householdProject:updated', project);
+
+    res.json(project);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ===== DELETE FUND =====
+export const deleteFund = async (req, res) => {
+  try {
+    const project = await assertFamilyProject(req.user._id, req.params.id);
+    project.funds = project.funds.filter(f => f._id.toString() !== req.params.fundId);
+    await project.save();
+    await project.populate('createdBy', 'name');
+    await project.populate('funds.addedBy', 'name');
+
+    const io = req.app.get('io');
+    const familyId = await getUserFamilyId(req.user._id);
+    if (io) io.to(`family:${familyId}`).emit('householdProject:updated', project);
+
+    res.json(project);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ===== FILE Operations =====
+export const uploadHouseholdProjectFile = async (req, res) => {
+  try {
+    const project = await assertFamilyProject(req.user._id, req.params.id);
+    if (!req.file) return res.status(400).json({ error: 'לא נבחר קובץ' });
+
+    const originalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+    project.files.push({
+      name: originalName,
+      url: `/uploads/${req.file.filename}`,
+      type: req.file.mimetype,
+    });
+    await project.save();
+    await project.populate('createdBy', 'name');
+
+    const io = req.app.get('io');
+    const familyId = await getUserFamilyId(req.user._id);
+    if (io) io.to(`family:${familyId}`).emit('householdProject:updated', project);
+
+    res.json(project);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const deleteHouseholdProjectFile = async (req, res) => {
+  try {
+    const project = await assertFamilyProject(req.user._id, req.params.id);
+    project.files = project.files.filter(f => f._id.toString() !== req.params.fileId);
+    await project.save();
+    await project.populate('createdBy', 'name');
+
+    const io = req.app.get('io');
+    const familyId = await getUserFamilyId(req.user._id);
+    if (io) io.to(`family:${familyId}`).emit('householdProject:updated', project);
+
+    res.json(project);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ===== COLLABORATOR Operations =====
+export const addCollaborator = async (req, res) => {
+  try {
+    const project = await assertFamilyProject(req.user._id, req.params.id);
+    const { userId, role } = req.body;
+
+    if (!userId || !['view', 'edit'].includes(role)) {
+      return res.status(400).json({ error: 'userId and valid role are required' });
+    }
+
+    // Check user exists
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: 'משתמש לא נמצא' });
+
+    // Check not already a collaborator
+    const exists = project.collaborators.some(c => c.userId.toString() === userId);
+    if (exists) return res.status(400).json({ message: 'User is already a collaborator' });
+
+    project.collaborators.push({ userId, role, addedAt: new Date() });
+    await project.save();
+    await project.populate('collaborators.userId', 'name email');
+
+    const io = req.app.get('io');
+    const familyId = await getUserFamilyId(req.user._id);
+    if (io) io.to(`family:${familyId}`).emit('householdProject:updated', project);
+
+    res.status(201).json({ collaborators: project.collaborators });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const removeCollaborator = async (req, res) => {
+  try {
+    const project = await assertFamilyProject(req.user._id, req.params.id);
+    project.collaborators.pull({ _id: req.params.collaboratorId });
+    await project.save();
+    await project.populate('collaborators.userId', 'name email');
+
+    const io = req.app.get('io');
+    const familyId = await getUserFamilyId(req.user._id);
+    if (io) io.to(`family:${familyId}`).emit('householdProject:updated', project);
+
+    res.json({ collaborators: project.collaborators });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const updateCollaboratorRole = async (req, res) => {
+  try {
+    const project = await assertFamilyProject(req.user._id, req.params.id);
+    const { role } = req.body;
+
+    if (!['view', 'edit'].includes(role)) {
+      return res.status(400).json({ error: 'תפקיד לא תקין' });
+    }
+
+    const collaborator = project.collaborators.id(req.params.collaboratorId);
+    if (!collaborator) return res.status(404).json({ error: 'משתתף לא נמצא' });
+
+    collaborator.role = role;
+    await project.save();
+    await project.populate('collaborators.userId', 'name email');
+
+    const io = req.app.get('io');
+    const familyId = await getUserFamilyId(req.user._id);
+    if (io) io.to(`family:${familyId}`).emit('householdProject:updated', project);
+
+    res.json({ collaborators: project.collaborators });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

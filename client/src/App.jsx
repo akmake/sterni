@@ -53,6 +53,7 @@ import FamilySettingsPage from './pages/FamilySettingsPage';
 import HouseholdProjectsPage from './pages/HouseholdProjectsPage';
 import HouseholdProjectPage from './pages/HouseholdProjectPage';
 import NewHouseholdProjectPage from './pages/NewHouseholdProjectPage';
+import HouseholdQuickTasksPage from './pages/HouseholdQuickTasksPage';
 
 /* Finance Pages */
 import FinanceDashboardPage from './pages/FinanceDashboardPage';
@@ -123,6 +124,7 @@ export default function App() {
           <Route path="household/projects"     element={<HouseholdProjectsPage />} />
           <Route path="household/projects/new" element={<NewHouseholdProjectPage />} />
           <Route path="household/projects/:id" element={<HouseholdProjectPage />} />
+          <Route path="household/quick-tasks"   element={<HouseholdQuickTasksPage />} />
 
           {/* Finance Management */}
           <Route path="household/finance"              element={<FinanceDashboardPage />} />

@@ -23,6 +23,7 @@ const getHouseholdNav = (hasTzitzitAccess) => {
     items.push({ to: '/admin/tzitzit', label: 'ציציות', icon: Scissors, type: 'link' });
   }
   items.push({ to: '/household/projects', label: 'פרויקטים', icon: FolderKanban, type: 'link' });
+  items.push({ to: '/household/quick-tasks', label: 'מטלות מהירות', icon: ListTodo, type: 'link' });
   return items;
 };
 

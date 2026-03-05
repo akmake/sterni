@@ -115,6 +115,78 @@ const useHouseholdProjectStore = create(
         }
       },
 
+      // Update task (name and/or amount)
+      renameTask: async (projectId, taskId, data) => {
+        try {
+          // support old signature: renameTask(id, taskId, 'name') or renameTask(id, taskId, { name, amount })
+          const payload = typeof data === 'string' ? { name: data } : data;
+          const current = get().activeProject;
+          if (current) {
+            const updatedTasks = current.tasks.map(t => t._id === taskId ? { ...t, ...payload } : t);
+            set({ activeProject: { ...current, tasks: updatedTasks } });
+          }
+          const res = await api.patch(`/household-projects/${projectId}/tasks/${taskId}/rename`, payload);
+          set({ activeProject: res.data });
+          return res.data;
+        } catch (err) {
+          throw err.response?.data || err;
+        }
+      },
+
+      // Update fund
+      updateFund: async (projectId, fundId, data) => {
+        try {
+          const res = await api.patch(`/household-projects/${projectId}/funds/${fundId}`, data);
+          set({ activeProject: res.data });
+          return res.data;
+        } catch (err) {
+          throw err.response?.data || err;
+        }
+      },
+
+      // Delete fund
+      deleteFund: async (projectId, fundId) => {
+        try {
+          const res = await api.delete(`/household-projects/${projectId}/funds/${fundId}`);
+          set({ activeProject: res.data });
+          return res.data;
+        } catch (err) {
+          throw err.response?.data || err;
+        }
+      },
+
+      // Upload file
+      uploadFileToProject: async (projectId, file) => {
+        set({ loading: true });
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          const res = await api.post(`/household-projects/${projectId}/upload`, formData);
+          set({ activeProject: res.data, loading: false });
+          return res.data;
+        } catch (err) {
+          set({ loading: false });
+          throw err.response?.data || err;
+        }
+      },
+
+      // Delete file
+      deleteFileFromProject: async (projectId, fileId) => {
+        try {
+          const current = get().activeProject;
+          // optimistic
+          if (current) {
+            const updatedFiles = current.files.filter(f => f._id !== fileId);
+            set({ activeProject: { ...current, files: updatedFiles } });
+          }
+          const res = await api.delete(`/household-projects/${projectId}/files/${fileId}`);
+          set({ activeProject: res.data });
+          return res.data;
+        } catch (err) {
+          throw err.response?.data || err;
+        }
+      },
+
       // Socket listeners
       setupSocketListeners: () => {
         const socket = getSocket();

@@ -13,17 +13,15 @@ import {
 // --- פריטי ניווט לפי תצוגה ---
 const getHouseholdNav = (hasTzitzitAccess) => {
   const items = [
+    { to: '/household/quick-tasks', label: 'משימות מהירות', icon: ListTodo, type: 'link' },
+    { to: '/household/projects', label: 'פרויקטים', icon: FolderKanban, type: 'link' },
     { to: '/household/shopping', label: 'קניות', icon: ShoppingCart, type: 'link' },
-    { to: '/household/tasks', label: 'משימות בית', icon: ClipboardCheck, type: 'link' },
-    { to: '/household/expenses', label: 'הוצאות', icon: Wallet, type: 'link' },
     { to: '/household/finance/transactions', label: 'כספים', icon: Landmark, type: 'link' },
-    { to: '/household/family', label: 'משפחה', icon: Users, type: 'link' },
   ];
   if (hasTzitzitAccess) {
     items.push({ to: '/admin/tzitzit', label: 'ציציות', icon: Scissors, type: 'link' });
   }
-  items.push({ to: '/household/projects', label: 'פרויקטים', icon: FolderKanban, type: 'link' });
-  items.push({ to: '/household/quick-tasks', label: 'מטלות מהירות', icon: ListTodo, type: 'link' });
+  items.push({ to: '/household/tasks', label: 'משימות בית', icon: ClipboardCheck, type: 'link' });
   return items;
 };
 
@@ -97,7 +95,7 @@ export default function Navbar({ mobileOnly = false }) {
     const handleSwitchView = () => {
       const nextView = toggleView();
       setSidebarOpen(false);
-      navigate(nextView === 'household' ? '/household/shopping' : '/tasks');
+      navigate(nextView === 'household' ? '/household/quick-tasks' : '/tasks');
     };
 
     return (
@@ -321,6 +319,9 @@ function UserNav({ user, logout }) {
             <DropdownMenuContent className="w-60 mb-2" align="end" side="top">
                 <DropdownMenuItem asChild>
                     <Link to="/profile"><UserCircle className="mr-2 h-4 w-4" /><span>פרופיל אישי</span></Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                    <Link to="/household/family"><Users className="mr-2 h-4 w-4" /><span>משפחה</span></Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={logout} className="text-red-600 focus:text-red-700 focus:bg-red-50">

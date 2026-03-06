@@ -48,7 +48,6 @@ import ProfilePage from './pages/ProfilePage';
 import HouseholdDashboard from './pages/HouseholdDashboard';
 import ShoppingListPage from './pages/ShoppingListPage';
 import HouseholdTasksPage from './pages/HouseholdTasksPage';
-import HouseholdExpensesPage from './pages/HouseholdExpensesPage';
 import FamilySettingsPage from './pages/FamilySettingsPage';
 import HouseholdProjectsPage from './pages/HouseholdProjectsPage';
 import HouseholdProjectPage from './pages/HouseholdProjectPage';
@@ -71,7 +70,7 @@ function DefaultRedirect() {
   const { activeView, user } = useAuthStore();
   const hasHouseholdAccess = user?.householdAccess || false;
   if (activeView === 'household' && hasHouseholdAccess) {
-    return <Navigate to="/household/shopping" replace />;
+    return <Navigate to="/household/quick-tasks" replace />;
   }
   return <Navigate to="/tasks" replace />;
 }
@@ -119,7 +118,6 @@ export default function App() {
           <Route path="household"             element={<HouseholdDashboard />} />
           <Route path="household/shopping"     element={<ShoppingListPage />} />
           <Route path="household/tasks"        element={<HouseholdTasksPage />} />
-          <Route path="household/expenses"     element={<HouseholdExpensesPage />} />
           <Route path="household/family"       element={<FamilySettingsPage />} />
           <Route path="household/projects"     element={<HouseholdProjectsPage />} />
           <Route path="household/projects/new" element={<NewHouseholdProjectPage />} />

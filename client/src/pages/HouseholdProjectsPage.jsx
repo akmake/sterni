@@ -31,6 +31,7 @@ export default function HouseholdProjectsPage() {
       const { currentAmount = 0, targetAmount = 0 } = project;
       return targetAmount > 0 ? Math.min(100, Math.round((currentAmount / targetAmount) * 100)) : 0;
     }
+    if (project.projectType === 'savings') return null;
     const total = project.tasks?.length || 0;
     const done = project.tasks?.filter(t => t.done).length || 0;
     return total === 0 ? 0 : Math.round((done / total) * 100);
@@ -41,6 +42,9 @@ export default function HouseholdProjectsPage() {
       const { currentAmount = 0, targetAmount = 0 } = project;
       return `${currentAmount.toLocaleString()} ₪ / ${targetAmount.toLocaleString()} ₪`;
     }
+    if (project.projectType === 'savings') {
+      return `${(project.currentAmount || 0).toLocaleString()} ₪ נצבר`;
+    }
     const total = project.tasks?.length || 0;
     const done = project.tasks?.filter(t => t.done).length || 0;
     return total > 0 ? `${done}/${total} משימות` : 'אין משימות';
@@ -49,6 +53,7 @@ export default function HouseholdProjectsPage() {
   const typeBadge = (type) => {
     if (type === 'goal') return { label: 'יעד כספי', cls: 'bg-blue-100 text-blue-700' };
     if (type === 'task') return { label: 'משימות + ₪', cls: 'bg-emerald-100 text-emerald-700' };
+    if (type === 'savings') return { label: 'חיסכון', cls: 'bg-pink-100 text-pink-700' };
     return { label: 'משימות', cls: 'bg-indigo-100 text-indigo-700' };
   };
 
@@ -121,11 +126,20 @@ export default function HouseholdProjectsPage() {
                     </div>
 
                     <div className="mt-8 space-y-3">
-                      <div className="flex justify-between text-xs font-medium text-slate-400 uppercase tracking-wider">
-                        <span>{getProgressLabel(project)}</span>
-                        <span>{percent}%</span>
-                      </div>
-                      <Progress value={percent} className="h-2 bg-slate-100" indicatorClassName="bg-slate-900" />
+                      {project.projectType === 'savings' ? (
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-2xl font-bold text-slate-900">{(project.currentAmount || 0).toLocaleString()}</span>
+                          <span className="text-sm text-slate-400 font-medium">₪ נצבר</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex justify-between text-xs font-medium text-slate-400 uppercase tracking-wider">
+                            <span>{getProgressLabel(project)}</span>
+                            <span>{percent}%</span>
+                          </div>
+                          <Progress value={percent} className="h-2 bg-slate-100" indicatorClassName="bg-slate-900" />
+                        </>
+                      )}
 
                       <div className="pt-4 flex items-center text-sm font-medium text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity -translate-x-2 group-hover:translate-x-0 duration-300">
                         הכנס לפרויקט <ArrowRight className="ml-1 w-4 h-4" />

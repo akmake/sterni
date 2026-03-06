@@ -49,7 +49,7 @@ const householdProjectSchema = new mongoose.Schema({
   },
   projectType: {
     type: String,
-    enum: ['goal', 'task', 'simple'],
+    enum: ['goal', 'task', 'simple', 'savings'],
     required: true,
   },
   targetAmount: {
@@ -77,7 +77,7 @@ const householdProjectSchema = new mongoose.Schema({
 
 // Auto-calculate currentAmount + targetAmount before saving
 householdProjectSchema.pre('save', function (next) {
-  if (this.projectType === 'goal') {
+  if (this.projectType === 'goal' || this.projectType === 'savings') {
     this.currentAmount = this.funds.reduce((sum, f) => sum + f.amount, 0);
   } else if (this.projectType === 'task') {
     this.targetAmount = this.tasks.reduce((sum, t) => sum + t.amount, 0);

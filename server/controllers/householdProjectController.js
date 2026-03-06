@@ -53,7 +53,7 @@ export const createHouseholdProject = async (req, res) => {
 
     const { projectName, description, projectType, targetAmount, dueDate } = req.body;
     if (!projectName?.trim()) return res.status(400).json({ error: 'שם הפרויקט נדרש' });
-    if (!['goal', 'task', 'simple'].includes(projectType)) return res.status(400).json({ error: 'סוג פרויקט לא תקין' });
+    if (!['goal', 'task', 'simple', 'savings'].includes(projectType)) return res.status(400).json({ error: 'סוג פרויקט לא תקין' });
 
     const project = await HouseholdProject.create({
       family: familyId,
@@ -121,7 +121,7 @@ export const deleteHouseholdProject = async (req, res) => {
 export const addFund = async (req, res) => {
   try {
     const project = await assertFamilyProject(req.user._id, req.params.id);
-    if (project.projectType !== 'goal') return res.status(400).json({ error: 'הפקדות רלוונטיות רק לפרויקטי יעד' });
+    if (!['goal', 'savings'].includes(project.projectType)) return res.status(400).json({ error: 'הפקדות רלוונטיות רק לפרויקטי יעד וחיסכון' });
 
     const { amount, destination } = req.body;
     if (!amount || Number(amount) <= 0) return res.status(400).json({ error: 'סכום לא תקין' });

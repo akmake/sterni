@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowRight, Target, CheckSquare, FolderOpen } from 'lucide-react';
+import { ArrowRight, Target, CheckSquare, FolderOpen, PiggyBank } from 'lucide-react';
 import useHouseholdProjectStore from '@/stores/householdProjectStore';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -61,7 +61,7 @@ export default function NewHouseholdProjectPage() {
               {/* Type selector */}
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-gray-700">סוג הפרויקט</label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => set('projectType', 'goal')}
@@ -113,6 +113,23 @@ export default function NewHouseholdProjectPage() {
                       משימות בלי כסף
                     </span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => set('projectType', 'savings')}
+                    className={`flex flex-col items-center gap-2 p-5 rounded-xl border-2 transition-all ${
+                      form.projectType === 'savings'
+                        ? 'border-pink-500 bg-pink-50 shadow-sm'
+                        : 'border-gray-200 hover:border-gray-300 bg-white'
+                    }`}
+                  >
+                    <PiggyBank className={`h-8 w-8 ${form.projectType === 'savings' ? 'text-pink-600' : 'text-gray-400'}`} />
+                    <span className={`font-semibold text-sm ${form.projectType === 'savings' ? 'text-pink-700' : 'text-gray-600'}`}>
+                      חיסכון
+                    </span>
+                    <span className="text-xs text-gray-500 text-center">
+                      צבירת כסף לאורך זמן
+                    </span>
+                  </button>
                 </div>
               </div>
 
@@ -142,7 +159,7 @@ export default function NewHouseholdProjectPage() {
               </div>
 
               {/* Target amount (relevant for goal, optional for task, hidden for simple) */}
-              {form.projectType !== 'simple' && (
+              {form.projectType !== 'simple' && form.projectType !== 'savings' && (
               <div className="space-y-1">
                 <label className="text-sm font-semibold text-gray-700">
                   {form.projectType === 'goal' ? 'סכום יעד (₪)' : 'תקציב כולל (אופציונלי)'}

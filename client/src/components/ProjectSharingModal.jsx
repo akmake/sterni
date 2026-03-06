@@ -23,10 +23,10 @@ export default function ProjectSharingModal({ projectId, isOpen, onClose, onUpda
   const fetchData = async () => {
     try {
       const [usersRes, projectRes] = await Promise.all([
-        api.get('/admin/users'),
+        api.get('/projects/users/all'),
         api.get(`${apiBase}/${projectId}`)
       ]);
-      setAllUsers(usersRes.data.data?.users || usersRes.data || []);
+      setAllUsers(usersRes.data || []);
       setCollaborators(projectRes.data.collaborators || []);
     } catch (error) {
       toast.error('שגיאה בטעינת נתונים');
@@ -119,41 +119,42 @@ export default function ProjectSharingModal({ projectId, isOpen, onClose, onUpda
               <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="חפש לפי שם או אימייל..."
+                placeholder="סנן לפי שם..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full bg-slate-50 px-4 py-2.5 pr-10 rounded-xl text-sm border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
               />
             </div>
 
-            {/* User results */}
-            {searchTerm && (
-              <div className="bg-slate-50 rounded-xl border border-slate-100 max-h-40 overflow-y-auto">
-                {loading ? (
-                  <p className="text-center text-sm text-slate-400 py-6">טוען...</p>
-                ) : filteredUsers.length === 0 ? (
-                  <p className="text-center text-sm text-slate-400 py-6">לא נמצאו משתמשים</p>
-                ) : (
-                  filteredUsers.map(user => (
-                    <button
-                      key={user._id}
-                      onClick={() => { setSelectedUser(user); setSearchTerm(''); }}
-                      className={`w-full flex items-center gap-3 p-3 hover:bg-white transition-colors text-right border-b border-slate-100 last:border-0 ${
-                        selectedUser?._id === user._id ? 'bg-blue-50' : ''
-                      }`}
-                    >
-                      <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold shrink-0">
-                        {(user.name || '?')[0]}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-800 truncate">{user.name}</p>
-                        <p className="text-xs text-slate-400 truncate">{user.email}</p>
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-            )}
+            {/* User list - always visible */}
+            <div className="bg-slate-50 rounded-xl border border-slate-100 max-h-48 overflow-y-auto">
+              {loading ? (
+                <p className="text-center text-sm text-slate-400 py-6">טוען...</p>
+              ) : filteredUsers.length === 0 ? (
+                <p className="text-center text-sm text-slate-400 py-6">אין משתמשים להוסיף</p>
+              ) : (
+                filteredUsers.map(user => (
+                  <button
+                    key={user._id}
+                    onClick={() => { setSelectedUser(user); setSearchTerm(''); }}
+                    className={`w-full flex items-center gap-3 p-3 hover:bg-white transition-colors text-right border-b border-slate-100 last:border-0 ${
+                      selectedUser?._id === user._id ? 'bg-blue-50' : ''
+                    }`}
+                  >
+                    <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold shrink-0">
+                      {(user.name || '?')[0]}
+                    </div>
+                    <div className="min-w-0 flex-1 text-right">
+                      <p className="text-sm font-medium text-slate-800 truncate">{user.name}</p>
+                      <p className="text-xs text-slate-400 truncate">{user.email}</p>
+                    </div>
+                    {selectedUser?._id === user._id && (
+                      <span className="text-xs text-blue-600 font-bold shrink-0">נבחר</span>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
 
             {/* Selected user + role + add */}
             {selectedUser && (

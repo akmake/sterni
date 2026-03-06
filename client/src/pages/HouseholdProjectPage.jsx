@@ -75,6 +75,7 @@ export default function HouseholdProjectPage() {
   const isGoal = project.projectType === 'goal';
   const isTask = project.projectType === 'task';
   const isSimple = project.projectType === 'simple';
+  const isSavings = project.projectType === 'savings';
   const hasTasks = isTask || isSimple;
 
   // Progress
@@ -85,7 +86,7 @@ export default function HouseholdProjectPage() {
     progress = project.targetAmount > 0
       ? Math.min(100, Math.round((project.currentAmount / project.targetAmount) * 100))
       : 0;
-  } else {
+  } else if (!isSavings) {
     totalTasks = project.tasks?.length || 0;
     completedTasks = project.tasks?.filter(t => t.done).length || 0;
     progress = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
@@ -250,7 +251,9 @@ export default function HouseholdProjectPage() {
     ? { label: 'יעד כספי', cls: 'bg-blue-100 text-blue-700' }
     : isTask
       ? { label: 'משימות + ₪', cls: 'bg-emerald-100 text-emerald-700' }
-      : { label: 'משימות', cls: 'bg-indigo-100 text-indigo-700' };
+      : isSavings
+        ? { label: 'חיסכון', cls: 'bg-pink-100 text-pink-700' }
+        : { label: 'משימות', cls: 'bg-indigo-100 text-indigo-700' };
 
   return (
     <div className="min-h-screen bg-[#F5F5F7] p-4 md:p-8 font-sans text-slate-800 dir-rtl">
@@ -328,6 +331,15 @@ export default function HouseholdProjectPage() {
               </Button>
 
               {/* Progress Widget */}
+              {isSavings ? (
+                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-1 min-w-[180px]">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">סה״כ נצבר</span>
+                  <span className="text-2xl font-bold text-slate-800">
+                    {(project.currentAmount || 0).toLocaleString()} <span className="text-base font-normal text-slate-400">₪</span>
+                  </span>
+                  <span className="text-xs text-slate-400">{project.funds?.length || 0} הפקדות</span>
+                </div>
+              ) : (
               <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 min-w-[200px]">
                 <div className="relative w-14 h-14 flex items-center justify-center">
                   <svg className="w-full h-full transform -rotate-90">
@@ -377,6 +389,7 @@ export default function HouseholdProjectPage() {
                   )}
                 </div>
               </div>
+              )}
             </div>
           </div>
         </div>
@@ -386,8 +399,50 @@ export default function HouseholdProjectPage() {
           {/* --- Left Column: Content (8/12) --- */}
           <div className="lg:col-span-8 space-y-6">
 
-            {/* Goal type — Funds section */}
+            {/* Goal type — Target amount editor */}
             {isGoal && (
+              <div className="bg-white/80 backdrop-blur-md p-5 rounded-[2rem] border border-white/60 shadow-sm flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="bg-blue-50 p-2.5 rounded-xl">
+                    <Target size={20} className="text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">יעד כספי</p>
+                    {editingTarget ? (
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <input
+                          ref={targetInputRef}
+                          type="number"
+                          value={editTargetValue}
+                          onChange={e => setEditTargetValue(e.target.value)}
+                          onBlur={saveTarget}
+                          onKeyDown={e => { if (e.key === 'Enter') saveTarget(); if (e.key === 'Escape') setEditingTarget(false); }}
+                          className="text-2xl font-bold w-36 bg-transparent border-b-2 border-blue-500 outline-none text-slate-800"
+                          min="1"
+                        />
+                        <span className="text-lg text-slate-400">₪</span>
+                      </div>
+                    ) : (
+                      <p className="text-2xl font-bold text-slate-800 mt-0.5">
+                        {(project.targetAmount || 0).toLocaleString()} <span className="text-base font-normal text-slate-400">₪</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {!editingTarget && (
+                  <button
+                    onClick={startEditTarget}
+                    className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-xl transition-colors"
+                  >
+                    <Pencil size={14} />
+                    ערוך יעד
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Goal/Savings type — Funds section */}
+            {(isGoal || isSavings) && (
               <div className="bg-white/80 backdrop-blur-md p-6 rounded-[2rem] border border-white/60 shadow-sm space-y-4">
                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                   <Banknote size={20} className="text-blue-500" />

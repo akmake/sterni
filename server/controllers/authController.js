@@ -65,7 +65,10 @@ export const loginUser = async (req, res) => {
     createAndSendTokens(user, res);
     return res.status(200).json({ message: "התחברת בהצלחה", user: userPayload });
   } catch (error) {
-    console.error('❌ [LOGIN] error:', error);
+    console.error('❌ [LOGIN] error:', error.message || error);
+    if (error.message?.includes('secretOrPrivateKey')) {
+      console.error('   ⚠ JWT secret is missing! Check JWT_ACCESS_SECRET / JWT_REFRESH_SECRET in .env');
+    }
     return res.status(500).json({ message: 'שגיאה בהתחברות' });
   }
 };

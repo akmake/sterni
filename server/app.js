@@ -51,6 +51,15 @@ import { loggingMiddleware } from './middlewares/loggingMiddleware.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// --- Validate Required Environment Variables ---
+const requiredEnvVars = ['MONGO_URI', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'];
+const missingVars = requiredEnvVars.filter(v => !process.env[v]);
+if (missingVars.length) {
+  console.error(`❌ Missing required environment variables: ${missingVars.join(', ')}`);
+  console.error('   Make sure your .env file exists and contains these variables.');
+  process.exit(1);
+}
+
 // --- DB Connection ---
 const connectDB = async () => {
   try {

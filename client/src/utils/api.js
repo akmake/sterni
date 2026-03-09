@@ -97,7 +97,11 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     // ── 403 CSRF invalid — רענן טוקן ונסה שוב פעם אחת ──
-    if (error.response?.status === 403 && !originalRequest._csrfRetry) {
+    // Only retry for CSRF errors, not for auth/refresh 403 responses
+    const isCsrfError = error.response?.status === 403 
+      && !originalRequest._csrfRetry
+      && !originalRequest.url?.includes('/auth/refresh');
+    if (isCsrfError) {
       originalRequest._csrfRetry = true;
       csrfTokenPromise = null; // פינוי cache
       try {

@@ -1,6 +1,6 @@
 import { useState, Fragment } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { Menu, X, LogOut, Briefcase, Utensils, FileText, ChevronDown, ChevronUp, Settings, UserCircle, ListTodo, User, Users, CalendarDays, CreditCard, Shield, BarChart3, Scissors, FolderPlus, ClipboardList, Home, ArrowLeftRight, ShoppingCart, ClipboardCheck, Wallet, FolderKanban, Landmark } from "lucide-react";
+import { Menu, X, LogOut, Briefcase, Utensils, FileText, ChevronDown, ChevronUp, Settings, UserCircle, ListTodo, User, Users, CalendarDays, CreditCard, Shield, BarChart3, Scissors, FolderPlus, ClipboardList, Home, ArrowLeftRight, ShoppingCart, ClipboardCheck, Wallet, FolderKanban, Landmark, Hotel } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/stores/authStore";
 import useLogout from "@/hooks/useLogout";
@@ -36,6 +36,7 @@ const getManagementNav = (isAuthenticated, isAdmin, hasTzitzitAccess) => {
     { to: '/tasks', label: 'מטלות מהירות', icon: ListTodo, type: 'link' },
     { to: '/projects', label: 'פרויקטים', icon: Briefcase, type: 'link' },
     { to: '/groups', label: 'ניהול קבוצות', icon: Users, type: 'link' },
+    { to: '/hotel-orders', label: 'הזמנות מלון', icon: Hotel, type: 'link' },
   );
 
   items.push({

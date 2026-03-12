@@ -29,6 +29,9 @@ import adminRoutes from './routes/adminRoutes.js';
 import logsRoutes from './routes/logsRoutes.js';
 
 import tzitzitRoutes from './routes/tzitzitRoutes.js';
+import hotelOrderRoutes from './routes/hotelOrderRoutes.js';
+import hotelZiporiDataRoutes from './routes/hotelZiporiDataRoutes.js';
+import './db/ziporiDb.js'; // יזום חיבור ל-zipori MongoDB
 import familyRoutes from './routes/familyRoutes.js';
 import shoppingRoutes from './routes/shoppingRoutes.js';
 import householdTaskRoutes from './routes/householdTaskRoutes.js';
@@ -158,6 +161,8 @@ app.use('/api/finance/analytics', requireAuth, financeAnalyticsRoutes);
 app.use('/api/finance/dashboard', requireAuth, financeDashboardRoutes);
 app.use('/api/finance/import', requireAuth, financeImportRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/hotel-orders', hotelOrderRoutes);
+app.use('/api/hotel-data', hotelZiporiDataRoutes);
 
 // Error Handling
 app.use('*', (req, res) => {

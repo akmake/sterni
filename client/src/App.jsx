@@ -44,6 +44,13 @@ import UserActivityPage from './pages/UserActivityPage';
 import TzitzitManagementPage from './pages/TzitzitManagementPage';
 import ProfilePage from './pages/ProfilePage';
 
+/* Hotel Orders */
+import HotelOrdersPage from './pages/HotelOrdersPage';
+import HotelNewOrderPage from './pages/HotelNewOrderPage';
+import HotelEditOrderPage from './pages/HotelEditOrderPage';
+import HotelQuotePage from './pages/HotelQuotePage';
+import HotelOrderConfirmationPage from './pages/HotelOrderConfirmationPage';
+
 /* Household Pages */
 import HouseholdDashboard from './pages/HouseholdDashboard';
 import ShoppingListPage from './pages/ShoppingListPage';
@@ -113,6 +120,13 @@ export default function App() {
           <Route path="thai-schedule"         element={<ThaiSchedulePage />} />
           <Route path="groups/:groupId/payments" element={<GroupPaymentsPage />} />
           <Route path="financial-report" element={<FinancialReportPage />} />
+
+          {/* Hotel Orders */}
+          <Route path="hotel-orders"                          element={<HotelOrdersPage />} />
+          <Route path="hotel-orders/new"                      element={<HotelNewOrderPage />} />
+          <Route path="hotel-orders/edit/:orderId"            element={<HotelEditOrderPage />} />
+          <Route path="hotel-orders/quote/:orderId"           element={<HotelQuotePage />} />
+          <Route path="hotel-orders/confirmation/:orderId"    element={<HotelOrderConfirmationPage />} />
 
           {/* Household Management */}
           <Route path="household"             element={<HouseholdDashboard />} />

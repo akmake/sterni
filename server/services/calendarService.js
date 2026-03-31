@@ -146,8 +146,10 @@ export async function getDailyCalendar(dateString) {
     // Rambam 3 chapters from Hebcal (dr3=on) — Sefaria URLs extracted from memo
     const hc3 = await fetchJson(`${HEBCAL_BASE}/hebcal?cfg=json&dr3=on&start=${dateString}&end=${dateString}`);
     const r3Item = (hc3?.items || []).find(i => i.category === 'dailyRambam3');
-    if (r3Item?.memo) {
-      const urls = r3Item.memo.match(/https:\/\/www\.sefaria\.org\/\S+/g) || [];
+    if (r3Item) {
+      const memoUrls = r3Item.memo ? (r3Item.memo.match(/https:\/\/www\.sefaria\.org\/\S+/g) || []) : [];
+      const linkUrl  = r3Item.link ? [r3Item.link] : [];
+      const urls = memoUrls.length > 0 ? memoUrls : linkUrl;
       const refs = urls.map(rambamUrlToRef).filter(Boolean);
       if (refs.length > 0) {
         items.push({

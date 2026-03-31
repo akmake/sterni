@@ -2,7 +2,6 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
-const TORAHCALC_BASE = 'https://www.torahcalc.com';
 const HEBCAL_BASE    = 'https://www.hebcal.com';
 const SEFARIA_BASE   = 'https://www.sefaria.org';
 
@@ -97,89 +96,11 @@ function rambamUrlToRef(url) {
   // "https://www.sefaria.org/Mishneh_Torah%2C_Sabbath.13-15?lang=bi"
   // → "Mishneh Torah, Sabbath.13-15"
   try {
-    const path = new URL(url).pathname.slice(1); // "Mishneh_Torah%2C_Sabbath.13-15"
+    const path = new URL(url).pathname.slice(1);
     return decodeURIComponent(path).replace(/_/g, ' ');
   } catch (_) {
     return null;
   }
-}
-
-// Parse a TorahCalc "name" field into individual Sefaria chapter refs.
-// "Eruvin 4-6"  → ["Mishneh Torah, Eruvin.4", …, "Mishneh Torah, Eruvin.6"]
-// "Eruvin 7, Eruvin 8, Rest on the Tenth of Tishrei 1"
-//             → ["Mishneh Torah, Eruvin.7", "Mishneh Torah, Eruvin.8",
-//                "Mishneh Torah, Rest on the Tenth of Tishrei.1"]
-const HE_ORDS = ['','א','ב','ג','ד','ה','ו','ז','ח','ט','י','יא','יב','יג','יד','טו','טז','יז','יח','יט','כ','כא','כב','כג','כד','כה','כו','כז','כח','כט','ל'];
-const heOrd = n => (n >= 1 && n < HE_ORDS.length) ? HE_ORDS[n] : String(n);
-
-// Parse a TorahCalc hebrewName into individual "Book פרק N" strings.
-// "עירובין 4-6"  → ["עירובין פרק ד", "עירובין פרק ה", "עירובין פרק ו"]
-// "עירובין פרק ז, ..."  → split by ", "
-function hebrewChapterEntries(hebrewName) {
-  if (!hebrewName) return [];
-  if (hebrewName.includes(',')) return hebrewName.split(', ');
-  const m = hebrewName.match(/^(.+?)\s+(\d+)-(\d+)$/);
-  if (m) {
-    const book = m[1], start = parseInt(m[2], 10), end = parseInt(m[3], 10);
-    return Array.from({ length: end - start + 1 }, (_, i) => `${book} פרק ${heOrd(start + i)}`);
-  }
-  return [hebrewName];
-}
-
-// Condenses 3 chapter entries into a compact label.
-// e.g. ["הלכות שבת פרק כח","הלכות שבת פרק כט","הלכות שבת פרק ל"]
-//   → "הלכות שבת פרקים כח-ל"
-// e.g. ["הלכות שבת פרק ל","הלכות ערובין פרק א","הלכות ערובין פרק ב"]
-//   → "הלכות שבת פרק ל, הלכות ערובין פרקים א-ב"
-function condenseRambamLabel(entries) {
-  if (!entries || entries.length === 0) return '';
-
-  const parsed = entries.map(e => {
-    const m = e?.match(/^(.+?)\s+פרק\s+(\S+)$/);
-    return m ? { book: m[1], ordinal: m[2] } : { book: e || '', ordinal: '' };
-  });
-
-  const groups = [];
-  for (const item of parsed) {
-    const last = groups[groups.length - 1];
-    if (last && last.book === item.book) {
-      last.ordinals.push(item.ordinal);
-    } else {
-      groups.push({ book: item.book, ordinals: [item.ordinal] });
-    }
-  }
-
-  return groups.map(g => {
-    if (g.ordinals.length === 1) return `${g.book} פרק ${g.ordinals[0]}`;
-    return `${g.book} פרקים ${g.ordinals[0]}-${g.ordinals[g.ordinals.length - 1]}`;
-  }).join(', ');
-}
-
-function nameToChapterRefs(name) {
-  if (!name) return [];
-  // Split by comma first, then handle each part (single chapter or range).
-  // This correctly handles cross-book entries like "Sabbath 30, Eruvin 1-2".
-  return name.split(', ').flatMap(entry => {
-    const rangeM = entry.match(/^(.+?)\s+(\d+)-(\d+)$/);
-    if (rangeM) {
-      const book = rangeM[1], start = parseInt(rangeM[2], 10), end = parseInt(rangeM[3], 10);
-      return Array.from({ length: end - start + 1 }, (_, i) => `Mishneh Torah, ${book}.${start + i}`);
-    }
-    const m = entry.match(/^(.+?)\s+(\d+)$/);
-    return m ? [`Mishneh Torah, ${m[1]}.${m[2]}`] : [];
-  });
-}
-
-function seferHamitzvotNameToRef(name) {
-  const match = String(name || '').match(/(Positive|Negative)\s+Commandments?\s+(\d+)(?:-(\d+))?/i);
-  if (!match) return null;
-  const type = match[1].toLowerCase();
-  const start = match[2];
-  const end = match[3];
-  const base = type === 'positive'
-    ? 'Sefer HaMitzvot, Positive Commandments'
-    : 'Sefer HaMitzvot, Negative Commandments';
-  return end ? `${base} ${start}-${end}` : `${base} ${start}`;
 }
 
 function buildSefariaCalendarUrl(dateString) {
@@ -213,32 +134,27 @@ export async function getDailyCalendar(dateString) {
           displayValue: { he: item.displayValue?.he || item.ref },
         });
       }
+      if (en.toLowerCase().includes('sefer hamitzvot') || en.toLowerCase().includes('sefer hamitzvos')) {
+        items.push({
+          title: { en: 'Daily Sefer HaMitzvot', he: 'ספר המצוות היומי' },
+          ref: item.ref,
+          displayValue: { he: item.displayValue?.he || item.ref },
+        });
+      }
     }
 
-    // Rambam 3 chapters + Sefer HaMitzvot from TorahCalc (Chabad's 3-chapter split)
-    const tc = await fetchJson(`${TORAHCALC_BASE}/api/dailylearning?date=${dateString}`);
-    const r3Today = tc?.data?.dailyRambam3;
-    const shmToday = tc?.data?.dailySeferHamitzvos;
-
-    if (r3Today?.name) {
-      const refs = nameToChapterRefs(r3Today.name);
+    // Rambam 3 chapters from Hebcal (dr3=on) — Sefaria URLs extracted from memo
+    const hc3 = await fetchJson(`${HEBCAL_BASE}/hebcal?cfg=json&dr3=on&start=${dateString}&end=${dateString}`);
+    const r3Item = (hc3?.items || []).find(i => i.category === 'dailyRambam3');
+    if (r3Item?.memo) {
+      const urls = r3Item.memo.match(/https:\/\/www\.sefaria\.org\/\S+/g) || [];
+      const refs = urls.map(rambamUrlToRef).filter(Boolean);
       if (refs.length > 0) {
         items.push({
           title: { en: 'Daily Rambam (3 chapters)', he: 'רמב"ם יומי' },
           refs,
           ref: refs[0],
-          displayValue: { he: r3Today.hebrewName || r3Today.name },
-        });
-      }
-    }
-
-    if (shmToday?.name) {
-      const shmRef = seferHamitzvotNameToRef(shmToday.name);
-      if (shmRef) {
-        items.push({
-          title: { en: 'Daily Sefer HaMitzvot', he: 'ספר המצוות היומי' },
-          ref: shmRef,
-          displayValue: { he: shmToday.hebrewName || shmToday.name },
+          displayValue: { he: r3Item.hebrew || r3Item.title },
         });
       }
     }

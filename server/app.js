@@ -46,6 +46,12 @@ import financeDashboardRoutes from './routes/financeDashboardRoutes.js';
 import financeImportRoutes from './routes/financeImportRoutes.js';
 import { setupSocketIO } from './services/socketService.js';
 
+// --- Shieor imports (daily study app) ---
+import studyRoutes from './routes/studyRoutes.js';
+import articleRoutes from './routes/articleRoutes.js';
+import zmanimRoutes from './routes/zmanimRoutes.js';
+import shieorUserRoutes from './routes/shieorUserRoutes.js';
+
 import rateLimiter from './middlewares/rateLimiter.js';
 import { requireAuth } from './middlewares/authMiddleware.js';
 import { startEmailListener } from './services/emailListener.js';
@@ -118,6 +124,12 @@ app.use(loggingMiddleware);
 app.use('/api/chat', chatRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/logs', logsRoutes);
+
+// --- Shieor routes (APK לימוד יומי — ללא CSRF) ---
+app.use('/api/study', studyRoutes);
+app.use('/api/articles', articleRoutes);
+app.use('/api/zmanim', zmanimRoutes);
+app.use('/api/user', shieorUserRoutes);
 // =================================================================
 
 

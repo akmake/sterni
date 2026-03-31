@@ -200,13 +200,12 @@ export async function getDailyCalendar(dateString) {
 
   // ── 1. Rambam (1 & 3 chapters) + Sefer HaMitzvot ─────────────────────────
   try {
-    // Sefaria gives clean refs directly — no offset hacks needed
+    // Rambam 1 chapter from Sefaria (correct)
     sefariaData = await fetchJson(buildSefariaCalendarUrl(dateString));
     const calItems = Array.isArray(sefariaData?.calendar_items) ? sefariaData.calendar_items : [];
 
     for (const item of calItems) {
       const en = String(item?.title?.en || '');
-
       if (en === 'Daily Rambam') {
         items.push({
           title: { en: 'Daily Rambam (1 chapter)', he: 'רמב"ם יומי (פרק 1)' },
@@ -214,19 +213,25 @@ export async function getDailyCalendar(dateString) {
           displayValue: { he: item.displayValue?.he || item.ref },
         });
       }
+    }
 
-      if (en === 'Daily Rambam (3 Chapters)') {
+    // Rambam 3 chapters + Sefer HaMitzvot from TorahCalc (Chabad's 3-chapter split)
+    const tc = await fetchJson(`${TORAHCALC_BASE}/api/dailylearning?date=${dateString}`);
+    const r3Today = tc?.data?.dailyRambam3;
+    const shmToday = tc?.data?.dailySeferHamitzvos;
+
+    if (r3Today?.name) {
+      const refs = nameToChapterRefs(r3Today.name);
+      if (refs.length > 0) {
         items.push({
           title: { en: 'Daily Rambam (3 chapters)', he: 'רמב"ם יומי' },
-          ref: item.ref,
-          displayValue: { he: item.displayValue?.he || item.ref },
+          refs,
+          ref: refs[0],
+          displayValue: { he: r3Today.hebrewName || r3Today.name },
         });
       }
     }
 
-    // Sefer HaMitzvot — only available from TorahCalc
-    const tc = await fetchJson(`${TORAHCALC_BASE}/api/dailylearning?date=${dateString}`);
-    const shmToday = tc?.data?.dailySeferHamitzvos;
     if (shmToday?.name) {
       const shmRef = seferHamitzvotNameToRef(shmToday.name);
       if (shmRef) {

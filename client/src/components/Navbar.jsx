@@ -70,6 +70,7 @@ const getManagementNav = (isAuthenticated, isAdmin, hasTzitzitAccess) => {
       children: [
         { to: '/admin/meals', label: 'ניהול ארוחות', icon: Utensils },
         { to: '/admin/users', label: 'ניהול משתמשים', icon: Users },
+        { to: '/admin/hotel-data', label: 'נתוני מלונות', icon: Hotel },
         { to: '/settings', label: 'הגדרות מערכת', icon: Settings },
         { to: '/admin/logs', label: 'דוח מבקרים', icon: BarChart3 },
       ]

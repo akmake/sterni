@@ -16,8 +16,8 @@ HotelOrdersPage (list)
 
 ## Data Sources
 - **Order data:** Main DB → `HotelOrder` model → `/api/hotel-orders`
-- **Hotel/Room data:** Zipori DB → `Hotel`, `PriceList`, `RoomType`, `ExtraType` → `/api/hotel-data/*`
-- **CRITICAL:** Zipori DB requires `ZIPORI_MONGO_URI` env var. If missing → no hotels/room types shown.
+- **Hotel/Room data:** Main DB → `Hotel`, `PriceList`, `RoomType`, `ExtraType` → `/api/hotel-data/*`
+- Full CRUD available on all hotel data entities (hotels, price lists, room types, extras)
 
 ## Key Files
 | File | Role |
@@ -35,9 +35,10 @@ HotelOrdersPage (list)
 | `server/routes/hotelZiporiDataRoutes.js` | Hotel data routes (zipori) |
 | `server/models/HotelOrder.js` | Order schema |
 | `server/models/HotelCounter.js` | Auto-increment order numbers |
-| `server/models/zipori/Hotel.js` | Hotel schema (zipori) |
-| `server/models/zipori/PriceList.js` | Pricing schema (zipori) |
-| `server/models/zipori/RoomType.js` | Room types schema (zipori) |
+| `server/models/Hotel.js` | Hotel schema (main DB) |
+| `server/models/PriceList.js` | Pricing schema (main DB) |
+| `server/models/RoomType.js` | Room types schema (main DB) |
+| `server/models/ExtraType.js` | Extra types schema (main DB) |
 
 ## HotelOrder Schema Fields (key fields)
 ```
@@ -67,5 +68,5 @@ createdByName
 - `user.role === 'admin'` OR `user.canViewCommissions` → shows 3% sales commission in UI
 
 ## Known Issues / Pitfalls
-- If `ZIPORI_MONGO_URI` missing in production → hotel dropdowns empty → order cannot be created
-- Zipori DB is read-only — never write to zipori models
+- Hotel data (hotels, price lists, room types, extras) now lives in the main DB — no longer depends on `ZIPORI_MONGO_URI`
+- The zipori models (`server/models/zipori/`) are no longer used for hotel-data routes — kept for reference only

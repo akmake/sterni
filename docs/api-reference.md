@@ -70,13 +70,25 @@
 | PUT | `/hotel-orders/:id` | Update order |
 | DELETE | `/hotel-orders/:id` | Delete order |
 
-### Hotel Data (Zipori DB — read only)
+### Hotel Data (Main DB — full CRUD)
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/hotel-data/hotels` | List hotels |
-| GET | `/hotel-data/pricelists?hotelId=&active=` | Price lists for hotel |
+| POST | `/hotel-data/hotels` | Create hotel |
+| PUT | `/hotel-data/hotels/:id` | Update hotel |
+| DELETE | `/hotel-data/hotels/:id` | Delete hotel |
+| GET | `/hotel-data/pricelists?hotelId=&active=` | Price lists (filter by hotel) |
+| POST | `/hotel-data/pricelists` | Create price list |
+| PUT | `/hotel-data/pricelists/:id` | Update price list |
+| DELETE | `/hotel-data/pricelists/:id` | Delete price list |
 | GET | `/hotel-data/room-types/:hotelId` | Room types for hotel |
+| POST | `/hotel-data/room-types` | Create room type |
+| PUT | `/hotel-data/room-types/:id` | Update room type |
+| DELETE | `/hotel-data/room-types/:id` | Delete room type |
 | GET | `/hotel-data/extras` | Extra types |
+| POST | `/hotel-data/extras` | Create extra type |
+| PUT | `/hotel-data/extras/:id` | Update extra type |
+| DELETE | `/hotel-data/extras/:id` | Delete extra type |
 
 ### Finance
 | Method | Path | Description |

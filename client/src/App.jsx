@@ -43,6 +43,7 @@ import AdminLogsPage from './pages/AdminLogsPage';
 import UserActivityPage from './pages/UserActivityPage';
 import TzitzitManagementPage from './pages/TzitzitManagementPage';
 import ProfilePage from './pages/ProfilePage';
+import SoftwareLibraryPage from './pages/SoftwareLibraryPage';
 
 /* Hotel Orders */
 import HotelOrdersPage from './pages/HotelOrdersPage';
@@ -95,6 +96,7 @@ export default function App() {
         <Route element={<ProtectedRoute />}>
           {/* ★ FIX: Consistent paths — all relative (no leading slash) */}
           <Route path="profile"               element={<ProfilePage />} />
+          <Route path="software-library"      element={<SoftwareLibraryPage />} />
           <Route path="settings"              element={<SystemSettings />} />
           <Route path="price-quote"           element={<PriceQuoteGenerator />} />
           <Route path="payment-requests"      element={<PaymentRequestsPage />} />

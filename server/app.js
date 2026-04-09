@@ -48,6 +48,8 @@ import financeDashboardRoutes from './routes/financeDashboardRoutes.js';
 import financeImportRoutes from './routes/financeImportRoutes.js';
 import { setupSocketIO } from './services/socketService.js';
 
+import softwareRoutes from './routes/softwareRoutes.js';
+
 // --- Shieor imports (daily study app) ---
 import studyRoutes from './routes/studyRoutes.js';
 import articleRoutes from './routes/articleRoutes.js';
@@ -116,6 +118,7 @@ app.use(cookieParser());
 app.use(mongoSanitize());
 
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads/software', express.static(path.join(__dirname, '../uploads/software')));
 
 // --- Logging Middleware ---
 app.use(loggingMiddleware);
@@ -174,6 +177,7 @@ app.use('/api/finance/deposits', requireAuth, financeDepositRoutes);
 app.use('/api/finance/analytics', requireAuth, financeAnalyticsRoutes);
 app.use('/api/finance/dashboard', requireAuth, financeDashboardRoutes);
 app.use('/api/finance/import', requireAuth, financeImportRoutes);
+app.use('/api/software', requireAuth, softwareRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/hotel-orders', hotelOrderRoutes);
 app.use('/api/hotel-data', hotelZiporiDataRoutes);

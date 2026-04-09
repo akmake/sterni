@@ -5,6 +5,16 @@
 
 ---
 
+## Software Library Module
+
+| File changed | Must also check |
+|---|---|
+| `server/models/Software.js` | `server/controllers/softwareController.js`, `docs/modules/software-library.md`, `docs/database.md` |
+| `server/routes/softwareRoutes.js` | `server/app.js`, `docs/api-reference.md`, `docs/modules/software-library.md` |
+| `client/src/pages/SoftwareLibraryPage.jsx` | `client/src/App.jsx` (route), `client/src/components/Navbar.jsx` (nav item) |
+
+---
+
 ## Auth & Security
 
 | File changed | Must also check |

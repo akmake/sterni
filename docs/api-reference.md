@@ -24,6 +24,16 @@
 |--------|------|-------------|
 | GET | `/auth/me` | Current user info |
 
+### Software Library
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/software` | רשימת תוכנות (query: `category`, `search`) |
+| GET | `/software/:id` | פרטי תוכנה |
+| GET | `/software/:id/download` | הורדת קובץ + increment counter |
+| POST | `/software` | העלאת תוכנה (`multipart/form-data`, עד 2GB) |
+| PATCH | `/software/:id` | עדכון פרטים |
+| DELETE | `/software/:id` | מחיקת תוכנה + קובץ |
+
 ### Projects
 | Method | Path | Description |
 |--------|------|-------------|

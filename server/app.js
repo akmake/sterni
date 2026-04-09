@@ -1,4 +1,6 @@
 import 'dotenv/config';
+import dns from 'dns';
+dns.setServers(['8.8.8.8', '8.8.4.4']); // Fix: Windows DNS Client (127.0.0.1) doesn't support TCP DNS needed for SRV records
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';

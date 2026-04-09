@@ -78,8 +78,13 @@ export default function FamilySettingsPage() {
     );
   }
 
+  useEffect(() => {
+    if (!familyLoading && !family) {
+      navigate('/household');
+    }
+  }, [familyLoading, family, navigate]);
+
   if (!family) {
-    navigate('/household');
     return null;
   }
 

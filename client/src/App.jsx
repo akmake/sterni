@@ -40,7 +40,9 @@ import FinancialReportPage from '@/pages/Financialreportpage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import AdminMealsPage from './pages/AdminMealsPage';
 import AdminLogsPage from './pages/AdminLogsPage';
-import HotelDataAdminPage from './pages/HotelDataAdminPage';
+import ManageHotelsPage from './pages/ManageHotelsPage';
+import ManagePriceListsPage from './pages/ManagePriceListsPage';
+import ManageExtrasPage from './pages/ManageExtrasPage';
 import UserActivityPage from './pages/UserActivityPage';
 import TzitzitManagementPage from './pages/TzitzitManagementPage';
 import ProfilePage from './pages/ProfilePage';
@@ -157,7 +159,9 @@ export default function App() {
           <Route path="admin/users" element={<AdminUsersPage />} />
           <Route path="admin/meals" element={<AdminMealsPage />} />
           <Route path="admin/logs" element={<AdminLogsPage />} />
-          <Route path="admin/hotel-data" element={<HotelDataAdminPage />} />
+          <Route path="admin/hotels" element={<ManageHotelsPage />} />
+          <Route path="admin/pricelists" element={<ManagePriceListsPage />} />
+          <Route path="admin/extras" element={<ManageExtrasPage />} />
           <Route path="admin/user-activity" element={<UserActivityPage />} />
         </Route>
 

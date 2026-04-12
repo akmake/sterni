@@ -1,0 +1,5 @@
+-keep class com.sterni.dailystudy.data.model.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation*
+-dontwarn okhttp3.**
+-dontwarn retrofit2.**

@@ -2,7 +2,7 @@ import UserData from '../models/UserData.js';
 
 /**
  * POST /api/user/register
- * Creates a new user with an auto-generated 8-digit code.
+ * Creates a new user with an auto-generated 4-digit code.
  * Returns { userId }.
  */
 export const registerUser = async (req, res, next) => {

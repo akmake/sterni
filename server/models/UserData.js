@@ -3,7 +3,7 @@ import crypto from 'crypto';
 
 const userDataSchema = new mongoose.Schema(
   {
-    /** 8-digit unique user code, auto-generated */
+    /** 4-digit unique user code, auto-generated */
     userId: {
       type: String,
       required: true,
@@ -36,10 +36,10 @@ const userDataSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-/** Generate a unique 8-digit numeric code. */
+/** Generate a unique 4-digit numeric code. */
 userDataSchema.statics.generateUserId = async function () {
   for (let i = 0; i < 20; i++) {
-    const code = crypto.randomInt(10_000_000, 99_999_999).toString();
+    const code = crypto.randomInt(1000, 9999).toString();
     const exists = await this.findOne({ userId: code });
     if (!exists) return code;
   }

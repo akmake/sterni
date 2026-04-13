@@ -77,6 +77,31 @@ const useGroupsStore = create((set, get) => ({
     }
   },
 
+  createHall: async (hallData) => {
+    try {
+      const res = await api.post('/halls', hallData);
+      set((state) => ({ halls: [...state.halls, res.data] }));
+      toast.success('האולם נוצר בהצלחה');
+      return res.data;
+    } catch (error) {
+      console.error('Failed to create hall:', error);
+      toast.error('שגיאה ביצירת אולם');
+      throw error;
+    }
+  },
+
+  deleteHall: async (id) => {
+    try {
+      await api.delete(`/halls/${id}`);
+      set((state) => ({ halls: state.halls.filter((h) => h._id !== id) }));
+      toast.success('האולם נמחק בהצלחה');
+    } catch (error) {
+      console.error('Failed to delete hall:', error);
+      toast.error('שגיאה במחיקת אולם');
+      throw error;
+    }
+  },
+
   // --- אירועים (Schedule) ---
 
   addEvent: async (groupId, eventData) => {

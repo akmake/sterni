@@ -128,11 +128,7 @@ const QuoteManager = ({ currentData, onLoadData, containerRef, getLatestBlocks }
         eventType: fullQuote.eventType || ''
       };
 
-      if (!fullQuote.content && fullQuote.blocks) {
-        onLoadData(fullQuote);
-      } else {
-        onLoadData(dataToLoad.blocks ? dataToLoad : fullQuote.content);
-      }
+      onLoadData(dataToLoad);
 
       setIsOpen(false);
       setMode(null);

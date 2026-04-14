@@ -441,7 +441,7 @@ const PriceQuoteGenerator = () => {
     }
 
     if (data.minPax) setMinPax(data.minPax);
-    if (data.blocks) setBlocks(data.blocks);
+    if (data.blocks != null) setBlocks(data.blocks);
 
     toast.success('הצעה נטענה בהצלחה!');
   };
@@ -870,9 +870,8 @@ const PriceQuoteGenerator = () => {
                                                                     suppressContentEditableWarning
                                                                     onBlur={(e) => tableActions.updateHeaderTitle(block.id, idx, e.target.innerText)}
                                                                     className="w-full bg-transparent text-center font-bold text-sm outline-none whitespace-normal break-words min-h-[1.5em]"
-                                                                >
-                                                                    {h.title}
-                                                                </div>
+                                                                    dangerouslySetInnerHTML={{ __html: h.title }}
+                                                                />
                                                                 <div className="flex items-center justify-center gap-1 no-print opacity-0 group-hover/th:opacity-100 transition-opacity bg-white absolute bottom-full left-0 w-full z-10 shadow border p-1 rounded mb-1">
                                                                     <input type="number" value={h.width} onChange={(e) => tableActions.updateHeaderWidth(block.id, idx, e.target.value)} className="w-8 text-[10px] text-center border rounded bg-gray-50"/>
                                                                     <span className="text-[10px]">%</span>
@@ -895,7 +894,8 @@ const PriceQuoteGenerator = () => {
                                                                         suppressContentEditableWarning
                                                                         onBlur={(e) => tableActions.updateCell(block.id, rIdx, cIdx, e.target.innerText)}
                                                                         className="w-full min-h-[1.5em] outline-none whitespace-pre-wrap text-sm"
-                                                                    >{cell}</div>
+                                                                        dangerouslySetInnerHTML={{ __html: cell }}
+                                                                    />
                                                                 </td>
                                                             ))}
                                                         </tr>

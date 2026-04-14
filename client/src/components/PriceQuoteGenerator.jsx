@@ -132,6 +132,7 @@ const PriceQuoteGenerator = () => {
   const [rawArrivalDate, setRawArrivalDate] = useState('');
   const [rawDepartureDate, setRawDepartureDate] = useState('');
   const [minPax, setMinPax] = useState('0');
+  const [quoteTitle, setQuoteTitle] = useState('הצעת מחיר');
   const [blocks, setBlocks] = useState([]);
   const [paginatedPages, setPaginatedPages] = useState([]);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -351,6 +352,7 @@ const PriceQuoteGenerator = () => {
     arrivalDate: rawArrivalDate,
     departureDate: rawDepartureDate,
     minPax,
+    quoteTitle,
     blocks
   };
 
@@ -413,6 +415,7 @@ const PriceQuoteGenerator = () => {
         setTargetEmail(data.contactEmail);
     }
     if (data.eventType) setEventType(data.eventType);
+    if (data.quoteTitle) setQuoteTitle(data.quoteTitle);
 
     if (data.dates) {
         const fromDate = data.dates.from ? new Date(data.dates.from).toISOString().split('T')[0] : '';
@@ -782,9 +785,12 @@ const PriceQuoteGenerator = () => {
 {/* אזור כותרת מרכזית */}
                             <div className="w-full flex flex-col items-center justify-center mt-6 mx-auto">
 
-                                <h1 className="text-5xl font-bold mb-1 text-center whitespace-nowrap" style={{ color: GOLD }}>
-                                    הצעת מחיר
-                                </h1>
+                                <input
+                                    value={quoteTitle}
+                                    onChange={(e) => setQuoteTitle(e.target.value)}
+                                    className="text-5xl font-bold mb-1 text-center bg-transparent border-none outline-none w-full hover:opacity-80 focus:opacity-100 transition-opacity"
+                                    style={{ color: GOLD, fontFamily: 'inherit' }}
+                                />
 
                                 <div className="flex items-center justify-center gap-1.5 mt-0 w-full">
 
@@ -826,7 +832,8 @@ const PriceQuoteGenerator = () => {
                             <Inserter onAddText={() => addBlock(-1, 'text')} onAddTable={() => addBlock(-1, 'table')} />
                         )}
 
-                        {pageBlocks.map((block) => {
+                        {pageBlocks.map((pageBlock) => {
+                            const block = blocks.find(b => b.id === pageBlock.id) || pageBlock;
                             const realIndex = blocks.findIndex(b => b.id === block.id);
                             return (
                                 <div key={block.id} ref={el => blockRefs.current[block.id] = el} className="relative group/block mb-4 transition-all">

@@ -1,16 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useGroupsStore from '@/stores/groupsStore';
-import { Plus, Users, Calendar, Trash2, Archive, LayoutGrid, Clock } from 'lucide-react';
+import { Plus, Users, Calendar, Trash2, Archive, LayoutGrid, Clock, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import GroupsCalendarModal from '@/components/GroupsCalendarModal';
+import api from '@/utils/api';
 
 export default function GroupsPage() {
   const { groups, fetchGroups, deleteGroup, loading } = useGroupsStore();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState('active'); // 'active' or 'archive'
+  const [viewMode, setViewMode] = useState('all'); // 'all' | 'groups' | 'quotes' | 'archive'
   const [showCalendar, setShowCalendar] = useState(false);
+  const [quotes, setQuotes] = useState([]);
+
+  useEffect(() => {
+    api.get('/quotes').then(res => {
+      const data = res.data.data?.quotes || res.data || [];
+      setQuotes(data.filter(q => !q.isConverted && q.dates?.from));
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetchGroups();
@@ -34,46 +43,54 @@ export default function GroupsPage() {
   };
 
   // --- לוגיקה של מיון, סינון וקיבוץ ---
-  const getProcessedGroups = () => {
+  const getProcessedItems = () => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
+    const items = [];
 
-    // 1. סינון ראשוני (חיפוש וסטטוס)
-    let processed = groups.filter(g => 
-      g.name?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // קבוצות
+    if (viewMode !== 'quotes') {
+      let processedGroups = groups.filter(g =>
+        g.name?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      processedGroups = processedGroups.filter(group => {
+        if (!group.endDate) return viewMode !== 'archive';
+        const end = new Date(group.endDate);
+        const isPast = now > end;
+        return viewMode === 'archive' ? isPast : !isPast;
+      });
+      processedGroups.forEach(g => items.push({ ...g, _itemType: 'group' }));
+    }
 
-    processed = processed.filter(group => {
-      if (!group.endDate) return viewMode === 'active';
-      const end = new Date(group.endDate);
-      const isPast = now > end;
-      return viewMode === 'active' ? !isPast : isPast;
+    // הצעות מחיר (רק בtabs שלא ארכיון)
+    if (viewMode !== 'groups' && viewMode !== 'archive') {
+      quotes
+        .filter(q => (q.clientName || q.name || '').toLowerCase().includes(searchTerm.toLowerCase()))
+        .forEach(q => items.push({ ...q, _itemType: 'quote' }));
+    }
+
+    // מיון
+    items.sort((a, b) => {
+      const dateA = new Date(a.startDate || a.dates?.from || 0);
+      const dateB = new Date(b.startDate || b.dates?.from || 0);
+      return viewMode === 'archive' ? dateB - dateA : dateA - dateB;
     });
 
-    // 2. מיון לפי תאריך בתוך השבועות
-    processed.sort((a, b) => {
-      const dateA = new Date(a.startDate || 0);
-      const dateB = new Date(b.startDate || 0);
-      return viewMode === 'active' ? dateA - dateB : dateB - dateA;
-    });
-
-    // 3. קיבוץ לפי שבועות
-    const grouped = processed.reduce((acc, group) => {
-      // אם אין תאריך, נשים תחת "ללא תאריך" או תאריך עתידי רחוק
-      const startDate = group.startDate ? new Date(group.startDate) : new Date();
+    // קיבוץ לפי שבועות
+    return items.reduce((acc, item) => {
+      const startDate = item.startDate
+        ? new Date(item.startDate)
+        : item.dates?.from
+          ? new Date(item.dates.from)
+          : new Date();
       const weekStart = getStartOfWeek(startDate).toISOString();
-      
-      if (!acc[weekStart]) {
-        acc[weekStart] = [];
-      }
-      acc[weekStart].push(group);
+      if (!acc[weekStart]) acc[weekStart] = [];
+      acc[weekStart].push(item);
       return acc;
     }, {});
-
-    return grouped;
   };
 
-  const groupedGroups = getProcessedGroups();
+  const groupedGroups = getProcessedItems();
   
   // מיון המפתחות (השבועות) עצמם
   const sortedWeeks = Object.keys(groupedGroups).sort((a, b) => {
@@ -120,23 +137,28 @@ export default function GroupsPage() {
 
         {/* שורת חיפוש וטאבים */}
         <div className="flex flex-col md:flex-row gap-4 mb-8 justify-between items-center">
-           <div className="bg-white p-1 rounded-2xl shadow-sm border border-slate-200 flex">
-              <button
-                onClick={() => setViewMode('active')}
-                className={`flex items-center gap-2 px-6 py-3 rounded-xl transition-all duration-200 font-medium ${
-                  viewMode === 'active' ? 'bg-slate-100 text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <LayoutGrid size={18} /> קבוצות פעילות
-              </button>
-              <button
-                onClick={() => setViewMode('archive')}
-                className={`flex items-center gap-2 px-6 py-3 rounded-xl transition-all duration-200 font-medium ${
-                  viewMode === 'archive' ? 'bg-slate-100 text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <Archive size={18} /> ארכיון
-              </button>
+           <div className="bg-white p-1 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap gap-1">
+              {[
+                { id: 'all',     label: 'הכל',              icon: LayoutGrid },
+                { id: 'groups',  label: 'קבוצות קיימות',    icon: Users },
+                { id: 'quotes',  label: 'הצעות בהמתנה',     icon: FileText },
+                { id: 'archive', label: 'ארכיון',            icon: Archive },
+              ].map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  onClick={() => setViewMode(id)}
+                  className={`flex items-center gap-2 px-5 py-3 rounded-xl transition-all duration-200 font-medium ${
+                    viewMode === id ? 'bg-slate-100 text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <Icon size={18} /> {label}
+                  {id === 'quotes' && quotes.length > 0 && (
+                    <span className="bg-amber-100 text-amber-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
+                      {quotes.length}
+                    </span>
+                  )}
+                </button>
+              ))}
            </div>
 
            <input 
@@ -168,58 +190,108 @@ export default function GroupsPage() {
 
                 {/* הגריד של אותו שבוע */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {groupedGroups[weekStart].map((group) => (
-                    <div 
-                      key={group._id}
-                      onClick={() => navigate(`/groups/${group._id}`)}
-                      className={`bg-white p-6 rounded-[2rem] border border-slate-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_10px_20px_-5px_rgba(0,0,0,0.1)] hover:-translate-y-1 transition-all duration-300 cursor-pointer group relative overflow-hidden ${viewMode === 'archive' ? 'opacity-80 grayscale-[0.3]' : ''}`}
-                    >
-                      {/* כפתור מחיקה */}
-                      <button
-                        onClick={(e) => handleDelete(e, group._id)}
-                        className="absolute top-4 left-4 p-2.5 rounded-full text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all duration-300 opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 z-20"
-                      >
-                        <Trash2 size={20} />
-                      </button>
-
-                      <div className="flex items-center justify-between mb-6">
-                        <div className={`${viewMode === 'archive' ? 'bg-slate-100 text-slate-500' : 'bg-blue-50/80 text-blue-600'} p-3.5 rounded-2xl backdrop-blur-sm`}>
-                          <Users size={24} strokeWidth={2} />
-                        </div>
-                        {group.status && (
-                            <span className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-xs font-bold tracking-wide">
-                                {group.status}
+                  {groupedGroups[weekStart].map((item) =>
+                    item._itemType === 'quote'
+                      ? (
+                        // ── קארטת הצעת מחיר (כתומה) ──
+                        <div
+                          key={`quote-${item._id || item.name}`}
+                          onClick={() => navigate('/price-quote', { state: { loadQuote: item.name } })}
+                          className="bg-amber-50 p-6 rounded-[2rem] border border-amber-200 shadow-[0_2px_10px_-4px_rgba(251,146,60,0.2)] hover:shadow-[0_10px_20px_-5px_rgba(251,146,60,0.3)] hover:-translate-y-1 transition-all duration-300 cursor-pointer group relative overflow-hidden"
+                        >
+                          <div className="flex items-center justify-between mb-6">
+                            <div className="bg-amber-100 text-amber-600 p-3.5 rounded-2xl">
+                              <FileText size={24} strokeWidth={2} />
+                            </div>
+                            <span className="bg-amber-200 text-amber-800 px-3 py-1 rounded-full text-xs font-bold tracking-wide">
+                              בהמתנה
                             </span>
-                        )}
-                      </div>
-                      
-                      <h3 className="text-xl font-bold text-slate-800 mb-2 tracking-tight">{group.name}</h3>
-                      
-                      <div className="space-y-2.5 text-sm text-slate-500">
-                        <div className="flex items-center gap-2.5">
-                           <Users size={16} className="text-slate-400" />
-                           <span className="font-medium">{group.pax} משתתפים</span>
+                          </div>
+
+                          <h3 className="text-xl font-bold text-slate-800 mb-2 tracking-tight">
+                            {item.clientName || item.name}
+                          </h3>
+
+                          <div className="space-y-2.5 text-sm text-slate-500">
+                            {item.pax > 0 && (
+                              <div className="flex items-center gap-2.5">
+                                <Users size={16} className="text-amber-400" />
+                                <span className="font-medium">{item.pax} משתתפים</span>
+                              </div>
+                            )}
+                            {item.dates?.from && (
+                              <div className="flex items-center gap-2.5">
+                                <Calendar size={16} className="text-amber-400" />
+                                <span className="font-medium">
+                                  {new Date(item.dates.from).toLocaleDateString('he-IL')}
+                                  {item.dates?.to && ` - ${new Date(item.dates.to).toLocaleDateString('he-IL')}`}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="mt-6 pt-5 border-t border-amber-100 flex justify-between items-center">
+                            <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+                              {item.eventType || 'הצעת מחיר'}
+                            </span>
+                            <span className="text-amber-600 text-sm font-bold group-hover:translate-x-1 transition-transform duration-300 flex items-center gap-1">
+                              פתח הצעה <span className="text-lg">←</span>
+                            </span>
+                          </div>
                         </div>
-                        {group.startDate && (
+                      ) : (
+                        // ── קארטת קבוצה רגילה ──
+                        <div
+                          key={item._id}
+                          onClick={() => navigate(`/groups/${item._id}`)}
+                          className={`bg-white p-6 rounded-[2rem] border border-slate-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_10px_20px_-5px_rgba(0,0,0,0.1)] hover:-translate-y-1 transition-all duration-300 cursor-pointer group relative overflow-hidden ${viewMode === 'archive' ? 'opacity-80 grayscale-[0.3]' : ''}`}
+                        >
+                          <button
+                            onClick={(e) => handleDelete(e, item._id)}
+                            className="absolute top-4 left-4 p-2.5 rounded-full text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all duration-300 opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 z-20"
+                          >
+                            <Trash2 size={20} />
+                          </button>
+
+                          <div className="flex items-center justify-between mb-6">
+                            <div className={`${viewMode === 'archive' ? 'bg-slate-100 text-slate-500' : 'bg-blue-50/80 text-blue-600'} p-3.5 rounded-2xl backdrop-blur-sm`}>
+                              <Users size={24} strokeWidth={2} />
+                            </div>
+                            {item.status && (
+                              <span className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-xs font-bold tracking-wide">
+                                {item.status}
+                              </span>
+                            )}
+                          </div>
+
+                          <h3 className="text-xl font-bold text-slate-800 mb-2 tracking-tight">{item.name}</h3>
+
+                          <div className="space-y-2.5 text-sm text-slate-500">
                             <div className="flex items-center gap-2.5">
+                              <Users size={16} className="text-slate-400" />
+                              <span className="font-medium">{item.pax} משתתפים</span>
+                            </div>
+                            {item.startDate && (
+                              <div className="flex items-center gap-2.5">
                                 <Calendar size={16} className="text-slate-400" />
                                 <span className="font-medium">
-                                    {new Date(group.startDate).toLocaleDateString('he-IL')} - {new Date(group.endDate).toLocaleDateString('he-IL')}
+                                  {new Date(item.startDate).toLocaleDateString('he-IL')} - {new Date(item.endDate).toLocaleDateString('he-IL')}
                                 </span>
-                            </div>
-                        )}
-                      </div>
+                              </div>
+                            )}
+                          </div>
 
-                      <div className="mt-6 pt-5 border-t border-slate-50 flex justify-between items-center">
-                          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                              {group.hostingType === 'seminar' ? 'יום עיון' : 'לינה'}
-                          </span>
-                          <span className="text-blue-600 text-sm font-bold group-hover:translate-x-1 transition-transform duration-300 flex items-center gap-1">
+                          <div className="mt-6 pt-5 border-t border-slate-50 flex justify-between items-center">
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                              {item.hostingType === 'seminar' ? 'יום עיון' : 'לינה'}
+                            </span>
+                            <span className="text-blue-600 text-sm font-bold group-hover:translate-x-1 transition-transform duration-300 flex items-center gap-1">
                               לפרטים נוספים <span className="text-lg">←</span>
-                          </span>
-                      </div>
-                    </div>
-                  ))}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                  )}
                 </div>
               </div>
             ))
@@ -230,7 +302,7 @@ export default function GroupsPage() {
                   {viewMode === 'active' ? <Users size={48} className="opacity-20" /> : <Archive size={48} className="opacity-20" />}
                 </div>
                 <p className="text-lg font-medium opacity-60">
-                  {viewMode === 'active' ? 'לא נמצאו קבוצות פעילות' : 'הארכיון ריק'}
+                  {viewMode === 'archive' ? 'הארכיון ריק' : viewMode === 'quotes' ? 'אין הצעות מחיר בהמתנה' : 'לא נמצאו קבוצות'}
                 </p>
             </div>
           )}

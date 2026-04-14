@@ -79,6 +79,21 @@
             android:name=".notification.MidnightReminderReceiver"
             android:exported="false" />
 
+        <!-- Omer night alarm receiver -->
+        <receiver
+            android:name=".omer.OmerNightReceiver"
+            android:exported="false" />
+
+        <!-- Omer mark-as-counted receiver (from notification action) -->
+        <receiver
+            android:name=".omer.OmerMarkReceiver"
+            android:exported="false" />
+
+        <!-- Omer rescue alarm receiver (23:55 last chance) -->
+        <receiver
+            android:name=".omer.OmerRescueReceiver"
+            android:exported="false" />
+
         <!-- Study checklist widget -->
         <receiver
             android:name=".widget.StudyWidgetProvider"

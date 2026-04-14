@@ -15,6 +15,10 @@ import com.sterni.dailystudy.ui.screens.settings.SettingsScreen
 import com.sterni.dailystudy.ui.screens.study.StudyDetailScreen
 import com.sterni.dailystudy.ui.screens.tracker.StudyTrackerScreen
 import com.sterni.dailystudy.ui.screens.zmanim.ZmanimScreen
+import com.sterni.dailystudy.ui.screens.omer.OmerScreen
+import com.sterni.dailystudy.ui.screens.omer.OmerNusachScreen
+import com.sterni.dailystudy.ui.screens.tefila.TefilaScreen
+import com.sterni.dailystudy.ui.screens.tools.ToolsScreen
 import java.net.URLDecoder
 import java.net.URLEncoder
 
@@ -33,6 +37,12 @@ sealed class Screen(val route: String) {
     object StudyTracker  : Screen("studyTracker")
     object Calendar      : Screen("calendar")
     object Settings      : Screen("settings")
+    object Tools         : Screen("tools")
+    object Tefila        : Screen("tefila")
+    object Omer          : Screen("omer")
+    object OmerNusach    : Screen("omerNusach/{day}") {
+        fun createRoute(day: Int) = "omerNusach/$day"
+    }
 }
 
 @Composable
@@ -49,7 +59,10 @@ fun NavGraph(navController: NavHostController) {
                 onLocationClick     = { navController.navigate(Screen.LocationZones.route) },
                 onTrackerClick      = { navController.navigate(Screen.StudyTracker.route) },
                 onCalendarClick     = { navController.navigate(Screen.Calendar.route) },
-                onSettingsClick     = { navController.navigate(Screen.Settings.route) }
+                onSettingsClick     = { navController.navigate(Screen.Settings.route) },
+                onToolsClick        = { navController.navigate(Screen.Tools.route) },
+                onTefilaClick       = { navController.navigate(Screen.Tefila.route) },
+                onOmerClick         = { navController.navigate(Screen.Omer.route) }
             )
         }
 
@@ -111,6 +124,38 @@ fun NavGraph(navController: NavHostController) {
 
         composable(Screen.Settings.route) {
             SettingsScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Screen.Tools.route) {
+            ToolsScreen(
+                onBack            = { navController.popBackStack() },
+                onTefilaClick     = { navController.navigate(Screen.Tefila.route) },
+                onOmerClick       = { navController.navigate(Screen.Omer.route) },
+                onSilentZoneClick = { navController.navigate(Screen.LocationZones.route) },
+                onMamaarimClick   = { navController.navigate(Screen.Mamaarim.route) }
+            )
+        }
+
+        composable(Screen.Tefila.route) {
+            TefilaScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Screen.Omer.route) {
+            OmerScreen(
+                onBack     = { navController.popBackStack() },
+                onDayClick = { day -> navController.navigate(Screen.OmerNusach.createRoute(day)) }
+            )
+        }
+
+        composable(
+            route = Screen.OmerNusach.route,
+            arguments = listOf(navArgument("day") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val day = backStackEntry.arguments?.getInt("day") ?: 1
+            OmerNusachScreen(
+                day    = day,
+                onBack = { navController.popBackStack() }
+            )
         }
     }
 }

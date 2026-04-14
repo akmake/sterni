@@ -1,10 +1,49 @@
-*.iml
+# Gradle files
+.gradle/
 .gradle
-/local.properties
-/.idea
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+gradle-wrapper.jar
+
+# Local configuration file
 local.properties
+/local.properties
+
+# Build outputs
+/build
+app/build/
+**/build/
+/captures
+*.apk
+*.aar
+
+# Android Studio / IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# Native build directories
+.externalNativeBuild
+.cxx/
+CMakeFiles/
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+
+# Keystore files
+*.jks
+*.keystore
+
+# Other
+*~
+*.bak

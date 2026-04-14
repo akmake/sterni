@@ -1,0 +1,297 @@
+package com.sterni.dailystudy.ui.screens.tefila
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.sterni.dailystudy.ui.theme.BaHaYetzira
+import com.sterni.dailystudy.ui.theme.SblHebrew
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TefilaScreen(
+    onBack: () -> Unit
+) {
+    var selectedTab by remember { mutableIntStateOf(0) }
+    val tabs = listOf("איזהו מקומן", "רבינו תם", "ברכות")
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        "תפילה",
+                        fontFamily = BaHaYetzira,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזור")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            TabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.primary
+            ) {
+                tabs.forEachIndexed { index, title ->
+                    Tab(
+                        selected = selectedTab == index,
+                        onClick = { selectedTab = index },
+                        text = {
+                            Text(
+                                title,
+                                fontFamily = SblHebrew,
+                                fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    )
+                }
+            }
+
+            when (selectedTab) {
+                0 -> EizehuMekomanContent()
+                1 -> RabbeinuTamContent()
+                2 -> BrachotContent()
+            }
+        }
+    }
+}
+
+@Composable
+private fun EizehuMekomanContent() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp)
+    ) {
+        SectionTitle("איזהו מקומן של זבחים")
+
+        PrayerText(
+            "אֵיזֶהוּ מְקוֹמָן שֶׁל זְבָחִים. קָדְשֵׁי קָדָשִׁים שְׁחִיטָתָן בַּצָּפוֹן. " +
+            "פַּר וְשָׂעִיר שֶׁל יוֹם הַכִּפּוּרִים שְׁחִיטָתָן בַּצָּפוֹן, וְקִבּוּל דָּמָן בִּכְלִי שָׁרֵת בַּצָּפוֹן, " +
+            "וְדָמָן טָעוּן הַזָּיָה עַל בֵּין הַבַּדִּים, וְעַל הַפָּרֹכֶת, וְעַל מִזְבַּח הַזָּהָב. מַתָּנָה אַחַת מֵהֶן מְעַכֶּבֶת. " +
+            "שְׁיָרֵי הַדָּם הָיָה שׁוֹפֵךְ עַל יְסוֹד מַעֲרָבִי שֶׁל מִזְבֵּחַ הַחִיצוֹן. אִם לֹא נָתַן לֹא עִכֵּב."
+        )
+
+        PrayerText(
+            "פָּרִים הַנִּשְׂרָפִים וּשְׂעִירִים הַנִּשְׂרָפִים, שְׁחִיטָתָן בַּצָּפוֹן, וְקִבּוּל דָּמָן בִּכְלִי שָׁרֵת בַּצָּפוֹן, " +
+            "וְדָמָן טָעוּן הַזָּיָה עַל הַפָּרֹכֶת, וְעַל מִזְבַּח הַזָּהָב. מַתָּנָה אַחַת מֵהֶן מְעַכֶּבֶת. " +
+            "שְׁיָרֵי הַדָּם הָיָה שׁוֹפֵךְ עַל יְסוֹד מַעֲרָבִי שֶׁל מִזְבֵּחַ הַחִיצוֹן. אִם לֹא נָתַן לֹא עִכֵּב. " +
+            "אֵלוּ וָאֵלוּ נִשְׂרָפִים בְּבֵית הַדָּשֶׁן."
+        )
+
+        PrayerText(
+            "חַטֹּאות הַצִּבּוּר וְהַיָּחִיד, אֵלוּ הֵן חַטֹּאות הַצִּבּוּר: שְׂעִירֵי רָאשֵׁי חֳדָשִׁים וְשֶׁל מוֹעֲדוֹת, " +
+            "שְׁחִיטָתָן בַּצָּפוֹן, וְקִבּוּל דָּמָן בִּכְלִי שָׁרֵת בַּצָּפוֹן, " +
+            "וְדָמָן טָעוּן אַרְבַּע מַתָּנוֹת עַל אַרְבַּע קְרָנוֹת. כֵּיצַד, עָלָה בַכֶּבֶשׁ וּפָנָה לַסּוֹבֵב, " +
+            "וּבָא לוֹ לְקֶרֶן דְּרוֹמִית מִזְרָחִית, מִזְרָחִית צְפוֹנִית, צְפוֹנִית מַעֲרָבִית, מַעֲרָבִית דְּרוֹמִית. " +
+            "שְׁיָרֵי הַדָּם הָיָה שׁוֹפֵךְ עַל יְסוֹד דְּרוֹמִי. " +
+            "וְנֶאֱכָלִים לִפְנִים מִן הַקְּלָעִים, לְזִכְרֵי כְהֻנָּה, בְּכָל מַאֲכָל, לְיוֹם וָלַיְלָה עַד חֲצוֹת."
+        )
+
+        PrayerText(
+            "הָעוֹלָה קָדְשֵׁי קָדָשִׁים, שְׁחִיטָתָהּ בַּצָּפוֹן, וְקִבּוּל דָּמָהּ בִּכְלִי שָׁרֵת בַּצָּפוֹן, " +
+            "וְדָמָהּ טָעוּן שְׁתֵּי מַתָּנוֹת שֶׁהֵן אַרְבַּע. " +
+            "וּטְעוּנָה הֶפְשֵׁט וְנִתּוּחַ וְכָלִיל לָאִשׁ."
+        )
+
+        PrayerText(
+            "זִבְחֵי שַׁלְמֵי צִבּוּר וַאֲשָׁמוֹת, אֵלוּ הֵן אֲשָׁמוֹת: אֲשַׁם גְּזֵלוֹת, אֲשַׁם מְעִילוֹת, " +
+            "אֲשַׁם שִׁפְחָה חֲרוּפָה, אֲשַׁם נָזִיר, אֲשַׁם מְצוֹרָע, אֲשַׁם תָּלוּי. " +
+            "שְׁחִיטָתָן בַּצָּפוֹן, וְקִבּוּל דָּמָן בִּכְלִי שָׁרֵת בַּצָּפוֹן, " +
+            "וְדָמָן טָעוּן שְׁתֵּי מַתָּנוֹת שֶׁהֵן אַרְבַּע. " +
+            "וְנֶאֱכָלִים לִפְנִים מִן הַקְּלָעִים, לְזִכְרֵי כְהֻנָּה, בְּכָל מַאֲכָל, לְיוֹם וָלַיְלָה עַד חֲצוֹת."
+        )
+
+        PrayerText(
+            "הַתּוֹדָה וְאֵיל נָזִיר קָדָשִׁים קַלִּים, שְׁחִיטָתָן בְּכָל מָקוֹם בָּעֲזָרָה, " +
+            "וְדָמָן טָעוּן שְׁתֵּי מַתָּנוֹת שֶׁהֵן אַרְבַּע. " +
+            "וְנֶאֱכָלִין בְּכָל הָעִיר, לְכָל אָדָם, בְּכָל מַאֲכָל, לְיוֹם וָלַיְלָה עַד חֲצוֹת. " +
+            "הַמּוּרָם מֵהֶם כַּיּוֹצֵא בָהֶם, אֶלָּא שֶׁהַמּוּרָם נֶאֱכָל לַכֹּהֲנִים, לִנְשֵׁיהֶם, וְלִבְנֵיהֶם, וּלְעַבְדֵיהֶם."
+        )
+
+        PrayerText(
+            "שְׁלָמִים קָדָשִׁים קַלִּים, שְׁחִיטָתָן בְּכָל מָקוֹם בָּעֲזָרָה, " +
+            "וְדָמָן טָעוּן שְׁתֵּי מַתָּנוֹת שֶׁהֵן אַרְבַּע. " +
+            "וְנֶאֱכָלִין בְּכָל הָעִיר, לְכָל אָדָם, בְּכָל מַאֲכָל, לִשְׁנֵי יָמִים וְלַיְלָה אֶחָד. " +
+            "הַמּוּרָם מֵהֶם כַּיּוֹצֵא בָהֶם, אֶלָּא שֶׁהַמּוּרָם נֶאֱכָל לַכֹּהֲנִים, לִנְשֵׁיהֶם, וְלִבְנֵיהֶם, וּלְעַבְדֵיהֶם."
+        )
+
+        PrayerText(
+            "הַבְּכוֹר וְהַמַּעֲשֵׂר וְהַפֶּסַח קָדָשִׁים קַלִּים, שְׁחִיטָתָן בְּכָל מָקוֹם בָּעֲזָרָה, " +
+            "וְדָמָן טָעוּן מַתָּנָה אַחַת, וּבִלְבַד שֶׁיִּתֵּן כְּנֶגֶד הַיְסוֹד. " +
+            "שִׁנָּה בַאֲכִילָתָן. הַבְּכוֹר נֶאֱכָל לַכֹּהֲנִים, וְהַמַּעֲשֵׂר לְכָל אָדָם. " +
+            "וְנֶאֱכָלִין בְּכָל הָעִיר, בְּכָל מַאֲכָל, לִשְׁנֵי יָמִים וְלַיְלָה אֶחָד. " +
+            "הַפֶּסַח אֵינוֹ נֶאֱכָל אֶלָּא בַלַּיְלָה, וְאֵינוֹ נֶאֱכָל אֶלָּא עַד חֲצוֹת, " +
+            "וְאֵינוֹ נֶאֱכָל אֶלָּא לִמְנוּיָיו, וְאֵינוֹ נֶאֱכָל אֶלָּא צָלִי."
+        )
+
+        Spacer(Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun RabbeinuTamContent() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp)
+    ) {
+        SectionTitle("שקיעת רבינו תם")
+
+        PrayerText(
+            "לדעת רבינו תם, זמן צאת הכוכבים הוא 72 דקות לאחר השקיעה הנראית. " +
+            "כלומר, בין השקיעה לצאת הכוכבים עוברות 72 דקות (שעות זמניות), " +
+            "ובתוך זמן זה נמשך זמן \"בין השמשות\"."
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    "עיקרי ההלכה:",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    fontFamily = SblHebrew,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.height(8.dp))
+                BulletPoint("מוצאי שבת — יש להמתין עד 72 דקות אחרי השקיעה")
+                BulletPoint("הדלקת נרות — לפי שעון השקיעה הרגילה")
+                BulletPoint("בתענית — הצום נמשך עד צאת ר\"ת")
+                BulletPoint("קריאת שמע של ערבית — לכתחילה אחרי צאת ר\"ת")
+            }
+        }
+
+        Spacer(Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun BrachotContent() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp)
+    ) {
+        SectionTitle("ברכות השחר")
+
+        PrayerText(
+            "בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, אֲשֶׁר נָתַן לַשֶּׂכְוִי בִינָה לְהַבְחִין בֵּין יוֹם וּבֵין לָיְלָה:"
+        )
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, שֶׁעָשַׂנִי יִשְׂרָאֵל:")
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, שֶׁעָשַׂנִי בֶּן חוֹרִין:")
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, פּוֹקֵחַ עִוְרִים:")
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, מַלְבִּישׁ עֲרֻמִּים:")
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, מַתִּיר אֲסוּרִים:")
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, זוֹקֵף כְּפוּפִים:")
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, רוֹקַע הָאָרֶץ עַל הַמָּיִם:")
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, שֶׁעָשָׂה לִי כָּל צָרְכִּי:")
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, הַמֵּכִין מִצְעֲדֵי גָבֶר:")
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, אוֹזֵר יִשְׂרָאֵל בִּגְבוּרָה:")
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, עוֹטֵר יִשְׂרָאֵל בְּתִפְאָרָה:")
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, הַנּוֹתֵן לַיָּעֵף כֹּחַ:")
+
+        Spacer(Modifier.height(20.dp))
+        SectionTitle("ברכות התורה")
+
+        PrayerText(
+            "בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, אֲשֶׁר קִדְּשָׁנוּ בְּמִצְוֹתָיו " +
+            "וְצִוָּנוּ לַעֲסוֹק בְּדִבְרֵי תוֹרָה:"
+        )
+        PrayerText(
+            "וְהַעֲרֶב נָא יְיָ אֱלֹהֵינוּ אֶת דִּבְרֵי תוֹרָתְךָ בְּפִינוּ וּבְפִיפִיּוֹת עַמְּךָ בֵּית יִשְׂרָאֵל. " +
+            "וְנִהְיֶה אֲנַחְנוּ וְצֶאֱצָאֵינוּ וְצֶאֱצָאֵי עַמְּךָ בֵּית יִשְׂרָאֵל " +
+            "כֻּלָּנוּ יוֹדְעֵי שְׁמֶךָ וְלוֹמְדֵי תוֹרָתֶךָ לִשְׁמָהּ. בָּרוּךְ אַתָּה יְיָ, הַמְלַמֵּד תּוֹרָה לְעַמּוֹ יִשְׂרָאֵל:"
+        )
+        PrayerText(
+            "בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, אֲשֶׁר בָּחַר בָּנוּ מִכָּל הָעַמִּים, " +
+            "וְנָתַן לָנוּ אֶת תּוֹרָתוֹ. בָּרוּךְ אַתָּה יְיָ, נוֹתֵן הַתּוֹרָה:"
+        )
+
+        Spacer(Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text = text,
+        fontSize = 22.sp,
+        fontWeight = FontWeight.Bold,
+        fontFamily = BaHaYetzira,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(bottom = 12.dp)
+    )
+}
+
+@Composable
+private fun PrayerText(text: String) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(1.dp)
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(14.dp),
+            fontSize = 18.sp,
+            lineHeight = 30.sp,
+            fontFamily = SblHebrew,
+            color = MaterialTheme.colorScheme.onSurface,
+            style = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl)
+        )
+    }
+}
+
+@Composable
+private fun BulletPoint(text: String) {
+    Row(modifier = Modifier.padding(vertical = 3.dp)) {
+        Text("•", fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = text,
+            fontSize = 14.sp,
+            fontFamily = SblHebrew,
+            color = MaterialTheme.colorScheme.onSurface,
+            style = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl)
+        )
+    }
+}

@@ -2,11 +2,68 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { chatService } from '../services/chatService';
 import api from '@/utils/api';
-import { 
+import {
   Search, MoreVertical, Plus, X,
-  CheckCheck, Loader2, FileText, 
-  Paperclip, Send, Image as ImageIcon, UserPlus 
+  CheckCheck, Loader2, FileText,
+  Paperclip, Send, Image as ImageIcon, UserPlus,
+  Wifi, WifiOff, RefreshCw
 } from 'lucide-react';
+
+// === באנר סטטוס WhatsApp + QR ===
+function WhatsAppStatusBanner() {
+  const [showQR, setShowQR] = useState(false);
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['whatsapp-qr'],
+    queryFn: () => api.get('/whatsapp/qr').then(r => r.data),
+    refetchInterval: 5000,
+    retry: false,
+  });
+
+  const isConnected = data?.status === 'connected';
+  const hasQR = !!data?.qr;
+
+  if (isLoading) return null;
+  if (isError) return null;
+
+  return (
+    <>
+      <div className={`flex items-center justify-between px-4 py-2 text-sm border-b shrink-0 ${isConnected ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
+        <div className="flex items-center gap-2">
+          {isConnected
+            ? <><Wifi size={16} className="text-green-600" /><span className="text-green-700 font-medium">WhatsApp מחובר</span></>
+            : <><WifiOff size={16} className="text-amber-600" /><span className="text-amber-700 font-medium">WhatsApp לא מחובר</span></>
+          }
+        </div>
+
+        {!isConnected && (
+          <button
+            onClick={() => setShowQR(v => !v)}
+            className="flex items-center gap-1 text-amber-700 hover:text-amber-900 font-medium"
+          >
+            <RefreshCw size={14} />
+            {showQR ? 'הסתר QR' : 'הצג QR לחיבור'}
+          </button>
+        )}
+      </div>
+
+      {showQR && !isConnected && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center" onClick={() => setShowQR(false)}>
+          <div className="bg-white rounded-xl shadow-2xl p-6 flex flex-col items-center gap-3 border border-amber-200" onClick={e => e.stopPropagation()}>
+            <h3 className="font-bold text-gray-800 text-lg">סרוק עם WhatsApp</h3>
+            <p className="text-sm text-gray-500 text-center">פתח WhatsApp ← הגדרות ← מכשירים מקושרים ← קשר מכשיר</p>
+            {hasQR
+              ? <img src={data.qr} alt="WhatsApp QR" className="w-64 h-64 rounded-lg" />
+              : <div className="w-64 h-64 flex items-center justify-center bg-gray-100 rounded-lg"><Loader2 className="animate-spin text-amber-500" size={32} /></div>
+            }
+            <p className="text-xs text-gray-400">ה-QR מתרענן אוטומטית כל 5 שניות</p>
+            <button onClick={() => setShowQR(false)} className="text-gray-500 hover:text-gray-700 text-sm">סגור</button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 // --- רכיבים גרפיים (משולשים לבועות) ---
 // ✅ תיקון: ה-paths נוקו ממספרים מדעיים שגרמו לקריסה
@@ -66,7 +123,9 @@ export default function WhatsAppPage() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-[#e9edef] border-t border-gray-300 relative">
+    <div className="flex flex-col h-[calc(100vh-64px)] overflow-hidden bg-[#e9edef] border-t border-gray-300 relative">
+      <WhatsAppStatusBanner />
+      <div className="flex flex-1 overflow-hidden relative">
       
       {/* === מודל הוספת איש קשר === */}
       {isNewContactOpen && (
@@ -170,6 +229,7 @@ export default function WhatsAppPage() {
                   </p>
               </div>
           )}
+      </div>
       </div>
     </div>
   );

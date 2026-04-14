@@ -8,6 +8,7 @@ import makeWASocket, {
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import qrcode from 'qrcode-terminal';
+import QRCode from 'qrcode';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -27,6 +28,7 @@ const AUTH_FOLDER = path.join(__dirname, '../auth_info_baileys');
 export let sock = null;
 
 let connectionState = 'disconnected'; // 'connected' | 'connecting' | 'disconnected'
+let currentQRDataURL = null; // QR code כ-data URL לתצוגה בממשק
 let reconnectLock = false;
 let heartbeatInterval = null;
 let lastEventTimestamp = Date.now();
@@ -114,6 +116,9 @@ export const getConnectionStatus = () => ({
     reconnectAttempts,
     lastActivity: new Date(lastEventTimestamp).toISOString()
 });
+
+/** מחזיר את ה-QR הנוכחי כ-data URL (null אם מחובר או לא זמין) */
+export const getQRDataURL = () => currentQRDataURL;
 
 // ============================================================
 // ===  MESSAGE CONTENT EXTRACTION  ===
@@ -401,11 +406,15 @@ export const connectToWhatsApp = async () => {
             if (qr) {
                 qrcode.generate(qr, { small: true });
                 console.log('📸 סרוק את ה-QR Code');
+                QRCode.toDataURL(qr, { width: 300, margin: 2 })
+                    .then(dataURL => { currentQRDataURL = dataURL; })
+                    .catch(() => {});
             }
 
             if (connection === 'open') {
                 console.log('✅ WhatsApp connected successfully!');
                 connectionState = 'connected';
+                currentQRDataURL = null;
                 reconnectAttempts = 0;
                 startHeartbeat();
             }

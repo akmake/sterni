@@ -47,6 +47,7 @@ import financeAnalyticsRoutes from './routes/financeAnalyticsRoutes.js';
 import financeDashboardRoutes from './routes/financeDashboardRoutes.js';
 import financeImportRoutes from './routes/financeImportRoutes.js';
 import { setupSocketIO } from './services/socketService.js';
+import whatsappRoutes from './routes/whatsappRoutes.js';
 
 import softwareRoutes from './routes/softwareRoutes.js';
 
@@ -179,6 +180,7 @@ app.use('/api/finance/dashboard', requireAuth, financeDashboardRoutes);
 app.use('/api/finance/import', requireAuth, financeImportRoutes);
 app.use('/api/software', requireAuth, softwareRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/hotel-orders', hotelOrderRoutes);
 app.use('/api/hotel-data', hotelZiporiDataRoutes);
 

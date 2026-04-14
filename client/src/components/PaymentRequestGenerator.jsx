@@ -390,6 +390,47 @@ const PaymentRequestGenerator = ({ groupId = null, onSave = null, paymentRequest
       setContextMenu(null);
   };
 
+  const getLatestBlocks = () => {
+    return blocks.map(block => {
+      const el = blockRefs.current[block.id];
+      if (!el) return block;
+
+      if (block.type === 'text') {
+        const editableDiv = el.querySelector('[contenteditable]');
+        if (editableDiv) {
+          return { ...block, content: editableDiv.innerHTML };
+        }
+      } else if (block.type === 'table') {
+        const titleInput = el.querySelector('input');
+        const title = titleInput ? titleInput.value : block.title;
+
+        const headers = block.headers.map(h => ({ ...h }));
+        const headerEls = el.querySelectorAll('thead [contenteditable]');
+        headerEls.forEach((headerEl, idx) => {
+          if (idx < headers.length) {
+            headers[idx] = { ...headers[idx], title: headerEl.innerText };
+          }
+        });
+
+        const rows = block.rows.map(r => [...r]);
+        const rowEls = el.querySelectorAll('tbody tr');
+        rowEls.forEach((rowEl, rIdx) => {
+          if (rIdx < rows.length) {
+            const cellEls = rowEl.querySelectorAll('[contenteditable]');
+            cellEls.forEach((cellEl, cIdx) => {
+              if (cIdx < rows[rIdx].length) {
+                rows[rIdx][cIdx] = cellEl.innerText;
+              }
+            });
+          }
+        });
+
+        return { ...block, title, headers, rows };
+      }
+      return block;
+    });
+  };
+
   const tableActions = {
       updateCell: (blockId, rIdx, cIdx, val) => {
           const block = blocks.find(b => b.id === blockId);
@@ -504,13 +545,14 @@ const PaymentRequestGenerator = ({ groupId = null, onSave = null, paymentRequest
   };
 
   const handleSave = async (showToast = true) => {
+      const latestBlocks = getLatestBlocks();
       setIsSavingToServer(true);
       try {
         if (actualGroupId && group) {
           // שמירה לקבוצה + עדכון billing profile וטעינת תשלום
-          await updateGroup(group._id, { 
-            paymentRequest: { 
-              blocks, 
+          await updateGroup(group._id, {
+            paymentRequest: {
+              blocks: latestBlocks,
               orderNumber, 
               headerDetails, 
               totalAmount,
@@ -543,7 +585,7 @@ const PaymentRequestGenerator = ({ groupId = null, onSave = null, paymentRequest
           // עדכון דרישת תשלום קיימת
           const htmlBody = containerRef.current?.innerHTML || '';
           await api.patch(`/payment-requests/${paymentRequestId}`, {
-            content: blocks,
+            content: latestBlocks,
             htmlBody,
             name: headerDetails.groupName,
             clientName: headerDetails.contactName,
@@ -560,7 +602,7 @@ const PaymentRequestGenerator = ({ groupId = null, onSave = null, paymentRequest
           // שמירת דרישת תשלום חדשה
           const htmlBody = containerRef.current?.innerHTML || '';
           const response = await api.post('/payment-requests', {
-            content: blocks,
+            content: latestBlocks,
             htmlBody,
             name: headerDetails.groupName || `דרישה - ${new Date().toLocaleDateString('he-IL')}`,
             clientName: headerDetails.contactName,

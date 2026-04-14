@@ -86,6 +86,9 @@ dependencies {
     // KosherJava (Hebrew calendar + zmanim)
     implementation(libs.kosherjava)
 
+    // PDFBox Android (PDF text extraction)
+    implementation(libs.pdfbox.android)
+
     debugImplementation(libs.androidx.ui.tooling)
 }
 

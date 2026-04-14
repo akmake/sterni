@@ -13,12 +13,10 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.*
@@ -26,7 +24,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -43,7 +40,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sterni.dailystudy.data.model.Study
 import com.sterni.dailystudy.tracker.StudyTracker
 import com.sterni.dailystudy.ui.theme.BaHaYetzira
+import com.sterni.dailystudy.ui.theme.Ink
+import com.sterni.dailystudy.ui.theme.Muted
+import com.sterni.dailystudy.ui.theme.Primary
 import com.sterni.dailystudy.ui.theme.SblHebrew
+
+private val HomeBg  = Color(0xFFFDFBF7)
+private val CardBg  = Color.White
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,100 +68,150 @@ fun HomeScreen(
     var todayStatus by remember { mutableStateOf(StudyTracker.getTodayStatus(context)) }
 
     Scaffold(
+        containerColor = HomeBg,
         bottomBar = {
             NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 8.dp
+                containerColor = CardBg,
+                tonalElevation = 0.dp,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
             ) {
                 NavigationBarItem(
                     selected = true,
                     onClick = {},
-                    icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                    label = { Text("בית", fontWeight = FontWeight.Bold) },
+                    icon = { Icon(Icons.Default.Home, contentDescription = null, modifier = Modifier.size(22.dp)) },
+                    label = { Text("בית", fontSize = 11.sp) },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = MaterialTheme.colorScheme.primary,
-                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                        indicatorColor = MaterialTheme.colorScheme.primaryContainer
+                        selectedIconColor   = Primary,
+                        selectedTextColor   = Primary,
+                        indicatorColor      = Primary.copy(alpha = 0.1f),
+                        unselectedIconColor = Muted,
+                        unselectedTextColor = Muted
                     )
                 )
                 NavigationBarItem(
                     selected = false,
                     onClick = onZmanimClick,
-                    icon = { Icon(Icons.Default.AccessTime, contentDescription = null) },
-                    label = { Text("זמנים") },
+                    icon = { Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(22.dp)) },
+                    label = { Text("זמנים", fontSize = 11.sp) },
                     colors = NavigationBarItemDefaults.colors(
-                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        selectedIconColor   = Primary,
+                        selectedTextColor   = Primary,
+                        indicatorColor      = Primary.copy(alpha = 0.1f),
+                        unselectedIconColor = Muted,
+                        unselectedTextColor = Muted
                     )
                 )
                 NavigationBarItem(
                     selected = false,
                     onClick = onToolsClick,
-                    icon = { Icon(Icons.Default.Build, contentDescription = null) },
-                    label = { Text("כלים") },
+                    icon = { Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(22.dp)) },
+                    label = { Text("כלים", fontSize = 11.sp) },
                     colors = NavigationBarItemDefaults.colors(
-                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        selectedIconColor   = Primary,
+                        selectedTextColor   = Primary,
+                        indicatorColor      = Primary.copy(alpha = 0.1f),
+                        unselectedIconColor = Muted,
+                        unselectedTextColor = Muted
                     )
                 )
                 NavigationBarItem(
                     selected = false,
                     onClick = onCalendarClick,
-                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
-                    label = { Text("לוח") },
+                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(22.dp)) },
+                    label = { Text("לוח", fontSize = 11.sp) },
                     colors = NavigationBarItemDefaults.colors(
-                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        selectedIconColor   = Primary,
+                        selectedTextColor   = Primary,
+                        indicatorColor      = Primary.copy(alpha = 0.1f),
+                        unselectedIconColor = Muted,
+                        unselectedTextColor = Muted
                     )
                 )
             }
-        },
-        containerColor = MaterialTheme.colorScheme.background
+        }
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             when {
                 uiState.isLoading -> CircularProgressIndicator(
                     modifier = Modifier.align(Alignment.Center),
-                    color = MaterialTheme.colorScheme.primary
+                    color = Primary,
+                    strokeWidth = 2.dp
                 )
                 uiState.error != null -> ErrorState(
-                    message = uiState.error!!,
-                    onRetry = { viewModel.loadDailyStudy() },
-                    modifier = Modifier.align(Alignment.Center)
+                    message   = uiState.error!!,
+                    onRetry   = { viewModel.loadDailyStudy() },
+                    modifier  = Modifier.align(Alignment.Center)
                 )
                 else -> {
-                    val orderedKeys = listOf("chumash", "rambam", "rambamOne", "tanya", "seferHamitzvot", "shnayimMikra", "tehillim")
+                    val orderedKeys    = listOf("chumash", "rambam", "rambamOne", "tanya", "shnayimMikra", "tehillim")
                     val orderedStudies = orderedKeys.mapNotNull { key -> uiState.studies[key]?.let { key to it } }
-                    LazyColumn(contentPadding = PaddingValues(bottom = 32.dp), modifier = Modifier.fillMaxSize()) {
+
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 24.dp)
+                    ) {
+                        // ── Header ───────────────────────────────────────────
                         item {
-                            HomeHeroSection(
-                                hebrewDate = uiState.hebrewDate,
+                            HomeHeader(
+                                hebrewDate      = uiState.hebrewDate,
                                 onSettingsClick = onSettingsClick,
-                                onRefreshClick = {
+                                onRefreshClick  = {
                                     viewModel.loadDailyStudy()
                                     todayStatus = StudyTracker.getTodayStatus(context)
                                 }
                             )
                         }
+
+                        // ── Quick access ─────────────────────────────────────
+                        item {
+                            QuickAccessRow(
+                                onMamaarimClick = onMamaarimClick,
+                                onOmerClick     = onOmerClick,
+                                onToolsClick    = onToolsClick,
+                                onTefilaClick   = onTefilaClick,
+                                modifier        = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                        }
+
+                        // ── Progress ─────────────────────────────────────────
                         if (todayStatus.isNotEmpty()) {
                             item {
-                                DailyProgressCard(todayStatus = todayStatus)
-                                Spacer(modifier = Modifier.height(8.dp))
+                                DailyProgressCard(
+                                    todayStatus = todayStatus,
+                                    modifier    = Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp)
+                                )
                             }
                         }
+
+                        // ── Section header ───────────────────────────────────
                         item {
-                            QuickAccessRow(onTefilaClick = onTefilaClick, onOmerClick = onOmerClick, onToolsClick = onToolsClick)
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text     = "לימוד היום",
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color    = Muted,
+                                fontFamily = SblHebrew
+                            )
                         }
+
+                        // ── Study cards ──────────────────────────────────────
                         itemsIndexed(orderedStudies, key = { _, pair -> pair.first }) { index, (key, study) ->
                             AnimatedVisibility(
                                 visible = true,
-                                enter = slideInVertically(initialOffsetY = { 50 + (index * 20) }, animationSpec = tween(400)) + fadeIn(animationSpec = tween(400))
+                                enter = slideInVertically(
+                                    initialOffsetY = { 40 + index * 15 },
+                                    animationSpec  = tween(350, delayMillis = index * 40)
+                                ) + fadeIn(animationSpec = tween(350, delayMillis = index * 40))
                             ) {
                                 StudyCard(
-                                    study = study,
-                                    modifier = Modifier.padding(horizontal = 16.dp).padding(vertical = 8.dp),
-                                    onClick = {
+                                    studyKey = key,
+                                    study    = study,
+                                    modifier = Modifier
+                                        .padding(horizontal = 16.dp)
+                                        .padding(bottom = 10.dp),
+                                    onClick  = {
                                         if (study.available == true) {
                                             onStudyClick(key, uiState.date, study.title ?: "", study.label ?: "")
                                         }
@@ -173,239 +226,401 @@ fun HomeScreen(
     }
 }
 
+// ── Header ──────────────────────────────────────────────────────────────────
+
 @Composable
-fun HomeHeroSection(
-    hebrewDate: String,
+fun HomeHeader(
+    hebrewDate:      String,
     onSettingsClick: () -> Unit,
-    onRefreshClick: () -> Unit
+    onRefreshClick:  () -> Unit
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
-            .background(Brush.verticalGradient(colors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary.copy(alpha = 0.85f))))
-            .padding(bottom = 24.dp)
-    ) {
+    Surface(color = CardBg, shadowElevation = 0.dp) {
         Column {
             Spacer(Modifier.statusBarsPadding())
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 18.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+                verticalAlignment     = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Column {
                     Text(
-                        text = "לימוד יומי",
-                        fontSize = 34.sp,
+                        text       = "לימוד יומי",
+                        fontSize   = 28.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        fontFamily = BaHaYetzira
+                        fontFamily = BaHaYetzira,
+                        color      = Primary
                     )
-                    Spacer(Modifier.height(4.dp))
                     if (hebrewDate.isNotEmpty()) {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
-                        ) {
-                            Text(
-                                text = hebrewDate,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                                fontSize = 16.sp,
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                fontFamily = SblHebrew,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text       = hebrewDate,
+                            fontSize   = 15.sp,
+                            fontFamily = SblHebrew,
+                            color      = Muted
+                        )
                     }
                 }
-                Row {
+
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     IconButton(
-                        onClick = onRefreshClick,
-                        modifier = Modifier.clip(CircleShape).background(Color.White.copy(alpha = 0.15f))
+                        onClick  = onRefreshClick,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(Primary.copy(alpha = 0.07f))
                     ) {
-                        Icon(Icons.Rounded.Refresh, contentDescription = "רענן", tint = MaterialTheme.colorScheme.onPrimary)
+                        Icon(
+                            imageVector        = Icons.Rounded.Refresh,
+                            contentDescription = "רענן",
+                            tint               = Primary,
+                            modifier           = Modifier.size(20.dp)
+                        )
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
                     IconButton(
-                        onClick = onSettingsClick,
-                        modifier = Modifier.clip(CircleShape).background(Color.White.copy(alpha = 0.15f))
+                        onClick  = onSettingsClick,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(Primary.copy(alpha = 0.07f))
                     ) {
-                        Icon(Icons.Rounded.Settings, contentDescription = "הגדרות", tint = MaterialTheme.colorScheme.onPrimary)
+                        Icon(
+                            imageVector        = Icons.Rounded.Settings,
+                            contentDescription = "הגדרות",
+                            tint               = Primary,
+                            modifier           = Modifier.size(20.dp)
+                        )
                     }
                 }
             }
+
+            HorizontalDivider(color = Color(0xFFE4E4E7), thickness = 0.5.dp)
         }
     }
 }
 
-@Composable
-private fun DailyProgressCard(todayStatus: List<Pair<String, Boolean>>) {
-    val done = todayStatus.count { it.second }
-    val total = todayStatus.size
-    val progress = if (total > 0) done.toFloat() / total else 0f
-    val allDone = done == total && total > 0
+// ── Quick Access ─────────────────────────────────────────────────────────────
 
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).offset(y = (-16).dp),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = if (allDone) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+@Composable
+private fun QuickAccessRow(
+    onMamaarimClick: () -> Unit,
+    onOmerClick:     () -> Unit,
+    onToolsClick:    () -> Unit,
+    onTefilaClick:   () -> Unit,
+    modifier:        Modifier = Modifier
+) {
+    Row(
+        modifier              = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Row(modifier = Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(72.dp), contentAlignment = Alignment.Center) {
-                val ringColor = if (allDone) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
-                val trackColor = MaterialTheme.colorScheme.surfaceVariant
+        QuickChip(
+            label    = "מאמרים",
+            icon     = Icons.AutoMirrored.Filled.List,
+            onClick  = onMamaarimClick,
+            modifier = Modifier.weight(1f)
+        )
+        QuickChip(
+            label    = "ספירה",
+            icon     = Icons.Default.DateRange,
+            onClick  = onOmerClick,
+            modifier = Modifier.weight(1f)
+        )
+        QuickChip(
+            label    = "כלים",
+            icon     = Icons.Default.Tune,
+            onClick  = onToolsClick,
+            modifier = Modifier.weight(1f)
+        )
+        QuickChip(
+            label    = "תפילה",
+            icon     = Icons.AutoMirrored.Filled.MenuBook,
+            onClick  = onTefilaClick,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun QuickChip(
+    label:    String,
+    icon:     ImageVector,
+    onClick:  () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier        = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick),
+        shape           = RoundedCornerShape(14.dp),
+        color           = Primary.copy(alpha = 0.07f),
+        shadowElevation = 0.dp
+    ) {
+        Column(
+            modifier            = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(
+                modifier         = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Primary.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = Primary, modifier = Modifier.size(18.dp))
+            }
+            Text(
+                text       = label,
+                fontSize   = 12.sp,
+                color      = Primary,
+                fontFamily = SblHebrew
+            )
+        }
+    }
+}
+
+// ── Progress Card ────────────────────────────────────────────────────────────
+
+@Composable
+private fun DailyProgressCard(
+    todayStatus: List<Pair<String, Boolean>>,
+    modifier:    Modifier = Modifier
+) {
+    val done     = todayStatus.count { it.second }
+    val total    = todayStatus.size
+    val progress = if (total > 0) done.toFloat() / total else 0f
+    val allDone  = done == total && total > 0
+    val ringColor = if (allDone) Color(0xFF059669) else Primary
+
+    Surface(
+        modifier        = modifier.fillMaxWidth(),
+        shape           = RoundedCornerShape(18.dp),
+        color           = CardBg,
+        shadowElevation = 1.dp
+    ) {
+        Row(
+            modifier          = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(modifier = Modifier.size(56.dp), contentAlignment = Alignment.Center) {
+                val trackColor = Color(0xFFE4E4E7)
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    val stroke = 8.dp.toPx()
+                    val stroke = 5.dp.toPx()
                     drawArc(color = trackColor, startAngle = -90f, sweepAngle = 360f, useCenter = false, style = Stroke(width = stroke))
                     if (progress > 0f) {
                         drawArc(color = ringColor, startAngle = -90f, sweepAngle = 360f * progress, useCenter = false, style = Stroke(width = stroke, cap = StrokeCap.Round))
                     }
                 }
-                Text(text = "$done/$total", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = ringColor)
-            }
-            Spacer(Modifier.width(20.dp))
-            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (allDone) "כל הכבוד! סיימת הכל" else "ההתקדמות שלך להיום",
-                    fontSize = 18.sp,
+                    text       = "$done/$total",
+                    fontSize   = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (allDone) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
+                    color      = ringColor
                 )
-                Spacer(Modifier.height(4.dp))
+            }
+
+            Spacer(Modifier.width(16.dp))
+
+            Column {
                 Text(
-                    text = if (allDone) "עברת על כל $total הלימודים היום!" else "נשארו לך עוד ${total-done} לימודים",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text       = if (allDone) "כל הכבוד! סיימת הכל ✓" else "ההתקדמות שלך להיום",
+                    fontSize   = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color      = if (allDone) ringColor else Ink,
+                    fontFamily = SblHebrew
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text       = if (allDone) "עברת על כל $total הלימודים" else "נשארו עוד ${total - done} לימודים",
+                    fontSize   = 13.sp,
+                    color      = Muted,
+                    fontFamily = SblHebrew
                 )
             }
         }
     }
 }
 
-@Composable
-private fun StudyCard(study: Study, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    val available = study.available == true
-    val accentColor = when (study.accent) {
-        "blue" -> Color(0xFF0284C7)
-        "emerald" -> Color(0xFF059669)
-        "violet" -> Color(0xFF7C3AED)
-        "amber" -> Color(0xFFD97706)
-        else -> MaterialTheme.colorScheme.primary
-    }
-    val cardAccent = if (available) accentColor else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+// ── Study Card ───────────────────────────────────────────────────────────────
 
-    Card(
-        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).clickable(enabled = available, onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (available) 3.dp else 1.dp)
+@Composable
+private fun StudyCard(
+    studyKey: String,
+    study:    Study,
+    modifier: Modifier = Modifier,
+    onClick:  () -> Unit
+) {
+    val available    = study.available == true
+    val accentColor  = studyAccentColor(study.accent)
+    val icon         = studyIcon(studyKey)
+
+    Surface(
+        modifier        = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(enabled = available, onClick = onClick),
+        shape           = RoundedCornerShape(16.dp),
+        color           = CardBg,
+        shadowElevation = if (available) 1.5.dp else 0.5.dp
     ) {
-        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            Box(modifier = Modifier.width(6.dp).fillMaxHeight().background(cardAccent))
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = study.title ?: "",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (available) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            fontFamily = SblHebrew
-                        )
-                        if (!study.subtitle.isNullOrEmpty()) {
-                            Spacer(Modifier.height(2.dp))
-                            Text(text = study.subtitle, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontFamily = SblHebrew)
-                        }
-                    }
+        Row(
+            modifier          = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Icon box
+            Box(
+                modifier         = Modifier
+                    .size(46.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(
+                        if (available) accentColor.copy(alpha = 0.10f)
+                        else           Color(0xFFF4F4F5)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector        = icon,
+                    contentDescription = null,
+                    tint               = if (available) accentColor else Muted,
+                    modifier           = Modifier.size(22.dp)
+                )
+            }
+
+            Spacer(Modifier.width(14.dp))
+
+            // Text content
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment    = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier             = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text       = study.title ?: "",
+                        fontSize   = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color      = if (available) Ink else Muted,
+                        fontFamily = SblHebrew,
+                        modifier   = Modifier.weight(1f, fill = false)
+                    )
                     if (available && !study.label.isNullOrEmpty()) {
-                        Spacer(Modifier.width(12.dp))
-                        Surface(shape = RoundedCornerShape(8.dp), color = cardAccent.copy(alpha = 0.1f)) {
+                        Spacer(Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = accentColor.copy(alpha = 0.09f)
+                        ) {
                             Text(
-                                text = study.label,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = cardAccent,
-                                textAlign = TextAlign.End,
+                                text       = study.label,
+                                modifier   = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                fontSize   = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color      = accentColor,
                                 fontFamily = SblHebrew,
-                                style = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl)
+                                style      = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl)
                             )
                         }
                     }
                 }
-                if (available && !study.preview.isNullOrEmpty()) {
-                    Spacer(Modifier.height(10.dp))
+
+                if (!study.subtitle.isNullOrEmpty()) {
+                    Spacer(Modifier.height(2.dp))
                     Text(
-                        text = study.preview,
-                        fontSize = 14.sp,
-                        lineHeight = 22.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        fontFamily = SblHebrew,
-                        style = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl)
+                        text       = study.subtitle,
+                        fontSize   = 13.sp,
+                        color      = Muted,
+                        fontFamily = SblHebrew
                     )
                 }
-                if (!available) {
+
+                if (available && !study.preview.isNullOrEmpty()) {
                     Spacer(Modifier.height(6.dp))
-                    Text(text = "לא נמצאו נתונים להיום", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                    Text(
+                        text       = study.preview,
+                        fontSize   = 13.sp,
+                        lineHeight = 20.sp,
+                        color      = Muted.copy(alpha = 0.8f),
+                        maxLines   = 2,
+                        overflow   = TextOverflow.Ellipsis,
+                        fontFamily = SblHebrew,
+                        style      = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl)
+                    )
                 }
+
+                if (!available) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text       = "לא נמצאו נתונים להיום",
+                        fontSize   = 12.sp,
+                        color      = Muted.copy(alpha = 0.55f),
+                        fontFamily = SblHebrew
+                    )
+                }
+            }
+
+            if (available) {
+                Spacer(Modifier.width(8.dp))
+                Icon(
+                    imageVector        = Icons.Default.ChevronLeft,
+                    contentDescription = null,
+                    tint               = Muted.copy(alpha = 0.4f),
+                    modifier           = Modifier.size(20.dp)
+                )
             }
         }
     }
 }
 
-@Composable
-private fun QuickAccessRow(onTefilaClick: () -> Unit, onOmerClick: () -> Unit, onToolsClick: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        QuickAccessButton(
-            label = "תפילה",
-            icon = Icons.AutoMirrored.Filled.MenuBook,
-            color = Color(0xFF0284C7),
-            onClick = onTefilaClick,
-            modifier = Modifier.weight(1f)
-        )
-        QuickAccessButton(
-            label = "עומר",
-            icon = Icons.Default.DateRange,
-            color = Color(0xFF7C3AED),
-            onClick = onOmerClick,
-            modifier = Modifier.weight(1f)
-        )
-        QuickAccessButton(
-            label = "כלים",
-            icon = Icons.Default.Build,
-            color = Color(0xFF059669),
-            onClick = onToolsClick,
-            modifier = Modifier.weight(1f)
-        )
-    }
-}
-
-@Composable
-private fun QuickAccessButton(label: String, icon: ImageVector, color: Color, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.08f)),
-        elevation = CardDefaults.cardElevation(1.dp)
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(26.dp))
-            Spacer(Modifier.height(6.dp))
-            Text(text = label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = color, fontFamily = SblHebrew)
-        }
-    }
-}
+// ── Error State ───────────────────────────────────────────────────────────────
 
 @Composable
 private fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier = modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("שגיאה בטעינה", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-        Text(message, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-        Button(onClick = onRetry, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary), shape = RoundedCornerShape(12.dp)) {
-            Text("נסה שוב", fontWeight = FontWeight.Bold)
+    Column(
+        modifier              = modifier.padding(32.dp),
+        horizontalAlignment   = Alignment.CenterHorizontally,
+        verticalArrangement   = Arrangement.spacedBy(16.dp)
+    ) {
+        Icon(
+            Icons.Default.CloudOff,
+            contentDescription = null,
+            tint     = Muted,
+            modifier = Modifier.size(48.dp)
+        )
+        Text("שגיאה בטעינה", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink, fontFamily = SblHebrew)
+        Text(message, fontSize = 14.sp, color = Muted, textAlign = TextAlign.Center, fontFamily = SblHebrew)
+        Button(
+            onClick = onRetry,
+            colors  = ButtonDefaults.buttonColors(containerColor = Primary),
+            shape   = RoundedCornerShape(12.dp)
+        ) {
+            Text("נסה שוב", fontFamily = SblHebrew, fontWeight = FontWeight.SemiBold)
         }
     }
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+private fun studyAccentColor(accent: String?): Color = when (accent) {
+    "blue"    -> Color(0xFF0284C7)
+    "emerald" -> Color(0xFF059669)
+    "violet"  -> Color(0xFF7C3AED)
+    "amber"   -> Color(0xFFD97706)
+    else      -> Primary
+}
+
+private fun studyIcon(key: String): ImageVector = when (key) {
+    "chumash"         -> Icons.AutoMirrored.Filled.MenuBook
+    "tehillim"        -> Icons.Default.MusicNote
+    "tanya"           -> Icons.Default.Star
+    "rambam"          -> Icons.Default.School
+    "rambamOne"       -> Icons.Default.School
+    "seferHamitzvot"  -> Icons.AutoMirrored.Filled.List
+    "shnayimMikra"    -> Icons.AutoMirrored.Filled.VolumeUp
+    else              -> Icons.AutoMirrored.Filled.MenuBook
 }

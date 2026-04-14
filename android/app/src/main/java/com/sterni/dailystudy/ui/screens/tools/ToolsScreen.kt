@@ -27,7 +27,8 @@ fun ToolsScreen(
     onTefilaClick: () -> Unit,
     onOmerClick: () -> Unit,
     onSilentZoneClick: () -> Unit,
-    onMamaarimClick: () -> Unit
+    onMamaarimClick: () -> Unit,
+    onPdfLibraryClick: () -> Unit = {}
 ) {
     Scaffold(
         topBar = {
@@ -93,6 +94,15 @@ fun ToolsScreen(
                     icon = Icons.Default.Article,
                     accentColor = Color(0xFFD97706),
                     onClick = onMamaarimClick
+                )
+            }
+            item {
+                ToolCard(
+                    title = "ארון הספרים",
+                    subtitle = "ספרים אישיים · גמרא · שיחות · PDF",
+                    icon = Icons.Default.PictureAsPdf,
+                    accentColor = Color(0xFFD32F2F),
+                    onClick = onPdfLibraryClick
                 )
             }
         }

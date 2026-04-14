@@ -11,12 +11,15 @@ import com.sterni.dailystudy.ui.screens.home.HomeScreen
 import com.sterni.dailystudy.ui.screens.location.LocationZoneScreen
 import com.sterni.dailystudy.ui.screens.mamaarim.MamaarimScreen
 import com.sterni.dailystudy.ui.screens.mamaarim.MamaarReaderScreen
+import com.sterni.dailystudy.ui.screens.mamaarim.ArticleUploadScreen
+import com.sterni.dailystudy.ui.screens.pdflibrary.PdfStudyScreen
 import com.sterni.dailystudy.ui.screens.settings.SettingsScreen
 import com.sterni.dailystudy.ui.screens.study.StudyDetailScreen
 import com.sterni.dailystudy.ui.screens.tracker.StudyTrackerScreen
 import com.sterni.dailystudy.ui.screens.zmanim.ZmanimScreen
 import com.sterni.dailystudy.ui.screens.omer.OmerScreen
 import com.sterni.dailystudy.ui.screens.omer.OmerNusachScreen
+import com.sterni.dailystudy.ui.screens.tefila.RabbenuTamScreen
 import com.sterni.dailystudy.ui.screens.tefila.TefilaScreen
 import com.sterni.dailystudy.ui.screens.tools.ToolsScreen
 import java.net.URLDecoder
@@ -30,15 +33,18 @@ sealed class Screen(val route: String) {
     }
     object Zmanim        : Screen("zmanim")
     object Mamaarim      : Screen("mamaarim")
-    object MamaarReader  : Screen("mamaarReader/{id}") {
+    object MamaarReader   : Screen("mamaarReader/{id}") {
         fun createRoute(id: String) = "mamaarReader/$id"
     }
+    object ArticleUpload  : Screen("articleUpload")
+    object PdfLibrary     : Screen("pdfLibrary")
     object LocationZones : Screen("locationZones")
     object StudyTracker  : Screen("studyTracker")
     object Calendar      : Screen("calendar")
     object Settings      : Screen("settings")
     object Tools         : Screen("tools")
     object Tefila        : Screen("tefila")
+    object RabbenuTam    : Screen("rabbenuTam")
     object Omer          : Screen("omer")
     object OmerNusach    : Screen("omerNusach/{day}") {
         fun createRoute(day: Int) = "omerNusach/$day"
@@ -94,8 +100,18 @@ fun NavGraph(navController: NavHostController) {
 
         composable(Screen.Mamaarim.route) {
             MamaarimScreen(
-                onBack  = { navController.popBackStack() },
-                onOpen  = { id -> navController.navigate(Screen.MamaarReader.createRoute(id)) }
+                onBack   = { navController.popBackStack() },
+                onOpen   = { id -> navController.navigate(Screen.MamaarReader.createRoute(id)) },
+                onUpload = { navController.navigate(Screen.ArticleUpload.route) }
+            )
+        }
+
+        composable(Screen.ArticleUpload.route) {
+            ArticleUploadScreen(
+                onBack    = { navController.popBackStack() },
+                onSuccess = {
+                    navController.popBackStack(Screen.Mamaarim.route, inclusive = false)
+                }
             )
         }
 
@@ -128,16 +144,28 @@ fun NavGraph(navController: NavHostController) {
 
         composable(Screen.Tools.route) {
             ToolsScreen(
-                onBack            = { navController.popBackStack() },
-                onTefilaClick     = { navController.navigate(Screen.Tefila.route) },
-                onOmerClick       = { navController.navigate(Screen.Omer.route) },
-                onSilentZoneClick = { navController.navigate(Screen.LocationZones.route) },
-                onMamaarimClick   = { navController.navigate(Screen.Mamaarim.route) }
+                onBack              = { navController.popBackStack() },
+                onTefilaClick       = { navController.navigate(Screen.Tefila.route) },
+                onOmerClick         = { navController.navigate(Screen.Omer.route) },
+                onSilentZoneClick   = { navController.navigate(Screen.LocationZones.route) },
+                onMamaarimClick     = { navController.navigate(Screen.Mamaarim.route) },
+                onPdfLibraryClick   = { navController.navigate(Screen.PdfLibrary.route) }
             )
         }
 
+        composable(Screen.PdfLibrary.route) {
+            PdfStudyScreen(onBack = { navController.popBackStack() })
+        }
+
         composable(Screen.Tefila.route) {
-            TefilaScreen(onBack = { navController.popBackStack() })
+            TefilaScreen(
+                onBack = { navController.popBackStack() },
+                onRabbenuTamClick = { navController.navigate(Screen.RabbenuTam.route) }
+            )
+        }
+
+        composable(Screen.RabbenuTam.route) {
+            RabbenuTamScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Screen.Omer.route) {

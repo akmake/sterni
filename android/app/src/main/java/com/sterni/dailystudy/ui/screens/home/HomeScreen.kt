@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -25,8 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -38,34 +35,50 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sterni.dailystudy.data.model.Study
+import com.sterni.dailystudy.omer.OmerHelper
 import com.sterni.dailystudy.tracker.StudyTracker
 import com.sterni.dailystudy.ui.theme.BaHaYetzira
 import com.sterni.dailystudy.ui.theme.Ink
 import com.sterni.dailystudy.ui.theme.Muted
 import com.sterni.dailystudy.ui.theme.Primary
 import com.sterni.dailystudy.ui.theme.SblHebrew
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
-private val HomeBg  = Color(0xFFFDFBF7)
-private val CardBg  = Color.White
+private val HomeBg = Color(0xFFFDFBF7)
+private val CardBg = Color.White
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    onStudyClick: (studyKey: String, date: String, title: String, label: String) -> Unit,
-    onZmanimClick:   () -> Unit = {},
-    onMamaarimClick: () -> Unit = {},
-    onLocationClick: () -> Unit = {},
-    onTrackerClick:  () -> Unit = {},
-    onCalendarClick: () -> Unit = {},
-    onSettingsClick: () -> Unit = {},
-    onToolsClick:    () -> Unit = {},
-    onTefilaClick:   () -> Unit = {},
-    onOmerClick:     () -> Unit = {},
+    onStudyClick:       (studyKey: String, date: String, title: String, label: String) -> Unit,
+    onZmanimClick:      () -> Unit = {},
+    onMamaarimClick:    () -> Unit = {},
+    onLocationClick:    () -> Unit = {},
+    onTrackerClick:     () -> Unit = {},
+    onCalendarClick:    () -> Unit = {},
+    onSettingsClick:    () -> Unit = {},
+    onToolsClick:       () -> Unit = {},
+    onTefilaClick:      () -> Unit = {},
+    onOmerClick:        () -> Unit = {},
+    onPdfLibraryClick:  () -> Unit = {},
+    onOmerNusachClick:  (Int) -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+    val uiState  by viewModel.uiState.collectAsStateWithLifecycle()
+    val context  = LocalContext.current
     var todayStatus by remember { mutableStateOf(StudyTracker.getTodayStatus(context)) }
+    var dateOffset  by remember { mutableStateOf(0) }
+    val displayDate = remember(dateOffset) { LocalDate.now().plusDays(dateOffset.toLong()) }
+
+    // Reload study data whenever the selected date changes
+    LaunchedEffect(dateOffset) {
+        viewModel.loadDailyStudy(displayDate.format(DateTimeFormatter.ISO_LOCAL_DATE))
+    }
+
+    // Current active Omer day
+    val activeOmerDay = remember { OmerHelper.activeOmerDay(context) }
 
     Scaffold(
         containerColor = HomeBg,
@@ -73,60 +86,35 @@ fun HomeScreen(
             NavigationBar(
                 containerColor = CardBg,
                 tonalElevation = 0.dp,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                modifier       = Modifier.clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
             ) {
                 NavigationBarItem(
                     selected = true,
-                    onClick = {},
-                    icon = { Icon(Icons.Default.Home, contentDescription = null, modifier = Modifier.size(22.dp)) },
-                    label = { Text("בית", fontSize = 11.sp) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor   = Primary,
-                        selectedTextColor   = Primary,
-                        indicatorColor      = Primary.copy(alpha = 0.1f),
-                        unselectedIconColor = Muted,
-                        unselectedTextColor = Muted
-                    )
+                    onClick  = {},
+                    icon     = { Icon(Icons.Default.Home, contentDescription = null, modifier = Modifier.size(22.dp)) },
+                    label    = { Text("בית", fontSize = 11.sp) },
+                    colors   = navColors()
                 )
                 NavigationBarItem(
                     selected = false,
-                    onClick = onZmanimClick,
-                    icon = { Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(22.dp)) },
-                    label = { Text("זמנים", fontSize = 11.sp) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor   = Primary,
-                        selectedTextColor   = Primary,
-                        indicatorColor      = Primary.copy(alpha = 0.1f),
-                        unselectedIconColor = Muted,
-                        unselectedTextColor = Muted
-                    )
+                    onClick  = onZmanimClick,
+                    icon     = { Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(22.dp)) },
+                    label    = { Text("זמנים", fontSize = 11.sp) },
+                    colors   = navColors()
                 )
                 NavigationBarItem(
                     selected = false,
-                    onClick = onToolsClick,
-                    icon = { Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(22.dp)) },
-                    label = { Text("כלים", fontSize = 11.sp) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor   = Primary,
-                        selectedTextColor   = Primary,
-                        indicatorColor      = Primary.copy(alpha = 0.1f),
-                        unselectedIconColor = Muted,
-                        unselectedTextColor = Muted
-                    )
+                    onClick  = onToolsClick,
+                    icon     = { Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(22.dp)) },
+                    label    = { Text("כלים", fontSize = 11.sp) },
+                    colors   = navColors()
                 )
                 NavigationBarItem(
                     selected = false,
-                    onClick = onCalendarClick,
-                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(22.dp)) },
-                    label = { Text("לוח", fontSize = 11.sp) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor   = Primary,
-                        selectedTextColor   = Primary,
-                        indicatorColor      = Primary.copy(alpha = 0.1f),
-                        unselectedIconColor = Muted,
-                        unselectedTextColor = Muted
-                    )
+                    onClick  = onCalendarClick,
+                    icon     = { Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(22.dp)) },
+                    label    = { Text("לוח", fontSize = 11.sp) },
+                    colors   = navColors()
                 )
             }
         }
@@ -134,64 +122,57 @@ fun HomeScreen(
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             when {
                 uiState.isLoading -> CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center),
-                    color = Primary,
+                    modifier    = Modifier.align(Alignment.Center),
+                    color       = Primary,
                     strokeWidth = 2.dp
                 )
                 uiState.error != null -> ErrorState(
-                    message   = uiState.error!!,
-                    onRetry   = { viewModel.loadDailyStudy() },
-                    modifier  = Modifier.align(Alignment.Center)
+                    message  = uiState.error!!,
+                    onRetry  = { viewModel.loadDailyStudy(displayDate.format(DateTimeFormatter.ISO_LOCAL_DATE)) },
+                    modifier = Modifier.align(Alignment.Center)
                 )
                 else -> {
                     val orderedKeys    = listOf("chumash", "rambam", "rambamOne", "tanya", "shnayimMikra", "tehillim")
                     val orderedStudies = orderedKeys.mapNotNull { key -> uiState.studies[key]?.let { key to it } }
 
                     LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier       = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(bottom = 24.dp)
                     ) {
-                        // ── Header ───────────────────────────────────────────
+                        // ── Header ──────────────────────────────────────────────
                         item {
                             HomeHeader(
+                                displayDate     = displayDate,
                                 hebrewDate      = uiState.hebrewDate,
                                 onSettingsClick = onSettingsClick,
                                 onRefreshClick  = {
-                                    viewModel.loadDailyStudy()
+                                    viewModel.loadDailyStudy(displayDate.format(DateTimeFormatter.ISO_LOCAL_DATE))
                                     todayStatus = StudyTracker.getTodayStatus(context)
-                                }
+                                },
+                                onPrevDay = { dateOffset-- },
+                                onNextDay = { dateOffset++ }
                             )
                         }
 
                         // ── Quick access ─────────────────────────────────────
                         item {
                             QuickAccessRow(
-                                onMamaarimClick = onMamaarimClick,
-                                onOmerClick     = onOmerClick,
-                                onToolsClick    = onToolsClick,
-                                onTefilaClick   = onTefilaClick,
-                                modifier        = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                onMamaarimClick   = onMamaarimClick,
+                                onTefilaClick     = onTefilaClick,
+                                onPdfLibraryClick = onPdfLibraryClick,
+                                onToolsClick      = onToolsClick,
+                                modifier          = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                             )
                         }
 
-                        // ── Progress ─────────────────────────────────────────
-                        if (todayStatus.isNotEmpty()) {
-                            item {
-                                DailyProgressCard(
-                                    todayStatus = todayStatus,
-                                    modifier    = Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp)
-                                )
-                            }
-                        }
-
-                        // ── Section header ───────────────────────────────────
+                        // ── Section header ──────────────────────────────────
                         item {
                             Text(
-                                text     = "לימוד היום",
-                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                                fontSize = 13.sp,
+                                text       = "לימוד היום",
+                                modifier   = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                                fontSize   = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color    = Muted,
+                                color      = Muted,
                                 fontFamily = SblHebrew
                             )
                         }
@@ -219,6 +200,24 @@ fun HomeScreen(
                                 )
                             }
                         }
+
+                        // ── Omer card ────────────────────────────────────────
+                        if (activeOmerDay in 1..49) {
+                            item {
+                                AnimatedVisibility(
+                                    visible = true,
+                                    enter   = slideInVertically(initialOffsetY = { 40 }) + fadeIn()
+                                ) {
+                                    OmerStudyCard(
+                                        day      = activeOmerDay,
+                                        modifier = Modifier
+                                            .padding(horizontal = 16.dp)
+                                            .padding(bottom = 10.dp),
+                                        onClick  = { onOmerNusachClick(activeOmerDay) }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -226,118 +225,128 @@ fun HomeScreen(
     }
 }
 
-// ── Header ──────────────────────────────────────────────────────────────────
+// ── Nav color helper ──────────────────────────────────────────────────────────
+
+@Composable
+private fun navColors() = NavigationBarItemDefaults.colors(
+    selectedIconColor   = Primary,
+    selectedTextColor   = Primary,
+    indicatorColor      = Primary.copy(alpha = 0.1f),
+    unselectedIconColor = Muted,
+    unselectedTextColor = Muted
+)
+
+// ── Header ────────────────────────────────────────────────────────────────────
 
 @Composable
 fun HomeHeader(
+    displayDate:     LocalDate,
     hebrewDate:      String,
     onSettingsClick: () -> Unit,
-    onRefreshClick:  () -> Unit
+    onRefreshClick:  () -> Unit,
+    onPrevDay:       () -> Unit,
+    onNextDay:       () -> Unit
 ) {
     Surface(color = CardBg, shadowElevation = 0.dp) {
         Column {
             Spacer(Modifier.statusBarsPadding())
+
+            // Action icons at the top
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 18.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.End,
                 verticalAlignment     = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(
-                        text       = "לימוד יומי",
-                        fontSize   = 28.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontFamily = BaHaYetzira,
-                        color      = Primary
-                    )
-                    if (hebrewDate.isNotEmpty()) {
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text       = hebrewDate,
-                            fontSize   = 15.sp,
-                            fontFamily = SblHebrew,
-                            color      = Muted
-                        )
-                    }
-                }
-
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    IconButton(
-                        onClick  = onRefreshClick,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(Primary.copy(alpha = 0.07f))
-                    ) {
+                    IconButton(onClick = onRefreshClick, modifier = Modifier.size(40.dp)) {
                         Icon(
                             imageVector        = Icons.Rounded.Refresh,
                             contentDescription = "רענן",
                             tint               = Primary,
-                            modifier           = Modifier.size(20.dp)
+                            modifier           = Modifier.size(22.dp)
                         )
                     }
-                    IconButton(
-                        onClick  = onSettingsClick,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(Primary.copy(alpha = 0.07f))
-                    ) {
+                    IconButton(onClick = onSettingsClick, modifier = Modifier.size(40.dp)) {
                         Icon(
                             imageVector        = Icons.Rounded.Settings,
                             contentDescription = "הגדרות",
                             tint               = Primary,
-                            modifier           = Modifier.size(20.dp)
+                            modifier           = Modifier.size(22.dp)
                         )
                     }
                 }
             }
 
-            HorizontalDivider(color = Color(0xFFE4E4E7), thickness = 0.5.dp)
+            // Date navigation (independent area)
+            Row(
+                modifier              = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp)
+                    .padding(bottom = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                // In RTL Row: first = RIGHT side = go to yesterday
+                IconButton(onClick = onPrevDay) {
+                    Icon(
+                        Icons.Default.KeyboardArrowRight,
+                        contentDescription = "יום קודם",
+                        tint               = Primary,
+                        modifier           = Modifier.size(28.dp)
+                    )
+                }
+
+                Text(
+                    text       = "${displayDate.toHebrewDayOfWeek()} ${com.sterni.dailystudy.util.HebrewDate.format(displayDate.format(DateTimeFormatter.ISO_LOCAL_DATE))}",
+                    fontSize   = 22.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontFamily = BaHaYetzira,
+                    color      = Ink,
+                    textAlign  = TextAlign.Center
+                )
+
+                // In RTL Row: last = LEFT side = go to tomorrow
+                IconButton(onClick = onNextDay) {
+                    Icon(
+                        Icons.Default.KeyboardArrowLeft,
+                        contentDescription = "יום הבא",
+                        tint               = Primary,
+                        modifier           = Modifier.size(28.dp)
+                    )
+                }
+            }
+
+            HorizontalDivider(
+                modifier  = Modifier.padding(top = 4.dp),
+                color     = Color(0xFFE4E4E7),
+                thickness = 0.5.dp
+            )
         }
     }
 }
 
-// ── Quick Access ─────────────────────────────────────────────────────────────
+// ── Quick Access ──────────────────────────────────────────────────────────────
 
 @Composable
 private fun QuickAccessRow(
-    onMamaarimClick: () -> Unit,
-    onOmerClick:     () -> Unit,
-    onToolsClick:    () -> Unit,
-    onTefilaClick:   () -> Unit,
-    modifier:        Modifier = Modifier
+    onMamaarimClick:   () -> Unit,
+    onTefilaClick:     () -> Unit,
+    onPdfLibraryClick: () -> Unit,
+    onToolsClick:      () -> Unit,
+    modifier:          Modifier = Modifier
 ) {
+    // Order (RTL — first item appears on the RIGHT):
+    // מאמרים | תפילה | ספריה | כלים
     Row(
         modifier              = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        QuickChip(
-            label    = "מאמרים",
-            icon     = Icons.AutoMirrored.Filled.List,
-            onClick  = onMamaarimClick,
-            modifier = Modifier.weight(1f)
-        )
-        QuickChip(
-            label    = "ספירה",
-            icon     = Icons.Default.DateRange,
-            onClick  = onOmerClick,
-            modifier = Modifier.weight(1f)
-        )
-        QuickChip(
-            label    = "כלים",
-            icon     = Icons.Default.Tune,
-            onClick  = onToolsClick,
-            modifier = Modifier.weight(1f)
-        )
-        QuickChip(
-            label    = "תפילה",
-            icon     = Icons.AutoMirrored.Filled.MenuBook,
-            onClick  = onTefilaClick,
-            modifier = Modifier.weight(1f)
-        )
+        QuickChip(label = "מאמרים", icon = Icons.AutoMirrored.Filled.List,    onClick = onMamaarimClick,   modifier = Modifier.weight(1f))
+        QuickChip(label = "תפילה",  icon = Icons.AutoMirrored.Filled.MenuBook, onClick = onTefilaClick,     modifier = Modifier.weight(1f))
+        QuickChip(label = "ספריה",  icon = Icons.Default.PictureAsPdf,         onClick = onPdfLibraryClick, modifier = Modifier.weight(1f))
+        QuickChip(label = "כלים",   icon = Icons.Default.Tune,                 onClick = onToolsClick,      modifier = Modifier.weight(1f))
     }
 }
 
@@ -372,81 +381,100 @@ private fun QuickChip(
             ) {
                 Icon(icon, contentDescription = null, tint = Primary, modifier = Modifier.size(18.dp))
             }
-            Text(
-                text       = label,
-                fontSize   = 12.sp,
-                color      = Primary,
-                fontFamily = SblHebrew
-            )
+            Text(text = label, fontSize = 12.sp, color = Primary, fontFamily = SblHebrew)
         }
     }
 }
 
-// ── Progress Card ────────────────────────────────────────────────────────────
+// ── Omer Study Card ───────────────────────────────────────────────────────────
 
 @Composable
-private fun DailyProgressCard(
-    todayStatus: List<Pair<String, Boolean>>,
-    modifier:    Modifier = Modifier
+private fun OmerStudyCard(
+    day:      Int,
+    modifier: Modifier = Modifier,
+    onClick:  () -> Unit
 ) {
-    val done     = todayStatus.count { it.second }
-    val total    = todayStatus.size
-    val progress = if (total > 0) done.toFloat() / total else 0f
-    val allDone  = done == total && total > 0
-    val ringColor = if (allDone) Color(0xFF059669) else Primary
-
     Surface(
-        modifier        = modifier.fillMaxWidth(),
-        shape           = RoundedCornerShape(18.dp),
+        modifier        = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick),
+        shape           = RoundedCornerShape(16.dp),
         color           = CardBg,
-        shadowElevation = 1.dp
+        shadowElevation = 1.5.dp
     ) {
         Row(
-            modifier          = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 14.dp),
+            modifier          = Modifier.fillMaxWidth().padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(modifier = Modifier.size(56.dp), contentAlignment = Alignment.Center) {
-                val trackColor = Color(0xFFE4E4E7)
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val stroke = 5.dp.toPx()
-                    drawArc(color = trackColor, startAngle = -90f, sweepAngle = 360f, useCenter = false, style = Stroke(width = stroke))
-                    if (progress > 0f) {
-                        drawArc(color = ringColor, startAngle = -90f, sweepAngle = 360f * progress, useCenter = false, style = Stroke(width = stroke, cap = StrokeCap.Round))
-                    }
-                }
-                Text(
-                    text       = "$done/$total",
-                    fontSize   = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color      = ringColor
+            Box(
+                modifier         = Modifier
+                    .size(46.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFF7C3AED).copy(alpha = 0.10f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector        = Icons.Default.DateRange,
+                    contentDescription = null,
+                    tint               = Color(0xFF7C3AED),
+                    modifier           = Modifier.size(22.dp)
                 )
             }
 
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(14.dp))
 
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier              = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text       = "ספירת העומר",
+                        fontSize   = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color      = Ink,
+                        fontFamily = SblHebrew,
+                        modifier   = Modifier.weight(1f, fill = false)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = Color(0xFF7C3AED).copy(alpha = 0.09f)
+                    ) {
+                        Text(
+                            text       = "יום ${OmerHelper.hebrewNumeral(day)}",
+                            modifier   = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            fontSize   = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color      = Color(0xFF7C3AED),
+                            fontFamily = SblHebrew,
+                            style      = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
                 Text(
-                    text       = if (allDone) "כל הכבוד! סיימת הכל ✓" else "ההתקדמות שלך להיום",
-                    fontSize   = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color      = if (allDone) ringColor else Ink,
-                    fontFamily = SblHebrew
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text       = if (allDone) "עברת על כל $total הלימודים" else "נשארו עוד ${total - done} לימודים",
+                    text       = "לחץ לנוסח הספירה והברכה",
                     fontSize   = 13.sp,
                     color      = Muted,
                     fontFamily = SblHebrew
                 )
             }
+
+            Spacer(Modifier.width(8.dp))
+            Icon(
+                imageVector        = Icons.Default.ChevronLeft,
+                contentDescription = null,
+                tint               = Muted.copy(alpha = 0.4f),
+                modifier           = Modifier.size(20.dp)
+            )
         }
     }
 }
 
-// ── Study Card ───────────────────────────────────────────────────────────────
+// ── Study Card ────────────────────────────────────────────────────────────────
 
 @Composable
 private fun StudyCard(
@@ -455,9 +483,9 @@ private fun StudyCard(
     modifier: Modifier = Modifier,
     onClick:  () -> Unit
 ) {
-    val available    = study.available == true
-    val accentColor  = studyAccentColor(study.accent)
-    val icon         = studyIcon(studyKey)
+    val available   = study.available == true
+    val accentColor = studyAccentColor(study.accent)
+    val icon        = studyIcon(studyKey)
 
     Surface(
         modifier        = modifier
@@ -469,20 +497,14 @@ private fun StudyCard(
         shadowElevation = if (available) 1.5.dp else 0.5.dp
     ) {
         Row(
-            modifier          = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
+            modifier          = Modifier.fillMaxWidth().padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Icon box
             Box(
                 modifier         = Modifier
                     .size(46.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        if (available) accentColor.copy(alpha = 0.10f)
-                        else           Color(0xFFF4F4F5)
-                    ),
+                    .background(if (available) accentColor.copy(alpha = 0.10f) else Color(0xFFF4F4F5)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -495,12 +517,11 @@ private fun StudyCard(
 
             Spacer(Modifier.width(14.dp))
 
-            // Text content
             Column(modifier = Modifier.weight(1f)) {
                 Row(
-                    verticalAlignment    = Alignment.CenterVertically,
+                    verticalAlignment     = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier             = Modifier.fillMaxWidth()
+                    modifier              = Modifier.fillMaxWidth()
                 ) {
                     Text(
                         text       = study.title ?: "",
@@ -531,12 +552,7 @@ private fun StudyCard(
 
                 if (!study.subtitle.isNullOrEmpty()) {
                     Spacer(Modifier.height(2.dp))
-                    Text(
-                        text       = study.subtitle,
-                        fontSize   = 13.sp,
-                        color      = Muted,
-                        fontFamily = SblHebrew
-                    )
+                    Text(text = study.subtitle, fontSize = 13.sp, color = Muted, fontFamily = SblHebrew)
                 }
 
                 if (available && !study.preview.isNullOrEmpty()) {
@@ -555,12 +571,7 @@ private fun StudyCard(
 
                 if (!available) {
                     Spacer(Modifier.height(4.dp))
-                    Text(
-                        text       = "לא נמצאו נתונים להיום",
-                        fontSize   = 12.sp,
-                        color      = Muted.copy(alpha = 0.55f),
-                        fontFamily = SblHebrew
-                    )
+                    Text(text = "לא נמצאו נתונים להיום", fontSize = 12.sp, color = Muted.copy(alpha = 0.55f), fontFamily = SblHebrew)
                 }
             }
 
@@ -586,12 +597,7 @@ private fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier 
         horizontalAlignment   = Alignment.CenterHorizontally,
         verticalArrangement   = Arrangement.spacedBy(16.dp)
     ) {
-        Icon(
-            Icons.Default.CloudOff,
-            contentDescription = null,
-            tint     = Muted,
-            modifier = Modifier.size(48.dp)
-        )
+        Icon(Icons.Default.CloudOff, contentDescription = null, tint = Muted, modifier = Modifier.size(48.dp))
         Text("שגיאה בטעינה", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink, fontFamily = SblHebrew)
         Text(message, fontSize = 14.sp, color = Muted, textAlign = TextAlign.Center, fontFamily = SblHebrew)
         Button(
@@ -604,7 +610,18 @@ private fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier 
     }
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+private fun LocalDate.toHebrewDayOfWeek(): String = when (dayOfWeek) {
+    DayOfWeek.SUNDAY    -> "יום ראשון"
+    DayOfWeek.MONDAY    -> "יום שני"
+    DayOfWeek.TUESDAY   -> "יום שלישי"
+    DayOfWeek.WEDNESDAY -> "יום רביעי"
+    DayOfWeek.THURSDAY  -> "יום חמישי"
+    DayOfWeek.FRIDAY    -> "יום שישי"
+    DayOfWeek.SATURDAY  -> "שבת קודש"
+    else                -> ""
+}
 
 private fun studyAccentColor(accent: String?): Color = when (accent) {
     "blue"    -> Color(0xFF0284C7)
@@ -615,12 +632,12 @@ private fun studyAccentColor(accent: String?): Color = when (accent) {
 }
 
 private fun studyIcon(key: String): ImageVector = when (key) {
-    "chumash"         -> Icons.AutoMirrored.Filled.MenuBook
-    "tehillim"        -> Icons.Default.MusicNote
-    "tanya"           -> Icons.Default.Star
-    "rambam"          -> Icons.Default.School
-    "rambamOne"       -> Icons.Default.School
-    "seferHamitzvot"  -> Icons.AutoMirrored.Filled.List
-    "shnayimMikra"    -> Icons.AutoMirrored.Filled.VolumeUp
-    else              -> Icons.AutoMirrored.Filled.MenuBook
+    "chumash"        -> Icons.AutoMirrored.Filled.MenuBook
+    "tehillim"       -> Icons.Default.MusicNote
+    "tanya"          -> Icons.Default.Star
+    "rambam"         -> Icons.Default.School
+    "rambamOne"      -> Icons.Default.School
+    "seferHamitzvot" -> Icons.AutoMirrored.Filled.List
+    "shnayimMikra"   -> Icons.AutoMirrored.Filled.VolumeUp
+    else             -> Icons.AutoMirrored.Filled.MenuBook
 }

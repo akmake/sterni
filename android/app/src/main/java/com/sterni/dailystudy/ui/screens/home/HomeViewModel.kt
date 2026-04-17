@@ -1,7 +1,6 @@
 package com.sterni.dailystudy.ui.screens.home
 
 import android.app.Application
-import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.sterni.dailystudy.cache.StudyCache
@@ -37,40 +36,39 @@ class HomeViewModel @Inject constructor(
         loadDailyStudy()
     }
 
-    fun loadDailyStudy() {
+    fun loadDailyStudy(
+        dateString: String = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+    ) {
         val ctx = getApplication<Application>()
-        val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
 
         viewModelScope.launch {
-            _uiState.value = HomeUiState(isLoading = true)
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-            // Try cache first
-            val cached = StudyCache.get(ctx, today)
+            val cached = StudyCache.get(ctx, dateString)
             if (cached?.studies?.isNotEmpty() == true) {
                 _uiState.value = HomeUiState(
-                    isLoading = false,
-                    date = today,
+                    isLoading  = false,
+                    date       = dateString,
                     hebrewDate = cached.hebrewDate ?: "",
-                    studies = cached.studies
+                    studies    = cached.studies
                 )
                 return@launch
             }
 
-            // Network
             try {
-                val day = apiService.getDailyStudy(today)
-                StudyCache.save(ctx, today, day)
+                val day = apiService.getDailyStudy(dateString)
+                StudyCache.save(ctx, dateString, day)
                 _uiState.value = HomeUiState(
-                    isLoading = false,
-                    date = today,
+                    isLoading  = false,
+                    date       = dateString,
                     hebrewDate = day.hebrewDate ?: "",
-                    studies = day.studies ?: emptyMap()
+                    studies    = day.studies ?: emptyMap()
                 )
             } catch (e: Exception) {
                 _uiState.value = HomeUiState(
-                    isLoading = false,
-                    date = today,
-                    error = "No connection: ${e.message}"
+                    isLoading  = false,
+                    date       = dateString,
+                    error      = "שגיאה בטעינה: ${e.message}"
                 )
             }
         }

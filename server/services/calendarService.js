@@ -129,7 +129,7 @@ export async function getDailyCalendar(dateString) {
       const en = String(item?.title?.en || '');
       if (en === 'Daily Rambam') {
         items.push({
-          title: { en: 'Daily Rambam (1 chapter)', he: 'רמב"ם יומי (פרק 1)' },
+          title: { en: 'Daily Rambam (1 chapter)', he: 'רמב"ם פרק אחד' },
           ref: item.ref,
           displayValue: { he: item.displayValue?.he || item.ref },
         });
@@ -153,7 +153,7 @@ export async function getDailyCalendar(dateString) {
       const refs = urls.map(rambamUrlToRef).filter(Boolean);
       if (refs.length > 0) {
         items.push({
-          title: { en: 'Daily Rambam (3 chapters)', he: 'רמב"ם יומי' },
+          title: { en: 'Daily Rambam (3 chapters)', he: 'רמב"ם ג פרקים' },
           refs,
           ref: refs[0],
           displayValue: { he: r3Item.hebrew || r3Item.title },

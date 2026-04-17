@@ -22,7 +22,7 @@ import com.sterni.dailystudy.omer.OmerNusach
 import com.sterni.dailystudy.omer.OmerTracker
 import com.sterni.dailystudy.ui.theme.*
 
-private val BG_NUSACH      = Color(0xFFEAE8E7)
+private val BG_NUSACH      = Color(0xFFFDFBF7)
 private val HighlightGreen = Color(0xFF00D18C)
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,7 +58,7 @@ fun OmerNusachScreen(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = BG_NUSACH)
             )
         }
     ) { padding ->
@@ -89,7 +89,7 @@ fun OmerNusachScreen(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape    = RoundedCornerShape(14.dp),
-                    color    = Color(0xFFF0EFEE)
+                    color    = Color.White
                 ) {
                     Box(
                         modifier         = Modifier
@@ -145,7 +145,7 @@ fun OmerNusachScreen(
                     fontSize   = 18.sp,
                     fontFamily = BaHaYetzira,
                     color      = HighlightGreen,
-                    textAlign  = TextAlign.Start
+                    textAlign  = TextAlign.Center
                 )
             }
 
@@ -161,7 +161,10 @@ fun OmerNusachScreen(
 
             // ── Ana BeKoach ──────────────────────────────────────────────────
             item {
-                Column(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     OmerNusach.ANA_BEKOACH_LINES.forEachIndexed { idx, (lineText, acrostic) ->
                         val isCurrentWeek = idx == week
                         val lineColor     = if (isCurrentWeek) HighlightGreen else Ink
@@ -170,20 +173,19 @@ fun OmerNusachScreen(
                             modifier          = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
                         ) {
-                            // Text on the right (TextAlign.Start = right in RTL)
                             Text(
                                 text       = lineText,
                                 modifier   = Modifier.weight(1f),
                                 fontSize   = 17.sp,
                                 fontFamily = SblHebrew,
                                 color      = lineColor,
-                                textAlign  = TextAlign.Start,
+                                textAlign  = TextAlign.Center,
                                 lineHeight = 26.sp
                             )
                             Spacer(Modifier.width(10.dp))
-                            // Abbreviation on the left
                             Text(
                                 text       = acrostic,
                                 fontSize   = 12.sp,
@@ -215,7 +217,7 @@ fun OmerNusachScreen(
                     fontSize   = 17.sp,
                     fontFamily = SblHebrew,
                     color      = Ink,
-                    textAlign  = TextAlign.Start,
+                    textAlign  = TextAlign.Center,
                     lineHeight = 26.sp
                 )
             }
@@ -236,7 +238,7 @@ private fun NusachText(
         fontSize   = fontSize.sp,
         fontFamily = SblHebrew,
         color      = Ink,
-        textAlign  = TextAlign.Start,
+        textAlign  = TextAlign.Center,
         lineHeight = (fontSize + 9).sp
     )
 }

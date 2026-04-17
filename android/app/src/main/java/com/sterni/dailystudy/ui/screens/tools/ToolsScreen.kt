@@ -6,7 +6,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -23,21 +22,21 @@ import com.sterni.dailystudy.ui.theme.SblHebrew
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ToolsScreen(
-    onBack: () -> Unit,
-    onTefilaClick: () -> Unit,
-    onOmerClick: () -> Unit,
-    onSilentZoneClick: () -> Unit,
-    onMamaarimClick: () -> Unit,
-    onPdfLibraryClick: () -> Unit = {}
+    onBack:                    () -> Unit,
+    onSilentZoneClick:         () -> Unit,
+    onPermissionsClick:        () -> Unit,
+    onJerusalemDirectionClick: () -> Unit
 ) {
     Scaffold(
+        containerColor = Color(0xFFFDFBF7),
         topBar = {
             TopAppBar(
                 title = {
                     Text(
                         "כלים",
                         fontFamily = BaHaYetzira,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        fontSize   = 20.sp
                     )
                 },
                 navigationIcon = {
@@ -46,9 +45,9 @@ fun ToolsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor        = Color(0xFFFDFBF7),
+                    titleContentColor     = MaterialTheme.colorScheme.onSurface,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
         }
@@ -62,47 +61,29 @@ fun ToolsScreen(
         ) {
             item {
                 ToolCard(
-                    title = "תפילה",
-                    subtitle = "איזהו מקומן, רבינו תם, ברכות",
-                    icon = Icons.AutoMirrored.Filled.MenuBook,
+                    title       = "הרשאות",
+                    subtitle    = "ניהול כל הרשאות האפליקציה במקום אחד",
+                    icon        = Icons.Default.Security,
                     accentColor = Color(0xFF0284C7),
-                    onClick = onTefilaClick
+                    onClick     = onPermissionsClick
                 )
             }
             item {
                 ToolCard(
-                    title = "ספירת העומר",
-                    subtitle = "ספירה יומית עם נוסח מלא",
-                    icon = Icons.Default.DateRange,
-                    accentColor = Color(0xFF7C3AED),
-                    onClick = onOmerClick
-                )
-            }
-            item {
-                ToolCard(
-                    title = "אזורי שקט",
-                    subtitle = "השתקה אוטומטית לפי מיקום",
-                    icon = Icons.Default.LocationOn,
+                    title       = "כיוון ירושלים",
+                    subtitle    = "מצפן לכיוון ירושלים עיר הקודש",
+                    icon        = Icons.Default.Explore,
                     accentColor = Color(0xFF059669),
-                    onClick = onSilentZoneClick
+                    onClick     = onJerusalemDirectionClick
                 )
             }
             item {
                 ToolCard(
-                    title = "מאמרים",
-                    subtitle = "מאגר מאמרים וקבצי PDF",
-                    icon = Icons.Default.Article,
-                    accentColor = Color(0xFFD97706),
-                    onClick = onMamaarimClick
-                )
-            }
-            item {
-                ToolCard(
-                    title = "ארון הספרים",
-                    subtitle = "ספרים אישיים · גמרא · שיחות · PDF",
-                    icon = Icons.Default.PictureAsPdf,
-                    accentColor = Color(0xFFD32F2F),
-                    onClick = onPdfLibraryClick
+                    title       = "אזורי שקט",
+                    subtitle    = "השתקה אוטומטית לפי מיקום",
+                    icon        = Icons.Default.LocationOn,
+                    accentColor = Color(0xFF7C3AED),
+                    onClick     = onSilentZoneClick
                 )
             }
         }
@@ -111,38 +92,31 @@ fun ToolsScreen(
 
 @Composable
 private fun ToolCard(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
+    title:       String,
+    subtitle:    String,
+    icon:        ImageVector,
     accentColor: Color,
-    onClick: () -> Unit
+    onClick:     () -> Unit
 ) {
     Card(
-        modifier = Modifier
+        modifier  = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape     = RoundedCornerShape(16.dp),
+        colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier          = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = accentColor.copy(alpha = 0.12f),
+                shape    = RoundedCornerShape(12.dp),
+                color    = accentColor.copy(alpha = 0.12f),
                 modifier = Modifier.size(52.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        icon,
-                        contentDescription = null,
-                        tint = accentColor,
-                        modifier = Modifier.size(28.dp)
-                    )
+                    Icon(icon, contentDescription = null, tint = accentColor, modifier = Modifier.size(28.dp))
                 }
             }
 
@@ -150,25 +124,25 @@ private fun ToolCard(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = title,
-                    fontSize = 18.sp,
+                    text       = title,
+                    fontSize   = 18.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = SblHebrew,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color      = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    text = subtitle,
-                    fontSize = 14.sp,
+                    text       = subtitle,
+                    fontSize   = 14.sp,
                     fontFamily = SblHebrew,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color      = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
             Icon(
                 Icons.Default.ChevronRight,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                tint               = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )
         }
     }

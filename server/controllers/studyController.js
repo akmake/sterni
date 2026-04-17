@@ -21,7 +21,7 @@ const STUDY_CONFIG = {
   },
   rambam: {
     key: 'rambam',
-    title: "רמב\"ם יומי",
+    title: 'רמב"ם ג פרקים',
     subtitle: 'שלושה פרקים במשנה תורה',
     accent: 'emerald',
     kind: 'chapters',
@@ -31,7 +31,7 @@ const STUDY_CONFIG = {
   },
   rambamOne: {
     key: 'rambamOne',
-    title: 'רמב"ם יומי (פרק 1)',
+    title: 'רמב"ם פרק אחד',
     subtitle: 'פרק אחד במשנה תורה',
     accent: 'emerald',
     kind: 'chapter',

@@ -1,6 +1,6 @@
 import { useState, Fragment } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { Menu, X, LogOut, Briefcase, Utensils, FileText, ChevronDown, ChevronUp, Settings, UserCircle, ListTodo, User, Users, CalendarDays, CreditCard, Shield, BarChart3, Scissors, FolderPlus, ClipboardList, Home, ArrowLeftRight, ShoppingCart, ClipboardCheck, Wallet, FolderKanban, Landmark, Hotel, Monitor, DollarSign, Tag, MapPin, MessageCircle } from "lucide-react";
+import { Menu, X, LogOut, Briefcase, Utensils, FileText, ChevronDown, ChevronUp, Settings, UserCircle, ListTodo, User, Users, CalendarDays, CreditCard, Shield, BarChart3, Scissors, FolderPlus, ClipboardList, Home, ArrowLeftRight, ShoppingCart, ClipboardCheck, Wallet, FolderKanban, Landmark, Hotel, Monitor, DollarSign, Tag, MapPin, MessageCircle, Newspaper } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/stores/authStore";
 import useLogout from "@/hooks/useLogout";
@@ -23,6 +23,7 @@ const getHouseholdNav = (hasTzitzitAccess) => {
   }
   items.push({ to: '/household/tasks', label: 'משימות בית', icon: ClipboardCheck, type: 'link' });
   items.push({ to: '/software-library', label: 'ספריית תוכנות', icon: Monitor, type: 'link' });
+  items.push({ to: '/news', label: 'חדשות', icon: Newspaper, type: 'link' });
   return items;
 };
 
@@ -39,6 +40,7 @@ const getManagementNav = (isAuthenticated, isAdmin, hasTzitzitAccess) => {
     { to: '/groups', label: 'ניהול קבוצות', icon: Users, type: 'link' },
     { to: '/hotel-orders', label: 'הזמנות מלון', icon: Hotel, type: 'link' },
     { to: '/whatsapp', label: 'WhatsApp', icon: MessageCircle, type: 'link' },
+    { to: '/news', label: 'חדשות', icon: Newspaper, type: 'link' }
   );
 
   items.push({

@@ -60,6 +60,7 @@ fun HomeScreen(
     onCalendarClick:    () -> Unit = {},
     onSettingsClick:    () -> Unit = {},
     onToolsClick:       () -> Unit = {},
+    onNewsClick:        () -> Unit = {},
     onTefilaClick:      () -> Unit = {},
     onOmerClick:        () -> Unit = {},
     onPdfLibraryClick:  () -> Unit = {},
@@ -82,11 +83,14 @@ fun HomeScreen(
 
     Scaffold(
         containerColor = HomeBg,
+        contentWindowInsets = WindowInsets(0.dp),
         bottomBar = {
             NavigationBar(
                 containerColor = CardBg,
                 tonalElevation = 0.dp,
-                modifier       = Modifier.clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                modifier       = Modifier
+                    .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                    .navigationBarsPadding()
             ) {
                 NavigationBarItem(
                     selected = true,
@@ -104,16 +108,9 @@ fun HomeScreen(
                 )
                 NavigationBarItem(
                     selected = false,
-                    onClick  = { android.widget.Toast.makeText(context, "בקרוב", android.widget.Toast.LENGTH_SHORT).show() },
+                    onClick  = onNewsClick,
                     icon     = { Icon(androidx.compose.material.icons.Icons.Default.Feed, contentDescription = null, modifier = Modifier.size(22.dp)) },
                     label    = { Text("חדשות", fontSize = 11.sp) },
-                    colors   = navColors()
-                )
-                NavigationBarItem(
-                    selected = false,
-                    onClick  = onToolsClick,
-                    icon     = { Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(22.dp)) },
-                    label    = { Text("כלים", fontSize = 11.sp) },
                     colors   = navColors()
                 )
                 NavigationBarItem(

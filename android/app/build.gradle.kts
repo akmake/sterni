@@ -87,7 +87,10 @@ dependencies {
     implementation(libs.kosherjava)
 
     // PDFBox Android (PDF text extraction)
-    implementation(libs.pdfbox.android)
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+
+    // Coil (image loading for Compose)
+    implementation("io.coil-kt:coil-compose:2.6.0")
 
     debugImplementation(libs.androidx.ui.tooling)
 }

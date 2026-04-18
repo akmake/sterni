@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+﻿import { Routes, Route, Navigate } from "react-router-dom";
 import React, { Suspense } from "react";
 import { useAuthStore } from "@/stores/authStore";
 
@@ -28,6 +28,7 @@ import FullScheduleReportPage from '@/pages/FullScheduleReportPage';
 const NotFoundPage = React.lazy(() => import("@/pages/NotFoundPage"));
 import ChatPage from './pages/ChatPage';
 import WhatsAppPage from './pages/WhatsAppPage';
+import NewsPage from './pages/NewsPage';
 import PriceQuoteGenerator from './components/PriceQuoteGenerator';
 import PaymentRequestGenerator from './components/PaymentRequestGenerator';
 import SystemSettings from './pages/SystemSettings';
@@ -76,7 +77,7 @@ import FinanceImportPage from './pages/FinanceImportPage';
 import FinanceCategoriesPage from './pages/FinanceCategoriesPage';
 import FinanceAutomationPage from './pages/FinanceAutomationPage';
 
-// דף בית דינמי לפי תצוגה מועדפת
+// ׳“׳£ ׳‘׳™׳× ׳“׳™׳ ׳׳™ ׳׳₪׳™ ׳×׳¦׳•׳’׳” ׳׳•׳¢׳“׳₪׳×
 function DefaultRedirect() {
   const { activeView, user } = useAuthStore();
   const hasHouseholdAccess = user?.householdAccess || false;
@@ -89,7 +90,7 @@ function DefaultRedirect() {
 export default function App() {
   return (
     <Routes>
-      {/* ─── Main app area (with Layout) ─── */}
+      {/* ג”€ג”€ג”€ Main app area (with Layout) ג”€ג”€ג”€ */}
       <Route path="/" element={<Layout />}>
 
         <Route index element={<DefaultRedirect />} />
@@ -97,7 +98,7 @@ export default function App() {
         <Route path="login"    element={<LoginPage />}    />
 
         <Route element={<ProtectedRoute />}>
-          {/* ★ FIX: Consistent paths — all relative (no leading slash) */}
+          {/* ג˜… FIX: Consistent paths ג€” all relative (no leading slash) */}
           <Route path="profile"               element={<ProfilePage />} />
           <Route path="software-library"      element={<SoftwareLibraryPage />} />
           <Route path="settings"              element={<SystemSettings />} />
@@ -120,6 +121,7 @@ export default function App() {
           <Route path="full-schedule"         element={<FullScheduleReportPage />} />
           <Route path="chat/:ticketId"        element={<ChatPage />} />
           <Route path="whatsapp"              element={<WhatsAppPage />} />
+          <Route path="news"                  element={<NewsPage />} />
           <Route path="staff-manager"         element={<KitchenStaffManager />} />
           <Route path="staff-print-a3"        element={<StaffPrintA3 />} />
           <Route path="thai-schedule"         element={<ThaiSchedulePage />} />
@@ -172,10 +174,11 @@ export default function App() {
         <Route path="*" element={<Suspense fallback={<div className="flex items-center justify-center h-screen">...</div>}><NotFoundPage /></Suspense>} />
       </Route>
 
-      {/* ─── Print pages (outside Layout) ─── */}
+      {/* ג”€ג”€ג”€ Print pages (outside Layout) ג”€ג”€ג”€ */}
       <Route path="/print/kitchen-a3" element={<KitchenPrintPageA3 />} />
       <Route path="/print/group-schedule" element={<GroupSchedulePrintPage />} />
 
     </Routes>
   );
 }
+

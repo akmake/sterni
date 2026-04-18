@@ -27,4 +27,5 @@ object RetrofitClient {
     val zmanimService:  ZmanimService  by lazy { retrofit.create(ZmanimService::class.java)  }
     val articleService: ArticleService by lazy { retrofit.create(ArticleService::class.java) }
     val apiService:     ApiService     by lazy { retrofit.create(ApiService::class.java)     }
+    val newsService:    NewsService    by lazy { retrofit.create(NewsService::class.java)    }
 }

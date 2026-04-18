@@ -321,7 +321,7 @@ private fun MonthDayCell(
         else         -> Ink
     }
     val mainText = if (hebrewMode) day.hebrewLetters else day.day.toString()
-    val subText  = if (hebrewMode) day.day.toString() else day.hebrewLetters
+    val subText  = if (hebrewMode) day.gregDay.toString() else day.hebrewLetters
 
     Column(
         modifier = Modifier

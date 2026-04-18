@@ -294,10 +294,21 @@ class CalendarViewModel(app: Application) : AndroidViewModel(app) {
         val hebrewMonthName = hdf.formatMonth(startJd)
         val hebrewYearFormatted = hdf.formatHebrewNumber(hebrewYear)
 
+        // Build Gregorian month label from the range of Gregorian dates this Hebrew month spans
+        val firstGreg = cells.firstOrNull()
+        val lastGreg  = cells.lastOrNull()
+        val gregLabel = if (firstGreg != null && lastGreg != null) {
+            if (firstGreg.gregMonth == lastGreg.gregMonth) {
+                "${GREG_MONTHS[firstGreg.gregMonth]} ${firstGreg.gregYear}"
+            } else {
+                "${GREG_MONTHS[firstGreg.gregMonth]}–${GREG_MONTHS[lastGreg.gregMonth]} ${lastGreg.gregYear}"
+            }
+        } else ""
+
         _state.value = _state.value.copy(
             days             = cells,
             startOffset      = startOffset,
-            monthLabel       = "",
+            monthLabel       = gregLabel,
             hebrewMonthLabel = "$hebrewMonthName $hebrewYearFormatted",
             loading          = false
         )

@@ -11,6 +11,7 @@ import com.sterni.dailystudy.ui.screens.home.HomeScreen
 import com.sterni.dailystudy.ui.screens.location.LocationZoneScreen
 import com.sterni.dailystudy.ui.screens.mamaarim.MamaarimScreen
 import com.sterni.dailystudy.ui.screens.mamaarim.MamaarReaderScreen
+import com.sterni.dailystudy.ui.screens.news.NewsScreen
 import com.sterni.dailystudy.ui.screens.settings.SettingsScreen
 import com.sterni.dailystudy.ui.screens.study.StudyDetailScreen
 import com.sterni.dailystudy.ui.screens.tracker.StudyTrackerScreen
@@ -38,6 +39,7 @@ sealed class Screen(val route: String) {
     object Calendar      : Screen("calendar")
     object Settings      : Screen("settings")
     object Tools         : Screen("tools")
+    object News          : Screen("news")
     object Tefila        : Screen("tefila")
     object Omer          : Screen("omer")
     object OmerNusach    : Screen("omerNusach/{day}") {
@@ -61,6 +63,7 @@ fun NavGraph(navController: NavHostController) {
                 onCalendarClick     = { navController.navigate(Screen.Calendar.route) },
                 onSettingsClick     = { navController.navigate(Screen.Settings.route) },
                 onToolsClick        = { navController.navigate(Screen.Tools.route) },
+                onNewsClick         = { navController.navigate(Screen.News.route) },
                 onTefilaClick       = { navController.navigate(Screen.Tefila.route) },
                 onOmerClick         = { navController.navigate(Screen.Omer.route) }
             )
@@ -134,6 +137,10 @@ fun NavGraph(navController: NavHostController) {
                 onSilentZoneClick = { navController.navigate(Screen.LocationZones.route) },
                 onMamaarimClick   = { navController.navigate(Screen.Mamaarim.route) }
             )
+        }
+
+        composable(Screen.News.route) {
+            NewsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Screen.Tefila.route) {

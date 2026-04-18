@@ -1,6 +1,7 @@
 import csurf              from 'csurf';
 import authRoutes         from '../routes/auth.js';
 import tzitzitRoutes      from '../routes/tzitzitRoutes.js';
+import newsRoutes         from '../routes/newsRoutes.js';
 
 /* חדש */
 import projectRoutes      from '../routes/projectRoutes.js';
@@ -33,4 +34,7 @@ export const configureRoutes = (app) => {
 
   /* ---------- מסלול מוגן חדש: פרויקטים כספיים ---------- */
   app.use('/api/projects', requireAuth, projectRoutes);
+
+  /* ---------- מסלול חדשות ---------- */
+  app.use('/api/news', requireAuth, newsRoutes);
 };

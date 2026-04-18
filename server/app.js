@@ -1,4 +1,4 @@
-import 'dotenv/config';
+﻿import 'dotenv/config';
 import dns from 'dns';
 dns.setServers(['8.8.8.8', '8.8.4.4']); // Fix: Windows DNS Client (127.0.0.1) doesn't support TCP DNS needed for SRV records
 import express from 'express';
@@ -33,7 +33,7 @@ import logsRoutes from './routes/logsRoutes.js';
 import tzitzitRoutes from './routes/tzitzitRoutes.js';
 import hotelOrderRoutes from './routes/hotelOrderRoutes.js';
 import hotelZiporiDataRoutes from './routes/hotelZiporiDataRoutes.js';
-import './db/ziporiDb.js'; // יזום חיבור ל-zipori MongoDB
+import './db/ziporiDb.js'; // ׳™׳–׳•׳ ׳—׳™׳‘׳•׳¨ ׳-zipori MongoDB
 import familyRoutes from './routes/familyRoutes.js';
 import shoppingRoutes from './routes/shoppingRoutes.js';
 import householdTaskRoutes from './routes/householdTaskRoutes.js';
@@ -56,6 +56,7 @@ import studyRoutes from './routes/studyRoutes.js';
 import articleRoutes from './routes/articleRoutes.js';
 import zmanimRoutes from './routes/zmanimRoutes.js';
 import shieorUserRoutes from './routes/shieorUserRoutes.js';
+import newsRoutes from './routes/newsRoutes.js';
 
 import rateLimiter from './middlewares/rateLimiter.js';
 import { requireAuth } from './middlewares/authMiddleware.js';
@@ -69,7 +70,7 @@ const __dirname = path.dirname(__filename);
 const requiredEnvVars = ['MONGO_URI', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'];
 const missingVars = requiredEnvVars.filter(v => !process.env[v]);
 if (missingVars.length) {
-  console.error(`❌ Missing required environment variables: ${missingVars.join(', ')}`);
+  console.error(`ג Missing required environment variables: ${missingVars.join(', ')}`);
   console.error('   Make sure your .env file exists and contains these variables.');
   process.exit(1);
 }
@@ -78,9 +79,9 @@ if (missingVars.length) {
 const connectDB = async () => {
   try {
     const conn = await mongoose.connect(process.env.MONGO_URI);
-    console.log(`✔ MongoDB Connected: ${conn.connection.host}`);
+    console.log(`ג” MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
-    console.error(`❌ MongoDB Connection Error: ${error.message}`);
+    console.error(`ג MongoDB Connection Error: ${error.message}`);
     process.exit(1);
   }
 };
@@ -99,7 +100,7 @@ const io = new Server(httpServer, {
 app.set('io', io);
 setupSocketIO(io);
 
-// --- Trust Proxy (קריטי לזיהוי IP אמיתי מאחורי Nginx/Cloudflare) ---
+// --- Trust Proxy (׳§׳¨׳™׳˜׳™ ׳׳–׳™׳”׳•׳™ IP ׳׳׳™׳×׳™ ׳׳׳—׳•׳¨׳™ Nginx/Cloudflare) ---
 app.set('trust proxy', 1);
 
 // --- Security & Config ---
@@ -125,21 +126,22 @@ app.use('/uploads/software', express.static(path.join(__dirname, '../uploads/sof
 app.use(loggingMiddleware);
 
 // =================================================================
-// Routes ללא הגנה (Public)
+// Routes ׳׳׳ ׳”׳’׳ ׳” (Public)
 // =================================================================
 app.use('/api/chat', chatRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/logs', logsRoutes);
 
-// --- Shieor routes (APK לימוד יומי — ללא CSRF) ---
+// --- Shieor routes (APK ׳׳™׳׳•׳“ ׳™׳•׳׳™ ג€” ׳׳׳ CSRF) ---
 app.use('/api/study', studyRoutes);
 app.use('/api/articles', articleRoutes);
 app.use('/api/zmanim', zmanimRoutes);
 app.use('/api/user', shieorUserRoutes);
+app.use('/api/news', newsRoutes);
 // =================================================================
 
 
-// --- CSRF Protection (החסימה מתחילה מכאן) ---
+// --- CSRF Protection (׳”׳—׳¡׳™׳׳” ׳׳×׳—׳™׳׳” ׳׳›׳׳) ---
 const csrfProtection = csurf({
   cookie: {
     httpOnly: true,
@@ -152,7 +154,7 @@ app.get('/api/csrf-token', rateLimiter, csrfProtection, (req, res) => {
   res.json({ csrfToken: req.csrfToken() });
 });
 
-// --- Protected Routes (מכאן והלאה הכל חסום ללא טוקן) ---
+// --- Protected Routes (׳׳›׳׳ ׳•׳”׳׳׳” ׳”׳›׳ ׳—׳¡׳•׳ ׳׳׳ ׳˜׳•׳§׳) ---
 app.use(csrfProtection);
 
 app.use('/api/emails', requireAuth, emailRoutes);
@@ -201,6 +203,7 @@ startEmailListener();
 connectToWhatsApp();
 
 const PORT = process.env.PORT || 5000;
-httpServer.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+httpServer.listen(PORT, () => console.log(`נ€ Server running on port ${PORT}`));
 
 export default app;
+

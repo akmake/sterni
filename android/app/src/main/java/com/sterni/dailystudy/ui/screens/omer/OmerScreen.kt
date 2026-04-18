@@ -1,19 +1,18 @@
 package com.sterni.dailystudy.ui.screens.omer
 
-import android.Manifest
-import android.content.pm.PackageManager
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,114 +20,149 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.sterni.dailystudy.ui.theme.*
-
-private val BG           = Color(0xFFEAE8E7)
-private val GreenCounted = Color(0xFF00D18C)
-private val AmberMissed  = Color(0xFFFFC200)
-private val ActiveRing   = Primary
-private val FutureText   = Color(0xFF9E9E9E)
-private val FutureBg     = Color(0xFFF5F5F5)
+import com.sterni.dailystudy.omer.OmerHelper
+import com.sterni.dailystudy.omer.OmerNusach
+import com.sterni.dailystudy.omer.OmerScheduler
+import com.sterni.dailystudy.omer.OmerTracker
+import com.sterni.dailystudy.ui.theme.BaHaYetzira
+import com.sterni.dailystudy.ui.theme.SblHebrew
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OmerScreen(
     onBack: () -> Unit,
-    onDayClick: (Int) -> Unit,
-    vm: OmerViewModel = viewModel()
+    onDayClick: (Int) -> Unit
 ) {
-    val state by vm.state.collectAsState()
-    val ctx = LocalContext.current
+    val context = LocalContext.current
+    val activeDay = remember { OmerHelper.activeOmerDay(context) }
+    val counted = remember { mutableStateOf(OmerTracker.getAllCounted(context)) }
 
-    val notifPermLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted -> if (granted) vm.setNotificationsEnabled(true) }
-
-    // Refresh every time the screen becomes active so the omer day stays current
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) vm.refresh()
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    // Schedule notifications when screen opens
+    LaunchedEffect(Unit) {
+        OmerScheduler.scheduleIfNeeded(context)
     }
 
     Scaffold(
-        containerColor = BG,
         topBar = {
             TopAppBar(
-                title = { Text("ספירת העומר", fontFamily = BaHaYetzira) },
+                title = {
+                    Text(
+                        "ספירת העומר",
+                        fontFamily = BaHaYetzira,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ChevronRight, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזור")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                actions = {
+                    IconButton(onClick = {
+                        OmerScheduler.scheduleIfNeeded(context)
+                    }) {
+                        Icon(Icons.Default.Notifications, contentDescription = "הפעל תזכורות")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary
+                )
             )
         }
     ) { padding ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(padding)
+                .padding(16.dp)
         ) {
-            item {
-                OmerStatusCard(
-                    activeDay = state.activeDay,
-                    days = state.days,
-                    onMark = { vm.markDay(it) },
-                    onUnmark = { vm.unmarkDay(it) },
-                    onNusachClick = { day -> if (day in 1..49) onDayClick(day) }
-                )
-            }
+            // Status card
+            OmerStatusCard(
+                activeDay = activeDay,
+                totalCounted = counted.value.size,
+                onCountClick = {
+                    if (activeDay in 1..49 && !OmerTracker.isCounted(context, activeDay)) {
+                        OmerTracker.markCounted(context, activeDay)
+                        counted.value = OmerTracker.getAllCounted(context)
+                    }
+                    if (activeDay in 1..49) {
+                        onDayClick(activeDay)
+                    }
+                }
+            )
 
-            item { Spacer(Modifier.height(4.dp)) }
+            Spacer(modifier = Modifier.height(16.dp))
 
-            for (week in 1..7) {
-                item {
-                    OmerWeekRow(
-                        week = week,
-                        days = state.days,
-                        onToggle = { entry ->
-                            if (entry.counted) vm.unmarkDay(entry.day)
-                            else if (entry.canMark) vm.markDay(entry.day)
-                        }
+            // 7x7 grid
+            Text(
+                "לוח ספירה",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = SblHebrew,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            // Week headers
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                val sefirot = listOf("חסד", "גבורה", "תפארת", "נצח", "הוד", "יסוד", "מלכות")
+                sefirot.forEach { s ->
+                    Text(
+                        text = s,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.width(44.dp),
+                        textAlign = TextAlign.Center
                     )
                 }
             }
 
-            item { Spacer(Modifier.height(4.dp)) }
+            Spacer(modifier = Modifier.height(4.dp))
 
-            item {
-                NotificationToggleCard(
-                    enabled = state.notificationsEnabled,
-                    onToggle = { enabled ->
-                        if (enabled && Build.VERSION.SDK_INT >= 33) {
-                            if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS)
-                                != PackageManager.PERMISSION_GRANTED
-                            ) {
-                                notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                return@NotificationToggleCard
-                            }
-                        }
-                        vm.setNotificationsEnabled(enabled)
-                    }
-                )
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(7),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items((1..49).toList()) { day ->
+                    val isCounted = day in counted.value
+                    val isToday = day == activeDay
+                    val nusach = OmerNusach.getDayNusach(day)
+
+                    OmerDayCell(
+                        day = day,
+                        isCounted = isCounted,
+                        isToday = isToday,
+                        onClick = { onDayClick(day) }
+                    )
+                }
             }
 
-            item { Spacer(Modifier.height(16.dp)) }
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Legend
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                LegendDot(color = MaterialTheme.colorScheme.primary, label = "נספר")
+                Spacer(Modifier.width(16.dp))
+                LegendDot(color = Color(0xFFF59E0B), label = "היום")
+                Spacer(Modifier.width(16.dp))
+                LegendDot(color = MaterialTheme.colorScheme.surfaceVariant, label = "טרם")
+            }
         }
     }
 }
@@ -136,155 +170,104 @@ fun OmerScreen(
 @Composable
 private fun OmerStatusCard(
     activeDay: Int,
-    days: List<OmerDayEntry>,
-    onMark: (Int) -> Unit,
-    onUnmark: (Int) -> Unit,
-    onNusachClick: (Int) -> Unit
+    totalCounted: Int,
+    onCountClick: () -> Unit
 ) {
-    Surface(
+    val context = LocalContext.current
+    val isTwilight = activeDay == -2
+    val isOutside = activeDay == -1
+    val dayNusach = if (activeDay in 1..49) OmerNusach.getDayNusach(activeDay) else null
+
+    Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        shadowElevation = 2.dp
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+        ),
+        elevation = CardDefaults.cardElevation(4.dp)
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
+            modifier = Modifier.padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            if (activeDay in 1 until 50) {
-                Text(
-                    text = "יום",
-                    fontSize = 13.sp,
-                    color = Muted,
-                    fontFamily = SblHebrew
-                )
-                Text(
-                    text = days.getOrNull(activeDay - 1)?.hebNumeral ?: "",
-                    fontSize = 42.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = BaHaYetzira,
-                    color = Primary
-                )
-                Text(
-                    text = "לעומר",
-                    fontSize = 13.sp,
-                    color = Muted,
-                    fontFamily = SblHebrew
-                )
+            when {
+                isOutside -> {
+                    Text(
+                        "לא בתקופת העומר",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SblHebrew
+                    )
+                }
+                isTwilight -> {
+                    Text(
+                        "בין השמשות",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = SblHebrew,
+                        color = Color(0xFFF59E0B)
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "המתן לצאת הכוכבים לפני הספירה",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                else -> {
+                    Text(
+                        "יום ${OmerHelper.hebrewNumeral(activeDay)}",
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontFamily = BaHaYetzira,
+                        color = MaterialTheme.colorScheme.primary
+                    )
 
-                Spacer(Modifier.height(12.dp))
+                    dayNusach?.let {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            it.sefirah,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontFamily = SblHebrew
+                        )
+                        Text(
+                            it.hebrewDate,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFamily = SblHebrew
+                        )
+                    }
 
-                val entry = days.getOrNull(activeDay - 1)
-                if (entry != null) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (!entry.counted) {
-                            Button(
-                                onClick = { onMark(activeDay) },
-                                colors = ButtonDefaults.buttonColors(containerColor = Primary),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text("ספרתי ✓", fontFamily = SblHebrew, fontSize = 14.sp)
-                            }
-                        }
-                        OutlinedButton(
-                            onClick = { onNusachClick(activeDay) },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Primary)
-                        ) {
-                            Text("נוסח הספירה", fontFamily = SblHebrew, fontSize = 14.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "נספרו $totalCounted מתוך 49",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+
+                    val alreadyCounted = OmerTracker.isCounted(LocalContext.current, activeDay)
+                    Button(
+                        onClick = onCountClick,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (alreadyCounted)
+                                MaterialTheme.colorScheme.secondaryContainer
+                            else MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        if (alreadyCounted) {
+                            Icon(Icons.Default.Check, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("נספר — צפה בנוסח", fontFamily = SblHebrew)
+                        } else {
+                            Text("ספור עכשיו", fontFamily = SblHebrew, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
-            } else if (activeDay == -2) {
-                Text(
-                    text = "בין השמשות",
-                    fontSize = 18.sp,
-                    fontFamily = BaHaYetzira,
-                    color = Amber,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    text = "המתן לצאת הכוכבים לספירה",
-                    fontSize = 13.sp,
-                    color = Muted,
-                    fontFamily = SblHebrew
-                )
-            } else {
-                Text(
-                    text = "אין ספירה כעת",
-                    fontSize = 18.sp,
-                    fontFamily = BaHaYetzira,
-                    color = Muted,
-                    textAlign = TextAlign.Center
-                )
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            if (activeDay in 1..49) {
-                val currentWeek = (activeDay - 1) / 7 + 1
-                val weekDays = days.filter { it.week == currentWeek }
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    weekDays.forEach { entry ->
-                        val bg = when {
-                            entry.counted  -> GreenCounted
-                            entry.isActive -> Primary.copy(alpha = 0.15f)
-                            else           -> FutureBg
-                        }
-                        val borderMod = if (entry.isActive)
-                            Modifier.border(2.dp, ActiveRing, CircleShape) else Modifier
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .then(borderMod)
-                                .clip(CircleShape)
-                                .background(bg)
-                                .clickable(enabled = entry.canMark || entry.counted) {
-                                    if (entry.counted) onUnmark(entry.day) else onMark(entry.day)
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = entry.hebNumeral,
-                                fontSize = 11.sp,
-                                fontFamily = SblHebrew,
-                                color = if (entry.counted) Color.White else Ink
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun OmerWeekRow(
-    week: Int,
-    days: List<OmerDayEntry>,
-    onToggle: (OmerDayEntry) -> Unit
-) {
-    val weekDays = days.filter { it.week == week }
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = Color.White,
-        shadowElevation = 1.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            weekDays.forEach { entry ->
-                OmerDayCell(entry = entry) { onToggle(entry) }
             }
         }
     }
@@ -292,80 +275,64 @@ private fun OmerWeekRow(
 
 @Composable
 private fun OmerDayCell(
-    entry: OmerDayEntry,
+    day: Int,
+    isCounted: Boolean,
+    isToday: Boolean,
     onClick: () -> Unit
 ) {
-    val bg = when {
-        entry.counted  -> GreenCounted
-        entry.isActive -> Primary.copy(alpha = 0.12f)
-        entry.canMark  -> AmberMissed.copy(alpha = 0.15f)
-        else           -> FutureBg
+    val bgColor = when {
+        isCounted -> MaterialTheme.colorScheme.primary
+        isToday   -> Color(0xFFF59E0B)
+        else      -> MaterialTheme.colorScheme.surfaceVariant
     }
     val textColor = when {
-        entry.counted  -> Color.White
-        entry.isActive -> Primary
-        entry.canMark  -> AmberMissed
-        else           -> FutureText
+        isCounted -> Color.White
+        isToday   -> Color.White
+        else      -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-    val borderMod = if (entry.isActive) Modifier.border(2.dp, ActiveRing, CircleShape) else Modifier
 
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Box(
         modifier = Modifier
-            .width(40.dp)
-            .clickable(enabled = entry.canMark || entry.counted, onClick = onClick)
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(bgColor)
+            .then(
+                if (isToday && !isCounted)
+                    Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                else Modifier
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .then(borderMod)
-                .clip(CircleShape)
-                .background(bg),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = entry.hebNumeral,
-                fontSize = 12.sp,
-                fontFamily = SblHebrew,
-                fontWeight = FontWeight.Normal,
-                color = textColor
+        if (isCounted) {
+            Icon(
+                Icons.Default.Check,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(16.dp)
             )
         }
+        Text(
+            text = OmerHelper.hebrewNumeral(day),
+            fontSize = if (isCounted) 9.sp else 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = textColor,
+            textAlign = TextAlign.Center,
+            modifier = if (isCounted) Modifier.offset(y = 8.dp) else Modifier
+        )
     }
 }
 
 @Composable
-private fun NotificationToggleCard(
-    enabled: Boolean,
-    onToggle: (Boolean) -> Unit
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = Color.White,
-        shadowElevation = 1.dp
-    ) {
-        Row(
+private fun LegendDot(color: Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = "תזכורות ספירה",
-                fontSize = 15.sp,
-                fontFamily = SblHebrew,
-                color = Ink
-            )
-            Switch(
-                checked = enabled,
-                onCheckedChange = onToggle,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = Color.White,
-                    checkedTrackColor = Primary
-                )
-            )
-        }
+                .size(12.dp)
+                .clip(CircleShape)
+                .background(color)
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

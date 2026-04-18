@@ -104,6 +104,13 @@ fun HomeScreen(
                 )
                 NavigationBarItem(
                     selected = false,
+                    onClick  = { android.widget.Toast.makeText(context, "בקרוב", android.widget.Toast.LENGTH_SHORT).show() },
+                    icon     = { Icon(androidx.compose.material.icons.Icons.Default.Feed, contentDescription = null, modifier = Modifier.size(22.dp)) },
+                    label    = { Text("חדשות", fontSize = 11.sp) },
+                    colors   = navColors()
+                )
+                NavigationBarItem(
+                    selected = false,
                     onClick  = onToolsClick,
                     icon     = { Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(22.dp)) },
                     label    = { Text("כלים", fontSize = 11.sp) },
@@ -289,31 +296,37 @@ fun HomeHeader(
                 verticalAlignment     = Alignment.CenterVertically
             ) {
                 // In RTL Row: first = RIGHT side = go to yesterday
-                IconButton(onClick = onPrevDay) {
+                IconButton(
+                    onClick = onPrevDay,
+                    modifier = Modifier.size(48.dp).background(Color.Transparent, RoundedCornerShape(8.dp))
+                ) {
                     Icon(
                         Icons.Default.KeyboardArrowRight,
                         contentDescription = "יום קודם",
                         tint               = Primary,
-                        modifier           = Modifier.size(28.dp)
+                        modifier           = Modifier.size(32.dp)
                     )
                 }
 
                 Text(
                     text       = "${displayDate.toHebrewDayOfWeek()} ${com.sterni.dailystudy.util.HebrewDate.format(displayDate.format(DateTimeFormatter.ISO_LOCAL_DATE))}",
                     fontSize   = 22.sp,
-                    fontWeight = FontWeight.ExtraBold,
                     fontFamily = BaHaYetzira,
-                    color      = Ink,
-                    textAlign  = TextAlign.Center
+                    color      = Primary,
+                    textAlign  = TextAlign.Center,
+                    modifier   = Modifier.weight(1f)
                 )
 
                 // In RTL Row: last = LEFT side = go to tomorrow
-                IconButton(onClick = onNextDay) {
+                IconButton(
+                    onClick = onNextDay,
+                    modifier = Modifier.size(48.dp).background(Color.Transparent, RoundedCornerShape(8.dp))
+                ) {
                     Icon(
                         Icons.Default.KeyboardArrowLeft,
                         contentDescription = "יום הבא",
                         tint               = Primary,
-                        modifier           = Modifier.size(28.dp)
+                        modifier           = Modifier.size(32.dp)
                     )
                 }
             }

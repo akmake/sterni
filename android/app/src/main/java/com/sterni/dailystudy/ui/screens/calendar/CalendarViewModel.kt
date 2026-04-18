@@ -288,13 +288,17 @@ class CalendarViewModel(app: Application) : AndroidViewModel(app) {
         val startDow    = cells.firstOrNull()?.dayOfWeek ?: Calendar.SUNDAY
         val startOffset = startDow - 1
 
-        val hebrewMonthName = HEBREW_MONTHS.getOrElse(hebrewMonth - 1) { "" }
+        val hdf = com.kosherjava.zmanim.hebrewcalendar.HebrewDateFormatter().apply {
+            isHebrewFormat = true
+        }
+        val hebrewMonthName = hdf.formatMonth(startJd)
+        val hebrewYearFormatted = hdf.formatHebrewNumber(hebrewYear)
 
         _state.value = _state.value.copy(
             days             = cells,
             startOffset      = startOffset,
             monthLabel       = "",
-            hebrewMonthLabel = "$hebrewMonthName $hebrewYear",
+            hebrewMonthLabel = "$hebrewMonthName $hebrewYearFormatted",
             loading          = false
         )
     }
@@ -389,12 +393,10 @@ class CalendarViewModel(app: Application) : AndroidViewModel(app) {
         return try {
             val cal = Calendar.getInstance().apply { set(year, month, 15) }
             val jc  = JewishCalendar(cal)
-            HEBREW_MONTHS.getOrElse(jc.jewishMonth - 1) { "" }
+            val hdf = com.kosherjava.zmanim.hebrewcalendar.HebrewDateFormatter().apply {
+                isHebrewFormat = true
+            }
+            "${hdf.formatMonth(jc)} ${hdf.formatHebrewNumber(jc.jewishYear)}"
         } catch (_: Exception) { "" }
     }
 }
-
-private val HEBREW_MONTHS = listOf(
-    "ניסן", "אייר", "סיון", "תמוז", "אב", "אלול",
-    "תשרי", "חשוון", "כסלו", "טבת", "שבט", "אדר", "אדר ב׳"
-)

@@ -133,6 +133,39 @@ fun PdfStudyScreen(
         var offsetX     by remember { mutableStateOf(0f) }
         var offsetY     by remember { mutableStateOf(0f) }
         var showControls by remember { mutableStateOf(true) }
+        var showGoToPageDialog by remember { mutableStateOf(false) }
+        var goToPageStr by remember { mutableStateOf("") }
+
+        if (showGoToPageDialog) {
+            AlertDialog(
+                onDismissRequest = { showGoToPageDialog = false },
+                title = { Text("מעבר לעמוד") },
+                text = {
+                    OutlinedTextField(
+                        value = goToPageStr,
+                        onValueChange = { goToPageStr = it },
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                        ),
+                        singleLine = true,
+                        placeholder = { Text("הכנס מספר עמוד (1-${currentBook.totalPages})") }
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val p = goToPageStr.toIntOrNull()
+                        if (p != null) {
+                            vm.goToPage(p - 1)
+                            scale = 1f; offsetX = 0f; offsetY = 0f
+                        }
+                        showGoToPageDialog = false
+                    }) { Text("עבור", color = Primary) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showGoToPageDialog = false }) { Text("ביטול", color = Primary) }
+                }
+            )
+        }
 
         Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
 
@@ -143,13 +176,22 @@ fun PdfStudyScreen(
                         var swipeAccX = 0f
                         detectTransformGestures { _, pan, zoom, _ ->
                             if (zoom != 1f) {
-                                scale = (scale * zoom).coerceIn(1f, 5f)
-                                if (scale > 1f) { offsetX += pan.x; offsetY += pan.y }
+                                scale = (scale * zoom).coerceIn(1f, 3f)
+                                val maxOffsetX = 1200f * (scale - 1f)
+                                val maxOffsetY = 1800f * (scale - 1f)
+                                if (scale > 1f) {
+                                    offsetX = (offsetX + pan.x * scale).coerceIn(-maxOffsetX, maxOffsetX)
+                                    offsetY = (offsetY + pan.y * scale).coerceIn(-maxOffsetY, maxOffsetY)
+                                }
                                 swipeAccX = 0f
                             } else if (scale > 1f) {
-                                offsetX += pan.x; offsetY += pan.y
+                                val maxOffsetX = 1200f * (scale - 1f)
+                                val maxOffsetY = 1800f * (scale - 1f)
+                                offsetX = (offsetX + pan.x * scale).coerceIn(-maxOffsetX, maxOffsetX)
+                                offsetY = (offsetY + pan.y * scale).coerceIn(-maxOffsetY, maxOffsetY)
                                 swipeAccX = 0f
                             } else {
+                                offsetX = 0f; offsetY = 0f
                                 swipeAccX += pan.x
                                 if (swipeAccX > 120f) {
                                     vm.nextPage()
@@ -231,7 +273,15 @@ fun PdfStudyScreen(
                         Icon(Icons.Default.ChevronRight, "Prev Page", tint = Color.White)
                     }
 
-                    Text("עמוד ${currentBook.currentPage + 1}", color = Color.White, fontSize = 16.sp)
+                    Text(
+                        "עמוד ${currentBook.currentPage + 1}",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        modifier = Modifier.clickable { 
+                            goToPageStr = "${currentBook.currentPage + 1}"
+                            showGoToPageDialog = true 
+                        }.padding(8.dp)
+                    )
 
                     FilledIconButton(
                         onClick  = { vm.nextPage(); scale = 1f; offsetX = 0f; offsetY = 0f },

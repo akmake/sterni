@@ -26,6 +26,7 @@
         android:label="@string/app_name"
         android:roundIcon="@drawable/app_logo"
         android:supportsRtl="true"
+        android:enableOnBackInvokedCallback="true"
         android:theme="@style/Theme.DailyStudy"
         android:usesCleartextTraffic="false">
 
@@ -47,8 +48,10 @@
         <!-- Zmanim alarm receiver -->
         <receiver
             android:name=".alarm.ZmanimAlarmReceiver"
-            android:exported="false" />
-
+            android:exported="false" />            
+        <receiver
+            android:name=".notification.CalendarReminderReceiver"
+            android:exported="true" />
         <!-- Boot receiver — reschedules zmanim alarms after reboot -->
         <receiver
             android:name=".alarm.BootReceiver"

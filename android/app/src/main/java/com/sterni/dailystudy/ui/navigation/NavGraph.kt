@@ -11,48 +11,36 @@ import com.sterni.dailystudy.ui.screens.home.HomeScreen
 import com.sterni.dailystudy.ui.screens.location.LocationZoneScreen
 import com.sterni.dailystudy.ui.screens.mamaarim.MamaarimScreen
 import com.sterni.dailystudy.ui.screens.mamaarim.MamaarReaderScreen
-import com.sterni.dailystudy.ui.screens.mamaarim.ArticleUploadScreen
-import com.sterni.dailystudy.ui.screens.pdflibrary.PdfStudyScreen
 import com.sterni.dailystudy.ui.screens.settings.SettingsScreen
 import com.sterni.dailystudy.ui.screens.study.StudyDetailScreen
 import com.sterni.dailystudy.ui.screens.tracker.StudyTrackerScreen
 import com.sterni.dailystudy.ui.screens.zmanim.ZmanimScreen
 import com.sterni.dailystudy.ui.screens.omer.OmerScreen
 import com.sterni.dailystudy.ui.screens.omer.OmerNusachScreen
-import com.sterni.dailystudy.ui.screens.tefila.EizVehuScreen
-import com.sterni.dailystudy.ui.screens.tefila.RabbenuTamScreen
 import com.sterni.dailystudy.ui.screens.tefila.TefilaScreen
-import com.sterni.dailystudy.ui.screens.tools.JerusalemDirectionScreen
-import com.sterni.dailystudy.ui.screens.tools.PermissionsScreen
 import com.sterni.dailystudy.ui.screens.tools.ToolsScreen
 import java.net.URLDecoder
 import java.net.URLEncoder
 
 sealed class Screen(val route: String) {
-    object Home       : Screen("home")
+    object Home : Screen("home")
     object StudyDetail : Screen("study/{studyKey}/{date}/{title}/{label}") {
         fun createRoute(studyKey: String, date: String, title: String, label: String) =
             "study/$studyKey/${URLEncoder.encode(date, "UTF-8")}/${URLEncoder.encode(title, "UTF-8")}/${URLEncoder.encode(label, "UTF-8")}"
     }
-    object Zmanim               : Screen("zmanim")
-    object Mamaarim             : Screen("mamaarim")
-    object MamaarReader         : Screen("mamaarReader/{id}") {
+    object Zmanim        : Screen("zmanim")
+    object Mamaarim      : Screen("mamaarim")
+    object MamaarReader  : Screen("mamaarReader/{id}") {
         fun createRoute(id: String) = "mamaarReader/$id"
     }
-    object ArticleUpload        : Screen("articleUpload")
-    object PdfLibrary           : Screen("pdfLibrary")
-    object LocationZones        : Screen("locationZones")
-    object StudyTracker         : Screen("studyTracker")
-    object Calendar             : Screen("calendar")
-    object Settings             : Screen("settings")
-    object Tools                : Screen("tools")
-    object Permissions          : Screen("permissions")
-    object JerusalemDirection   : Screen("jerusalemDirection")
-    object Tefila               : Screen("tefila")
-    object EizVehu              : Screen("eizVehu")
-    object RabbenuTam           : Screen("rabbenuTam")
-    object Omer                 : Screen("omer")
-    object OmerNusach           : Screen("omerNusach/{day}") {
+    object LocationZones : Screen("locationZones")
+    object StudyTracker  : Screen("studyTracker")
+    object Calendar      : Screen("calendar")
+    object Settings      : Screen("settings")
+    object Tools         : Screen("tools")
+    object Tefila        : Screen("tefila")
+    object Omer          : Screen("omer")
+    object OmerNusach    : Screen("omerNusach/{day}") {
         fun createRoute(day: Int) = "omerNusach/$day"
     }
 }
@@ -74,14 +62,12 @@ fun NavGraph(navController: NavHostController) {
                 onSettingsClick     = { navController.navigate(Screen.Settings.route) },
                 onToolsClick        = { navController.navigate(Screen.Tools.route) },
                 onTefilaClick       = { navController.navigate(Screen.Tefila.route) },
-                onOmerClick         = { navController.navigate(Screen.Omer.route) },
-                onPdfLibraryClick   = { navController.navigate(Screen.PdfLibrary.route) },
-                onOmerNusachClick   = { day -> navController.navigate(Screen.OmerNusach.createRoute(day)) }
+                onOmerClick         = { navController.navigate(Screen.Omer.route) }
             )
         }
 
         composable(
-            route     = Screen.StudyDetail.route,
+            route = Screen.StudyDetail.route,
             arguments = listOf(
                 navArgument("studyKey") { type = NavType.StringType },
                 navArgument("date")     { type = NavType.StringType },
@@ -108,25 +94,20 @@ fun NavGraph(navController: NavHostController) {
 
         composable(Screen.Mamaarim.route) {
             MamaarimScreen(
-                onBack   = { navController.popBackStack() },
-                onOpen   = { id -> navController.navigate(Screen.MamaarReader.createRoute(id)) },
-                onUpload = { navController.navigate(Screen.ArticleUpload.route) }
-            )
-        }
-
-        composable(Screen.ArticleUpload.route) {
-            ArticleUploadScreen(
-                onBack    = { navController.popBackStack() },
-                onSuccess = { navController.popBackStack(Screen.Mamaarim.route, inclusive = false) }
+                onBack  = { navController.popBackStack() },
+                onOpen  = { id -> navController.navigate(Screen.MamaarReader.createRoute(id)) }
             )
         }
 
         composable(
-            route     = Screen.MamaarReader.route,
+            route = Screen.MamaarReader.route,
             arguments = listOf(navArgument("id") { type = NavType.StringType })
         ) { backStackEntry ->
             val id = backStackEntry.arguments?.getString("id") ?: return@composable
-            MamaarReaderScreen(mamaarId = id, onBack = { navController.popBackStack() })
+            MamaarReaderScreen(
+                mamaarId = id,
+                onBack   = { navController.popBackStack() }
+            )
         }
 
         composable(Screen.LocationZones.route) {
@@ -147,39 +128,16 @@ fun NavGraph(navController: NavHostController) {
 
         composable(Screen.Tools.route) {
             ToolsScreen(
-                onBack                    = { navController.popBackStack() },
-                onSilentZoneClick         = { navController.navigate(Screen.LocationZones.route) },
-                onPermissionsClick        = { navController.navigate(Screen.Permissions.route) },
-                onJerusalemDirectionClick = { navController.navigate(Screen.JerusalemDirection.route) }
+                onBack            = { navController.popBackStack() },
+                onTefilaClick     = { navController.navigate(Screen.Tefila.route) },
+                onOmerClick       = { navController.navigate(Screen.Omer.route) },
+                onSilentZoneClick = { navController.navigate(Screen.LocationZones.route) },
+                onMamaarimClick   = { navController.navigate(Screen.Mamaarim.route) }
             )
-        }
-
-        composable(Screen.Permissions.route) {
-            PermissionsScreen(onBack = { navController.popBackStack() })
-        }
-
-        composable(Screen.JerusalemDirection.route) {
-            JerusalemDirectionScreen(onBack = { navController.popBackStack() })
-        }
-
-        composable(Screen.PdfLibrary.route) {
-            PdfStudyScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Screen.Tefila.route) {
-            TefilaScreen(
-                onBack            = { navController.popBackStack() },
-                onEizVehuClick    = { navController.navigate(Screen.EizVehu.route) },
-                onRabbenuTamClick = { navController.navigate(Screen.RabbenuTam.route) }
-            )
-        }
-
-        composable(Screen.EizVehu.route) {
-            EizVehuScreen(onBack = { navController.popBackStack() })
-        }
-
-        composable(Screen.RabbenuTam.route) {
-            RabbenuTamScreen(onBack = { navController.popBackStack() })
+            TefilaScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Screen.Omer.route) {
@@ -190,11 +148,14 @@ fun NavGraph(navController: NavHostController) {
         }
 
         composable(
-            route     = Screen.OmerNusach.route,
+            route = Screen.OmerNusach.route,
             arguments = listOf(navArgument("day") { type = NavType.IntType })
         ) { backStackEntry ->
             val day = backStackEntry.arguments?.getInt("day") ?: 1
-            OmerNusachScreen(day = day, onBack = { navController.popBackStack() })
+            OmerNusachScreen(
+                day    = day,
+                onBack = { navController.popBackStack() }
+            )
         }
     }
 }

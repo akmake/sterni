@@ -114,6 +114,12 @@ class PdfStudyViewModel(app: Application) : AndroidViewModel(app) {
         if (book.currentPage > 0) renderPage(book.currentPage - 1)
     }
 
+    fun goToPage(page: Int) {
+        val book = _state.value.currentBook ?: return
+        val target = page.coerceIn(0, book.totalPages - 1)
+        renderPage(target)
+    }
+
     // ── Internal ──────────────────────────────────────────────────────────────
 
     private fun loadPdf(uri: Uri, startPage: Int) {

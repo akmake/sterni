@@ -12,6 +12,7 @@ import com.sterni.dailystudy.geofence.GeofenceCheckWorker
 import com.sterni.dailystudy.geofence.GeofenceHelper
 import com.sterni.dailystudy.notification.MidnightReminderReceiver
 import com.sterni.dailystudy.notification.ZmanBriefWorker
+import com.sterni.dailystudy.notification.CalendarReminderWorker
 import com.sterni.dailystudy.sync.StudySyncWorker
 import com.sterni.dailystudy.sync.UserManager
 import com.sterni.dailystudy.sync.UserSyncWorker
@@ -47,6 +48,9 @@ class MainActivity : ComponentActivity() {
         MidnightReminderReceiver.createChannel(this)
         if (ZmanBriefWorker.isEnabled(this)) ZmanBriefWorker.enqueue(this)
         if (MidnightReminderReceiver.isEnabled(this)) MidnightReminderReceiver.schedule(this)
+
+        // Queue custom Calendar alerts processing continuously
+        CalendarReminderWorker.enqueuePeriodic(this)
 
         // Re-schedule all active zmanim alarms
         ZmanimRescheduler.rescheduleAll(this)

@@ -35,7 +35,6 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sterni.dailystudy.data.model.Study
-import com.sterni.dailystudy.omer.OmerHelper
 import com.sterni.dailystudy.tracker.StudyTracker
 import com.sterni.dailystudy.ui.theme.BaHaYetzira
 import com.sterni.dailystudy.ui.theme.Ink
@@ -62,9 +61,7 @@ fun HomeScreen(
     onToolsClick:       () -> Unit = {},
     onNewsClick:        () -> Unit = {},
     onTefilaClick:      () -> Unit = {},
-    onOmerClick:        () -> Unit = {},
     onPdfLibraryClick:  () -> Unit = {},
-    onOmerNusachClick:  (Int) -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState  by viewModel.uiState.collectAsStateWithLifecycle()
@@ -77,9 +74,6 @@ fun HomeScreen(
     LaunchedEffect(dateOffset) {
         viewModel.loadDailyStudy(displayDate.format(DateTimeFormatter.ISO_LOCAL_DATE))
     }
-
-    // Current active Omer day
-    val activeOmerDay = remember { OmerHelper.activeOmerDay(context) }
 
     Scaffold(
         containerColor = HomeBg,
@@ -205,23 +199,6 @@ fun HomeScreen(
                             }
                         }
 
-                        // ── Omer card ────────────────────────────────────────
-                        if (activeOmerDay in 1..49) {
-                            item {
-                                AnimatedVisibility(
-                                    visible = true,
-                                    enter   = slideInVertically(initialOffsetY = { 40 }) + fadeIn()
-                                ) {
-                                    OmerStudyCard(
-                                        day      = activeOmerDay,
-                                        modifier = Modifier
-                                            .padding(horizontal = 16.dp)
-                                            .padding(bottom = 10.dp),
-                                        onClick  = { onOmerNusachClick(activeOmerDay) }
-                                    )
-                                }
-                            }
-                        }
                     }
                 }
             }
@@ -392,94 +369,6 @@ private fun QuickChip(
                 Icon(icon, contentDescription = null, tint = Primary, modifier = Modifier.size(18.dp))
             }
             Text(text = label, fontSize = 12.sp, color = Primary, fontFamily = SblHebrew)
-        }
-    }
-}
-
-// ── Omer Study Card ───────────────────────────────────────────────────────────
-
-@Composable
-private fun OmerStudyCard(
-    day:      Int,
-    modifier: Modifier = Modifier,
-    onClick:  () -> Unit
-) {
-    Surface(
-        modifier        = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick),
-        shape           = RoundedCornerShape(16.dp),
-        color           = CardBg,
-        shadowElevation = 1.5.dp
-    ) {
-        Row(
-            modifier          = Modifier.fillMaxWidth().padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier         = Modifier
-                    .size(46.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFF7C3AED).copy(alpha = 0.10f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector        = Icons.Default.DateRange,
-                    contentDescription = null,
-                    tint               = Color(0xFF7C3AED),
-                    modifier           = Modifier.size(22.dp)
-                )
-            }
-
-            Spacer(Modifier.width(14.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment     = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier              = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text       = "ספירת העומר",
-                        fontSize   = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color      = Ink,
-                        fontFamily = SblHebrew,
-                        modifier   = Modifier.weight(1f, fill = false)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = Color(0xFF7C3AED).copy(alpha = 0.09f)
-                    ) {
-                        Text(
-                            text       = "יום ${OmerHelper.hebrewNumeral(day)}",
-                            modifier   = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                            fontSize   = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color      = Color(0xFF7C3AED),
-                            fontFamily = SblHebrew,
-                            style      = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl)
-                        )
-                    }
-                }
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text       = "לחץ לנוסח הספירה והברכה",
-                    fontSize   = 13.sp,
-                    color      = Muted,
-                    fontFamily = SblHebrew
-                )
-            }
-
-            Spacer(Modifier.width(8.dp))
-            Icon(
-                imageVector        = Icons.Default.ChevronLeft,
-                contentDescription = null,
-                tint               = Muted.copy(alpha = 0.4f),
-                modifier           = Modifier.size(20.dp)
-            )
         }
     }
 }

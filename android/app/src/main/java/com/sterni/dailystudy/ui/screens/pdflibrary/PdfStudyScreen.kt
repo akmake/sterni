@@ -177,18 +177,20 @@ fun PdfStudyScreen(
                         detectTransformGestures { _, pan, zoom, _ ->
                             if (zoom != 1f) {
                                 scale = (scale * zoom).coerceIn(1f, 3f)
-                                val maxOffsetX = 1200f * (scale - 1f)
-                                val maxOffsetY = 1800f * (scale - 1f)
+                                val maxOffsetX = (size.width * (scale - 1f)) / 2f
+                                val maxOffsetY = (size.height * (scale - 1f)) / 2f
                                 if (scale > 1f) {
-                                    offsetX = (offsetX + pan.x * scale).coerceIn(-maxOffsetX, maxOffsetX)
-                                    offsetY = (offsetY + pan.y * scale).coerceIn(-maxOffsetY, maxOffsetY)
+                                    offsetX = (offsetX + pan.x).coerceIn(-maxOffsetX, maxOffsetX)
+                                    offsetY = (offsetY + pan.y).coerceIn(-maxOffsetY, maxOffsetY)
+                                } else {
+                                    offsetX = 0f; offsetY = 0f
                                 }
                                 swipeAccX = 0f
                             } else if (scale > 1f) {
-                                val maxOffsetX = 1200f * (scale - 1f)
-                                val maxOffsetY = 1800f * (scale - 1f)
-                                offsetX = (offsetX + pan.x * scale).coerceIn(-maxOffsetX, maxOffsetX)
-                                offsetY = (offsetY + pan.y * scale).coerceIn(-maxOffsetY, maxOffsetY)
+                                val maxOffsetX = (size.width * (scale - 1f)) / 2f
+                                val maxOffsetY = (size.height * (scale - 1f)) / 2f
+                                offsetX = (offsetX + pan.x).coerceIn(-maxOffsetX, maxOffsetX)
+                                offsetY = (offsetY + pan.y).coerceIn(-maxOffsetY, maxOffsetY)
                                 swipeAccX = 0f
                             } else {
                                 offsetX = 0f; offsetY = 0f

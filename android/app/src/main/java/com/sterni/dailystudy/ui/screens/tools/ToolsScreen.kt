@@ -25,9 +25,10 @@ import com.sterni.dailystudy.ui.theme.SblHebrew
 fun ToolsScreen(
     onBack: () -> Unit,
     onTefilaClick: () -> Unit,
-    onOmerClick: () -> Unit,
     onSilentZoneClick: () -> Unit,
-    onMamaarimClick: () -> Unit
+    onMamaarimClick: () -> Unit,
+    onPermissionsClick: () -> Unit,
+    onJerusalemDirClick: () -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -70,11 +71,20 @@ fun ToolsScreen(
             }
             item {
                 ToolCard(
-                    title = "ספירת העומר",
-                    subtitle = "ספירה יומית עם נוסח מלא",
-                    icon = Icons.Default.DateRange,
+                    title = "הרשאות",
+                    subtitle = "ניהול כל הרשאות האפליקציה",
+                    icon = Icons.Default.Security,
                     accentColor = Color(0xFF7C3AED),
-                    onClick = onOmerClick
+                    onClick = onPermissionsClick
+                )
+            }
+            item {
+                ToolCard(
+                    title = "כיוון ירושלים",
+                    subtitle = "מצפן לכיוון ירושלים עיר הקודש",
+                    icon = Icons.Default.Explore,
+                    accentColor = Color(0xFFEA580C),
+                    onClick = onJerusalemDirClick
                 )
             }
             item {

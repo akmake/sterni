@@ -1,5 +1,6 @@
 package com.sterni.dailystudy.ui.screens.tefila
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -8,86 +9,187 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sterni.dailystudy.ui.theme.BaHaYetzira
 import com.sterni.dailystudy.ui.theme.SblHebrew
 
+private val LightBg = Color(0xFFFDFBF7)
+private val Primary = Color(0xFF1B5E20)
+private val Ink = Color(0xFF2D2D2D)
+private val Muted = Color(0xFF8E8E93)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TefilaScreen(
     onBack: () -> Unit
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("איזהו מקומן", "רבינו תם", "ברכות")
+    var selectedSection by remember { mutableIntStateOf(-1) }
 
     Scaffold(
+        containerColor = LightBg,
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        "תפילה",
+                        if (selectedSection == -1) "תפילה"
+                        else when (selectedSection) {
+                            0 -> "ברכות השחר והתורה"
+                            1 -> "איזהו מקומן"
+                            else -> "תפילה"
+                        },
                         fontFamily = BaHaYetzira,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = Ink
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזור")
+                    IconButton(onClick = {
+                        if (selectedSection == -1) onBack() else selectedSection = -1
+                    }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזור", tint = Primary)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = LightBg)
             )
         }
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            TabRow(
-                selectedTabIndex = selectedTab,
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.primary
+        if (selectedSection == -1) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                tabs.forEachIndexed { index, title ->
-                    Tab(
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index },
-                        text = {
-                            Text(
-                                title,
-                                fontFamily = SblHebrew,
-                                fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    )
-                }
+                PrayerSectionCard(
+                    title = "ברכות השחר והתורה",
+                    subtitle = "ברכות הבוקר וברכות התורה",
+                    color = Color(0xFF1B5E20),
+                    onClick = { selectedSection = 0 }
+                )
+                PrayerSectionCard(
+                    title = "איזהו מקומן",
+                    subtitle = "סדר קרבנות — פרק ה׳ מזבחים",
+                    color = Color(0xFF4A148C),
+                    onClick = { selectedSection = 1 }
+                )
             }
-
-            when (selectedTab) {
-                0 -> EizehuMekomanContent()
-                1 -> RabbeinuTamContent()
-                2 -> BrachotContent()
+        } else {
+            when (selectedSection) {
+                0 -> BrachotContent(Modifier.padding(padding))
+                1 -> EizehuMekomanContent(Modifier.padding(padding))
             }
         }
     }
 }
 
 @Composable
-private fun EizehuMekomanContent() {
+private fun PrayerSectionCard(
+    title: String,
+    subtitle: String,
+    color: Color,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp, 40.dp)
+                    .background(color, RoundedCornerShape(3.dp))
+            )
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    title,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = BaHaYetzira,
+                    color = Ink,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    subtitle,
+                    fontSize = 14.sp,
+                    fontFamily = SblHebrew,
+                    color = Muted,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BrachotContent(modifier: Modifier = Modifier) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp)
+            .padding(horizontal = 20.dp, vertical = 8.dp)
+    ) {
+        SectionTitle("ברכות השחר")
+
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, אֲשֶׁר נָתַן לַשֶּׂכְוִי בִינָה לְהַבְחִין בֵּין יוֹם וּבֵין לָיְלָה:")
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, שֶׁעָשַׂנִי יִשְׂרָאֵל:")
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, שֶׁעָשַׂנִי בֶּן חוֹרִין:")
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, פּוֹקֵחַ עִוְרִים:")
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, מַלְבִּישׁ עֲרֻמִּים:")
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, מַתִּיר אֲסוּרִים:")
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, זוֹקֵף כְּפוּפִים:")
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, רוֹקַע הָאָרֶץ עַל הַמָּיִם:")
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, שֶׁעָשָׂה לִי כָּל צָרְכִּי:")
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, הַמֵּכִין מִצְעֲדֵי גָבֶר:")
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, אוֹזֵר יִשְׂרָאֵל בִּגְבוּרָה:")
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, עוֹטֵר יִשְׂרָאֵל בְּתִפְאָרָה:")
+        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, הַנּוֹתֵן לַיָּעֵף כֹּחַ:")
+
+        Spacer(Modifier.height(20.dp))
+        SectionTitle("ברכות התורה")
+
+        PrayerText(
+            "בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, אֲשֶׁר קִדְּשָׁנוּ בְּמִצְוֹתָיו " +
+            "וְצִוָּנוּ לַעֲסוֹק בְּדִבְרֵי תוֹרָה:"
+        )
+        PrayerText(
+            "וְהַעֲרֶב נָא יְיָ אֱלֹהֵינוּ אֶת דִּבְרֵי תוֹרָתְךָ בְּפִינוּ וּבְפִיפִיּוֹת עַמְּךָ בֵּית יִשְׂרָאֵל. " +
+            "וְנִהְיֶה אֲנַחְנוּ וְצֶאֱצָאֵינוּ וְצֶאֱצָאֵי עַמְּךָ בֵּית יִשְׂרָאֵל " +
+            "כֻּלָּנוּ יוֹדְעֵי שְׁמֶךָ וְלוֹמְדֵי תוֹרָתֶךָ לִשְׁמָהּ. בָּרוּךְ אַתָּה יְיָ, הַמְלַמֵּד תּוֹרָה לְעַמּוֹ יִשְׂרָאֵל:"
+        )
+        PrayerText(
+            "בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, אֲשֶׁר בָּחַר בָּנוּ מִכָּל הָעַמִּים, " +
+            "וְנָתַן לָנוּ אֶת תּוֹרָתוֹ. בָּרוּךְ אַתָּה יְיָ, נוֹתֵן הַתּוֹרָה:"
+        )
+
+        Spacer(Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun EizehuMekomanContent(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 8.dp)
     ) {
         SectionTitle("איזהו מקומן של זבחים")
 
@@ -156,106 +258,15 @@ private fun EizehuMekomanContent() {
 }
 
 @Composable
-private fun RabbeinuTamContent() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp)
-    ) {
-        SectionTitle("שקיעת רבינו תם")
-
-        PrayerText(
-            "לדעת רבינו תם, זמן צאת הכוכבים הוא 72 דקות לאחר השקיעה הנראית. " +
-            "כלומר, בין השקיעה לצאת הכוכבים עוברות 72 דקות (שעות זמניות), " +
-            "ובתוך זמן זה נמשך זמן \"בין השמשות\"."
-        )
-
-        Spacer(Modifier.height(12.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
-            )
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    "עיקרי ההלכה:",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    fontFamily = SblHebrew,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(Modifier.height(8.dp))
-                BulletPoint("מוצאי שבת — יש להמתין עד 72 דקות אחרי השקיעה")
-                BulletPoint("הדלקת נרות — לפי שעון השקיעה הרגילה")
-                BulletPoint("בתענית — הצום נמשך עד צאת ר\"ת")
-                BulletPoint("קריאת שמע של ערבית — לכתחילה אחרי צאת ר\"ת")
-            }
-        }
-
-        Spacer(Modifier.height(32.dp))
-    }
-}
-
-@Composable
-private fun BrachotContent() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp)
-    ) {
-        SectionTitle("ברכות השחר")
-
-        PrayerText(
-            "בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, אֲשֶׁר נָתַן לַשֶּׂכְוִי בִינָה לְהַבְחִין בֵּין יוֹם וּבֵין לָיְלָה:"
-        )
-        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, שֶׁעָשַׂנִי יִשְׂרָאֵל:")
-        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, שֶׁעָשַׂנִי בֶּן חוֹרִין:")
-        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, פּוֹקֵחַ עִוְרִים:")
-        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, מַלְבִּישׁ עֲרֻמִּים:")
-        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, מַתִּיר אֲסוּרִים:")
-        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, זוֹקֵף כְּפוּפִים:")
-        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, רוֹקַע הָאָרֶץ עַל הַמָּיִם:")
-        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, שֶׁעָשָׂה לִי כָּל צָרְכִּי:")
-        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, הַמֵּכִין מִצְעֲדֵי גָבֶר:")
-        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, אוֹזֵר יִשְׂרָאֵל בִּגְבוּרָה:")
-        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, עוֹטֵר יִשְׂרָאֵל בְּתִפְאָרָה:")
-        PrayerText("בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, הַנּוֹתֵן לַיָּעֵף כֹּחַ:")
-
-        Spacer(Modifier.height(20.dp))
-        SectionTitle("ברכות התורה")
-
-        PrayerText(
-            "בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, אֲשֶׁר קִדְּשָׁנוּ בְּמִצְוֹתָיו " +
-            "וְצִוָּנוּ לַעֲסוֹק בְּדִבְרֵי תוֹרָה:"
-        )
-        PrayerText(
-            "וְהַעֲרֶב נָא יְיָ אֱלֹהֵינוּ אֶת דִּבְרֵי תוֹרָתְךָ בְּפִינוּ וּבְפִיפִיּוֹת עַמְּךָ בֵּית יִשְׂרָאֵל. " +
-            "וְנִהְיֶה אֲנַחְנוּ וְצֶאֱצָאֵינוּ וְצֶאֱצָאֵי עַמְּךָ בֵּית יִשְׂרָאֵל " +
-            "כֻּלָּנוּ יוֹדְעֵי שְׁמֶךָ וְלוֹמְדֵי תוֹרָתֶךָ לִשְׁמָהּ. בָּרוּךְ אַתָּה יְיָ, הַמְלַמֵּד תּוֹרָה לְעַמּוֹ יִשְׂרָאֵל:"
-        )
-        PrayerText(
-            "בָּרוּךְ אַתָּה יְיָ אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, אֲשֶׁר בָּחַר בָּנוּ מִכָּל הָעַמִּים, " +
-            "וְנָתַן לָנוּ אֶת תּוֹרָתוֹ. בָּרוּךְ אַתָּה יְיָ, נוֹתֵן הַתּוֹרָה:"
-        )
-
-        Spacer(Modifier.height(32.dp))
-    }
-}
-
-@Composable
 private fun SectionTitle(text: String) {
     Text(
         text = text,
         fontSize = 22.sp,
         fontWeight = FontWeight.Bold,
         fontFamily = BaHaYetzira,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(bottom = 12.dp)
+        color = Primary,
+        textAlign = TextAlign.End,
+        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
     )
 }
 
@@ -266,7 +277,7 @@ private fun PrayerText(text: String) {
             .fillMaxWidth()
             .padding(vertical = 4.dp),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(1.dp)
     ) {
         Text(
@@ -275,22 +286,7 @@ private fun PrayerText(text: String) {
             fontSize = 18.sp,
             lineHeight = 30.sp,
             fontFamily = SblHebrew,
-            color = MaterialTheme.colorScheme.onSurface,
-            style = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl)
-        )
-    }
-}
-
-@Composable
-private fun BulletPoint(text: String) {
-    Row(modifier = Modifier.padding(vertical = 3.dp)) {
-        Text("•", fontSize = 14.sp, color = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = text,
-            fontSize = 14.sp,
-            fontFamily = SblHebrew,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = Ink,
             style = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl)
         )
     }

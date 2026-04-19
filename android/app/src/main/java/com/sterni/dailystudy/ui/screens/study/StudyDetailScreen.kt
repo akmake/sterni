@@ -63,11 +63,25 @@ fun StudyDetailScreen(
     LaunchedEffect(studyKey, date) { viewModel.load(studyKey, date, label) }
 
     val prefs = remember { context.getSharedPreferences("StudyPrefs", Context.MODE_PRIVATE) }
-    val fontSize = remember { mutableIntStateOf(prefs.getInt("text_size_sp", 20)) }
-    val scrollSpeed = remember { mutableIntStateOf(prefs.getInt("scroll_speed", 40)) }
     val isShnayim = studyKey == "shnayimMikra"
     val isTanya = studyKey == "tanya"
     val isTehillim = studyKey == "tehillim"
+    val isChumash = studyKey == "chumash"
+    val chumashPrefs = remember { context.getSharedPreferences("ChumashPrefs", Context.MODE_PRIVATE) }
+
+    val fontSize = remember {
+        mutableIntStateOf(
+            if (isChumash) chumashPrefs.getInt("chumash_text_size", 20)
+            else prefs.getInt("text_size_sp", 20)
+        )
+    }
+    val rashiFontSize = remember { mutableIntStateOf(chumashPrefs.getInt("rashi_text_size", 17)) }
+    val scrollSpeed = remember {
+        mutableIntStateOf(
+            if (isChumash) chumashPrefs.getInt("chumash_scroll_speed", 40)
+            else prefs.getInt("scroll_speed", 40)
+        )
+    }
     val connected = remember {
         context.getSharedPreferences("ShnayimPrefs", Context.MODE_PRIVATE)
             .getBoolean("shnayim_mikra_connected", true)
@@ -88,20 +102,59 @@ fun StudyDetailScreen(
     }
 
     if (showSettingsDialog) {
-        ReadingSettingsDialog(
-            fontSize = fontSize.intValue,
-            scrollSpeed = scrollSpeed.intValue,
-            onDismiss = { showSettingsDialog = false },
-            onSave = { size, speed ->
-                fontSize.intValue = size
-                scrollSpeed.intValue = speed
-                prefs.edit()
-                    .putInt("text_size_sp", size)
-                    .putInt("scroll_speed", speed)
-                    .apply()
-                showSettingsDialog = false
-            }
-        )
+        if (isChumash) {
+            ChumashSettingsDialog(
+                chumashFontSize = fontSize.intValue,
+                rashiFontSize = rashiFontSize.intValue,
+                scrollSpeed = scrollSpeed.intValue,
+                onDismiss = { showSettingsDialog = false },
+                onSave = { cSize, rSize, speed ->
+                    fontSize.intValue = cSize
+                    rashiFontSize.intValue = rSize
+                    scrollSpeed.intValue = speed
+                    chumashPrefs.edit()
+                        .putInt("chumash_text_size", cSize)
+                        .putInt("rashi_text_size", rSize)
+                        .putInt("chumash_scroll_speed", speed)
+                        .apply()
+                    showSettingsDialog = false
+                }
+            )
+        } else if (isTehillim) {
+            TehillimSettingsDialog(
+                fontSize = fontSize.intValue,
+                scrollSpeed = scrollSpeed.intValue,
+                currentChapters = state.customChapters,
+                onDismiss = { showSettingsDialog = false },
+                onSave = { size, speed, chapters ->
+                    fontSize.intValue = size
+                    scrollSpeed.intValue = speed
+                    prefs.edit()
+                        .putInt("text_size_sp", size)
+                        .putInt("scroll_speed", speed)
+                        .apply()
+                    if (chapters != null) {
+                        viewModel.saveCustomChapters(chapters, date, label)
+                    }
+                    showSettingsDialog = false
+                }
+            )
+        } else {
+            ReadingSettingsDialog(
+                fontSize = fontSize.intValue,
+                scrollSpeed = scrollSpeed.intValue,
+                onDismiss = { showSettingsDialog = false },
+                onSave = { size, speed ->
+                    fontSize.intValue = size
+                    scrollSpeed.intValue = speed
+                    prefs.edit()
+                        .putInt("text_size_sp", size)
+                        .putInt("scroll_speed", speed)
+                        .apply()
+                    showSettingsDialog = false
+                }
+            )
+        }
     }
 
     val listState = rememberLazyListState()
@@ -161,11 +214,6 @@ fun StudyDetailScreen(
                             maxLines = 1,
                             fontFamily = SblHebrew
                         )
-                        if (isTehillim) {
-                            IconButton(onClick = { showCustomChaptersDialog = true }) {
-                                Icon(Icons.Default.Add, contentDescription = "Custom chapters", tint = Primary)
-                            }
-                        }
                         IconButton(onClick = { showSettingsDialog = true }) {
                             Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Primary)
                         }
@@ -243,7 +291,7 @@ fun StudyDetailScreen(
                                     .fillMaxWidth()
                                     .absolutePadding(left = 12.dp, right = 16.dp)
                             ) {
-                                SectionRow(section, isShnayim, isTanya, connected, fontSize.intValue)
+                                SectionRow(section, isShnayim, isTanya, connected, fontSize.intValue, if (isChumash) rashiFontSize.intValue else null)
                             }
                         }
                     }
@@ -307,13 +355,14 @@ private fun SectionRow(
     isShnayim: Boolean,
     isTanya: Boolean,
     connected: Boolean,
-    fontSize: Int
+    fontSize: Int,
+    rashiFontSizeOverride: Int? = null
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         when {
             section.isHeader -> HeaderRow(section, fontSize)
             !section.ordinal.isNullOrEmpty() -> HalachaRow(section, fontSize)
-            else -> VerseRow(section, isShnayim, isTanya, connected, fontSize)
+            else -> VerseRow(section, isShnayim, isTanya, connected, fontSize, rashiFontSizeOverride)
         }
     }
 }
@@ -380,7 +429,8 @@ private fun VerseRow(
     isShnayim: Boolean,
     isTanya: Boolean,
     connected: Boolean,
-    fontSize: Int
+    fontSize: Int,
+    rashiFontSizeOverride: Int? = null
 ) {
     val hasRashi = !section.rashi.isNullOrEmpty()
     val he = section.he ?: ""
@@ -448,7 +498,7 @@ private fun VerseRow(
                 Text(en, fontSize = maxOf(14, fontSize - 3).sp, color = Muted, lineHeight = (maxOf(14, fontSize - 3) * 1.3f).sp, modifier = Modifier.fillMaxWidth())
             }
         }
-        if (hasRashi) RashiBlock(section.rashi!!, fontSize)
+        if (hasRashi) RashiBlock(section.rashi!!, rashiFontSizeOverride ?: fontSize)
     }
 }
 
@@ -606,6 +656,102 @@ fun ReadingSettingsDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel", color = Muted) }
+        }
+    )
+}
+
+// ── Chumash Settings Dialog ─────────────────────────────────────────────────
+@Composable
+fun ChumashSettingsDialog(
+    chumashFontSize: Int,
+    rashiFontSize: Int,
+    scrollSpeed: Int,
+    onDismiss: () -> Unit,
+    onSave: (Int, Int, Int) -> Unit
+) {
+    var cSize by remember { mutableIntStateOf(chumashFontSize) }
+    var rSize by remember { mutableIntStateOf(rashiFontSize) }
+    var speed by remember { mutableIntStateOf(scrollSpeed) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFFFDFBF7),
+        title = {
+            Text("הגדרות חומש", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Primary, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("גודל טקסט חומש: ${cSize}sp", fontSize = 14.sp, color = Ink)
+                Slider(value = cSize.toFloat(), onValueChange = { cSize = it.toInt() }, valueRange = 14f..32f, steps = 17, colors = SliderDefaults.colors(thumbColor = Primary, activeTrackColor = Primary))
+                Text("גודל טקסט רש\"י: ${rSize}sp", fontSize = 14.sp, color = Ink)
+                Slider(value = rSize.toFloat(), onValueChange = { rSize = it.toInt() }, valueRange = 12f..28f, steps = 15, colors = SliderDefaults.colors(thumbColor = Primary, activeTrackColor = Primary))
+                Text("מהירות גלילה: $speed", fontSize = 14.sp, color = Ink)
+                Slider(value = speed.toFloat(), onValueChange = { speed = it.toInt() }, valueRange = 10f..100f, steps = 8, colors = SliderDefaults.colors(thumbColor = Primary, activeTrackColor = Primary))
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onSave(cSize, rSize, speed) }, colors = ButtonDefaults.buttonColors(containerColor = Primary)) { Text("שמור") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("ביטול", color = Muted) }
+        }
+    )
+}
+
+// ── Tehillim Settings Dialog ────────────────────────────────────────────────
+@Composable
+fun TehillimSettingsDialog(
+    fontSize: Int,
+    scrollSpeed: Int,
+    currentChapters: List<Int>,
+    onDismiss: () -> Unit,
+    onSave: (Int, Int, List<Int>?) -> Unit
+) {
+    var size by remember { mutableIntStateOf(fontSize) }
+    var speed by remember { mutableIntStateOf(scrollSpeed) }
+    var showChaptersDialog by remember { mutableStateOf(false) }
+    var savedChapters by remember { mutableStateOf<List<Int>?>(null) }
+
+    if (showChaptersDialog) {
+        CustomTehillimChaptersDialog(
+            currentChapters = savedChapters ?: currentChapters,
+            onDismiss = { showChaptersDialog = false },
+            onSave = { chapters ->
+                savedChapters = chapters
+                showChaptersDialog = false
+            }
+        )
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFFFDFBF7),
+        title = {
+            Text("הגדרות תהילים", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Primary, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("גודל טקסט: ${size}sp", fontSize = 14.sp, color = Ink)
+                Slider(value = size.toFloat(), onValueChange = { size = it.toInt() }, valueRange = 14f..32f, steps = 17, colors = SliderDefaults.colors(thumbColor = Primary, activeTrackColor = Primary))
+                Text("מהירות גלילה: $speed", fontSize = 14.sp, color = Ink)
+                Slider(value = speed.toFloat(), onValueChange = { speed = it.toInt() }, valueRange = 10f..100f, steps = 8, colors = SliderDefaults.colors(thumbColor = Primary, activeTrackColor = Primary))
+                HorizontalDivider(color = Muted.copy(alpha = 0.2f))
+                Button(
+                    onClick = { showChaptersDialog = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = Primary.copy(alpha = 0.1f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = Primary, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("פרקים אישיים", color = Primary, fontSize = 14.sp)
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onSave(size, speed, savedChapters) }, colors = ButtonDefaults.buttonColors(containerColor = Primary)) { Text("שמור") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("ביטול", color = Muted) }
         }
     )
 }

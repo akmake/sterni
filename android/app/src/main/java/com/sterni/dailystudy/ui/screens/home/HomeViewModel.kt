@@ -56,19 +56,28 @@ class HomeViewModel @Inject constructor(
             }
 
             try {
-                val day = apiService.getDailyStudy(dateString)
-                StudyCache.save(ctx, dateString, day)
-                _uiState.value = HomeUiState(
-                    isLoading  = false,
-                    date       = dateString,
-                    hebrewDate = day.hebrewDate ?: "",
-                    studies    = day.studies ?: emptyMap()
-                )
+                val response = apiService.getDailyStudy(dateString)
+                val day = if (response.isSuccessful) response.body() else null
+                if (day != null) {
+                    StudyCache.save(ctx, dateString, day)
+                    _uiState.value = HomeUiState(
+                        isLoading  = false,
+                        date       = dateString,
+                        hebrewDate = day.hebrewDate ?: "",
+                        studies    = day.studies ?: emptyMap()
+                    )
+                } else {
+                    _uiState.value = HomeUiState(
+                        isLoading = false,
+                        date      = dateString,
+                        error     = "אין חיבור לשרת. נסה שוב מאוחר יותר."
+                    )
+                }
             } catch (e: Exception) {
                 _uiState.value = HomeUiState(
-                    isLoading  = false,
-                    date       = dateString,
-                    error      = "שגיאה בטעינה: ${e.message}"
+                    isLoading = false,
+                    date      = dateString,
+                    error     = "אין חיבור לאינטרנט."
                 )
             }
         }

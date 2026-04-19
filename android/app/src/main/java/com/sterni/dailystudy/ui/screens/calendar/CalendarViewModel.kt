@@ -250,10 +250,10 @@ class CalendarViewModel(app: Application) : AndroidViewModel(app) {
         val endJd   = JewishDate().apply { setJewishDate(hebrewYear, hebrewMonth, daysInMonth) }
 
         val startCal = Calendar.getInstance().apply {
-            set(startJd.gregorianYear, startJd.gregorianMonth - 1, startJd.gregorianDayOfMonth, 0, 0, 0)
+            set(startJd.gregorianYear, startJd.gregorianMonth, startJd.gregorianDayOfMonth, 0, 0, 0)
         }
         val endCal = Calendar.getInstance().apply {
-            set(endJd.gregorianYear, endJd.gregorianMonth - 1, endJd.gregorianDayOfMonth, 23, 59, 59)
+            set(endJd.gregorianYear, endJd.gregorianMonth, endJd.gregorianDayOfMonth, 23, 59, 59)
         }
 
         val eventMap = loadEventsForRange(startCal.timeInMillis, endCal.timeInMillis, enabledIds)
@@ -261,7 +261,7 @@ class CalendarViewModel(app: Application) : AndroidViewModel(app) {
         val cells = (1..daysInMonth).map { d ->
             jd.setJewishDate(hebrewYear, hebrewMonth, d)
             val gCal = Calendar.getInstance().apply {
-                set(jd.gregorianYear, jd.gregorianMonth - 1, jd.gregorianDayOfMonth)
+                set(jd.gregorianYear, jd.gregorianMonth, jd.gregorianDayOfMonth)
             }
             val dow    = gCal.get(Calendar.DAY_OF_WEEK)
             val gYear  = gCal.get(Calendar.YEAR)

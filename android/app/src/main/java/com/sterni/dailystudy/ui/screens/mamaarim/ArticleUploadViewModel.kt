@@ -40,7 +40,7 @@ class ArticleUploadViewModel(app: Application) : AndroidViewModel(app) {
 
     val title          = MutableStateFlow("")
     val rawText        = MutableStateFlow("")
-    val extractionMode = MutableStateFlow(ExtractionMode.LOCAL)
+    val extractionMode = MutableStateFlow(ExtractionMode.SERVER)
 
     fun onPdfPicked(uri: Uri) {
         _state.value = UploadState.Extracting()

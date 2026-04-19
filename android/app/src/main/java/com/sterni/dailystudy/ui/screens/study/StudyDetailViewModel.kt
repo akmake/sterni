@@ -75,9 +75,12 @@ class StudyDetailViewModel @Inject constructor(
                 dailySections = cachedStudy.sections!!
             } else {
                 try {
-                    val day = apiService.getDailyStudy(date)
-                    StudyCache.save(ctx, date, day)
-                    dailySections = day.studies?.get(key)?.sections ?: emptyList()
+                    val response = apiService.getDailyStudy(date)
+                    val day = if (response.isSuccessful) response.body() else null
+                    if (day != null) {
+                        StudyCache.save(ctx, date, day)
+                        dailySections = day.studies?.get(key)?.sections ?: emptyList()
+                    }
                 } catch (e: Exception) {
                     _uiState.value = StudyDetailUiState(
                         loading = false,
@@ -93,7 +96,8 @@ class StudyDetailViewModel @Inject constructor(
             if (key == "tehillim" && customChapters.isNotEmpty()) {
                 try {
                     val chaptersStr = customChapters.joinToString(",")
-                    val customSections = apiService.getTehillimChapters(chaptersStr).sections ?: emptyList()
+                    val resp = apiService.getTehillimChapters(chaptersStr)
+                    val customSections = if (resp.isSuccessful) resp.body()?.sections ?: emptyList() else emptyList()
                     if (customSections.isNotEmpty()) {
                         val separator = Section(
                             id = "custom_sep",

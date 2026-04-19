@@ -1,6 +1,6 @@
 import https from 'https';
 
-function fetchChannelHtml(channelName) {
+function fetchChannelHtml(channelName, timeoutMs = 8000) {
   return new Promise((resolve, reject) => {
     const options = {
       hostname: 't.me',
@@ -12,11 +12,15 @@ function fetchChannelHtml(channelName) {
       }
     };
 
-    https.get(options, (res) => {
+    const req = https.get(options, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => resolve(data));
-    }).on('error', reject);
+    });
+    req.on('error', reject);
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error(`Timeout fetching t.me/s/${channelName}`));
+    });
   });
 }
 

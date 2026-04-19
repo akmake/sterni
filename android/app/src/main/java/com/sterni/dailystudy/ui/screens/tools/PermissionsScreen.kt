@@ -1,6 +1,8 @@
 package com.sterni.dailystudy.ui.screens.tools
 
 import android.Manifest
+import android.app.NotificationManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -35,7 +37,8 @@ private data class PermissionInfo(
     val title:      String,
     val subtitle:   String,
     val permission: String?,   // null = not a runtime permission (granted automatically)
-    val icon:       ImageVector
+    val icon:       ImageVector,
+    val isDndSpecial: Boolean = false  // requires NotificationManager special access
 )
 
 private val APP_PERMISSIONS = listOf(
@@ -70,10 +73,11 @@ private val APP_PERMISSIONS = listOf(
         icon       = Icons.Default.VolumeOff
     ),
     PermissionInfo(
-        title      = "מצב שקט (DND)",
-        subtitle   = "כיבוי שעוני מעורר בזמן לימוד",
-        permission = Manifest.permission.ACCESS_NOTIFICATION_POLICY,
-        icon       = Icons.Default.DoNotDisturb
+        title        = "נא לא להפריע (DND)",
+        subtitle     = "השתקה אוטומטית ועצירת התראות בזמן לימוד",
+        permission   = null,
+        icon         = Icons.Default.DoNotDisturb,
+        isDndSpecial = true
     ),
     PermissionInfo(
         title      = "אינטרנט",
@@ -94,21 +98,23 @@ private val APP_PERMISSIONS = listOf(
 fun PermissionsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
 
-    // Track grant state — refresh when composable enters composition
-    var grantState by remember {
-        mutableStateOf(
-            APP_PERMISSIONS.associate { p ->
-                p.title to (p.permission == null || ContextCompat.checkSelfPermission(context, p.permission) == PackageManager.PERMISSION_GRANTED)
-            }
-        )
+    val notificationManager = remember {
+        context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     }
+
+    fun isGranted(p: PermissionInfo): Boolean = when {
+        p.isDndSpecial -> notificationManager.isNotificationPolicyAccessGranted
+        p.permission == null -> true
+        else -> ContextCompat.checkSelfPermission(context, p.permission) == PackageManager.PERMISSION_GRANTED
+    }
+
+    // Track grant state — refresh when composable enters composition
+    var grantState by remember { mutableStateOf(APP_PERMISSIONS.associate { it.title to isGranted(it) }) }
 
     val multiPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { results ->
-        grantState = APP_PERMISSIONS.associate { p ->
-            p.title to (p.permission == null || ContextCompat.checkSelfPermission(context, p.permission) == PackageManager.PERMISSION_GRANTED)
-        }
+    ) { _ ->
+        grantState = APP_PERMISSIONS.associate { it.title to isGranted(it) }
     }
 
     Scaffold(
@@ -161,8 +167,11 @@ fun PermissionsScreen(onBack: () -> Unit) {
                     info      = perm,
                     isGranted = isGranted,
                     onRequest = {
-                        if (perm.permission != null) {
-                            multiPermLauncher.launch(arrayOf(perm.permission))
+                        when {
+                            perm.isDndSpecial ->
+                                context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
+                            perm.permission != null ->
+                                multiPermLauncher.launch(arrayOf(perm.permission))
                         }
                     },
                     onOpenSettings = {
@@ -251,7 +260,7 @@ private fun PermissionCard(
                             fontWeight = FontWeight.SemiBold
                         )
                     }
-                    if (!isGranted && info.permission != null) {
+                    if (!isGranted && (info.permission != null || info.isDndSpecial)) {
                         TextButton(
                             onClick      = onRequest,
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),

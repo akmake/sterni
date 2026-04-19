@@ -41,15 +41,23 @@ class NewsViewModel : ViewModel() {
             _state.value = _state.value.copy(loading = true, error = null)
             try {
                 val response = RetrofitClient.newsService.getNewsFeed()
-                _state.value = _state.value.copy(
-                    items = response.items,
-                    loading = false,
-                    lastUpdated = System.currentTimeMillis()
-                )
+                val body = if (response.isSuccessful) response.body() else null
+                if (body != null) {
+                    _state.value = _state.value.copy(
+                        items       = body.items,
+                        loading     = false,
+                        lastUpdated = System.currentTimeMillis()
+                    )
+                } else {
+                    _state.value = _state.value.copy(
+                        loading = false,
+                        error   = "אין חיבור לשרת. נסה שוב מאוחר יותר."
+                    )
+                }
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     loading = false,
-                    error = "שגיאה בטעינת החדשות"
+                    error   = "אין חיבור לאינטרנט."
                 )
             }
         }
@@ -67,7 +75,7 @@ class NewsViewModel : ViewModel() {
             _articleErrors.value = _articleErrors.value - url
             try {
                 val response = RetrofitClient.newsService.getArticle(url)
-                val content = response.content
+                val content = if (response.isSuccessful) response.body()?.content else null
                 if (content != null) {
                     _articleCache[url] = content
                     _articleContents.value = _articleContents.value + (url to content)

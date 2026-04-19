@@ -1,7 +1,7 @@
 import https from 'https';
 import iconv from 'iconv-lite';
 
-function fetchBuffer(url) {
+function fetchBuffer(url, timeoutMs = 8000) {
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
     const options = {
@@ -14,11 +14,15 @@ function fetchBuffer(url) {
       }
     };
 
-    https.get(options, (res) => {
+    const req = https.get(options, (res) => {
       const chunks = [];
       res.on('data', chunk => chunks.push(chunk));
       res.on('end', () => resolve(Buffer.concat(chunks)));
-    }).on('error', reject);
+    });
+    req.on('error', reject);
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error('Timeout fetching rotter RSS'));
+    });
   });
 }
 

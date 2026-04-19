@@ -20,6 +20,8 @@ import com.sterni.dailystudy.ui.screens.tefila.TefilaScreen
 import com.sterni.dailystudy.ui.screens.tools.ToolsScreen
 import com.sterni.dailystudy.ui.screens.tools.PermissionsScreen
 import com.sterni.dailystudy.ui.screens.tools.JerusalemDirectionScreen
+import com.sterni.dailystudy.ui.screens.pdflibrary.PdfStudyScreen
+import com.sterni.dailystudy.ui.screens.mamaarim.ArticleUploadScreen
 import java.net.URLDecoder
 import java.net.URLEncoder
 
@@ -43,6 +45,8 @@ sealed class Screen(val route: String) {
     object Tefila        : Screen("tefila")
     object Permissions    : Screen("permissions")
     object JerusalemDir   : Screen("jerusalemDirection")
+    object PdfLibrary     : Screen("pdfLibrary")
+    object ArticleUpload  : Screen("articleUpload")
 }
 
 @Composable
@@ -62,7 +66,8 @@ fun NavGraph(navController: NavHostController) {
                 onSettingsClick     = { navController.navigate(Screen.Settings.route) },
                 onToolsClick        = { navController.navigate(Screen.Tools.route) },
                 onNewsClick         = { navController.navigate(Screen.News.route) },
-                onTefilaClick       = { navController.navigate(Screen.Tefila.route) }
+                onTefilaClick       = { navController.navigate(Screen.Tefila.route) },
+                onPdfLibraryClick   = { navController.navigate(Screen.PdfLibrary.route) }
             )
         }
 
@@ -94,8 +99,9 @@ fun NavGraph(navController: NavHostController) {
 
         composable(Screen.Mamaarim.route) {
             MamaarimScreen(
-                onBack  = { navController.popBackStack() },
-                onOpen  = { id -> navController.navigate(Screen.MamaarReader.createRoute(id)) }
+                onBack   = { navController.popBackStack() },
+                onOpen   = { id -> navController.navigate(Screen.MamaarReader.createRoute(id)) },
+                onUpload = { navController.navigate(Screen.ArticleUpload.route) }
             )
         }
 
@@ -151,6 +157,17 @@ fun NavGraph(navController: NavHostController) {
 
         composable(Screen.JerusalemDir.route) {
             JerusalemDirectionScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Screen.PdfLibrary.route) {
+            PdfStudyScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Screen.ArticleUpload.route) {
+            ArticleUploadScreen(
+                onBack    = { navController.popBackStack() },
+                onSuccess = { navController.popBackStack() }
+            )
         }
     }
 }

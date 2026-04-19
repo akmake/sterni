@@ -34,8 +34,9 @@ class StudySyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
             val dateStr = sdf.format(calendar.time)
             if (StudyCache.get(ctx, dateStr) == null) {
                 try {
-                    val day = apiService.getDailyStudy(dateStr)
-                    StudyCache.save(ctx, dateStr, day)
+                    val response = apiService.getDailyStudy(dateStr)
+                    val day = if (response.isSuccessful) response.body() else null
+                    if (day != null) StudyCache.save(ctx, dateStr, day)
                     successCount++
                     Log.d("StudySyncWorker", "Downloaded $dateStr")
                 } catch (e: Exception) {

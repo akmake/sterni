@@ -137,7 +137,7 @@ app.use('/api/study', studyRoutes);
 app.use('/api/articles', articleRoutes);
 app.use('/api/zmanim', zmanimRoutes);
 app.use('/api/user', shieorUserRoutes);
-app.use('/api/news', newsRoutes);
+app.use('/api/news', requireAuth, newsRoutes);
 // =================================================================
 
 

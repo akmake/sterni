@@ -24,7 +24,6 @@ server/credentials/
 credentials/
 
 # Uploads (user-generated)
-uploads/
 
 # Docker
 mongo-data/

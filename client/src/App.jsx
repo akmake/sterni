@@ -48,6 +48,7 @@ import UserActivityPage from './pages/UserActivityPage';
 import TzitzitManagementPage from './pages/TzitzitManagementPage';
 import ProfilePage from './pages/ProfilePage';
 import SoftwareLibraryPage from './pages/SoftwareLibraryPage';
+import TetherAdminPage from './pages/TetherAdminPage';
 
 /* Hotel Orders */
 import HotelOrdersPage from './pages/HotelOrdersPage';
@@ -165,6 +166,7 @@ export default function App() {
           <Route path="admin/pricelists" element={<ManagePriceListsPage />} />
           <Route path="admin/extras" element={<ManageExtrasPage />} />
           <Route path="admin/user-activity" element={<UserActivityPage />} />
+          <Route path="admin/tether" element={<TetherAdminPage />} />
         </Route>
 
         <Route element={<TzitzitRoute />}>

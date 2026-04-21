@@ -183,17 +183,31 @@ function Dashboard() {
 
 // ── Policy Editor ─────────────────────────────────────────────────────────────
 function PolicyEditor({ communityId, initialPolicy, onSaved }) {
-  const [policy, setPolicy] = useState(initialPolicy);
+  const [policy, setPolicy] = useState({
+    webFilterMode: 'NONE',
+    allowedDomains: [],
+    blockedDomains: [],
+    ...initialPolicy
+  });
   const [saving, setSaving] = useState(false);
+  const [domainsInput, setDomainsInput] = useState({
+    allowed: (initialPolicy.allowedDomains || []).join('\n'),
+    blocked: (initialPolicy.blockedDomains || []).join('\n'),
+  });
 
   const toggle = (key) => setPolicy(p => ({ ...p, [key]: !p[key] }));
 
   const save = async () => {
     setSaving(true);
     try {
-      await tetherApi.put(`/admin/communities/${communityId}/policy`, policy, { headers: authHeader() });
+      const finalPolicy = {
+        ...policy,
+        allowedDomains: domainsInput.allowed.split('\n').map(d => d.trim().toLowerCase()).filter(Boolean),
+        blockedDomains: domainsInput.blocked.split('\n').map(d => d.trim().toLowerCase()).filter(Boolean),
+      };
+      await tetherApi.put(`/admin/communities/${communityId}/policy`, finalPolicy, { headers: authHeader() });
       toast.success('פוליסי עודכן');
-      onSaved(policy);
+      onSaved(finalPolicy);
     } catch {
       toast.error('שגיאה בשמירה');
     } finally {
@@ -234,6 +248,52 @@ function PolicyEditor({ communityId, initialPolicy, onSaved }) {
           <option value="SHOW_MESSAGE">הצג הודעה</option>
           <option value="REQUEST_APPROVAL">בקשת אישור</option>
         </select>
+      </div>
+
+      {/* Web Filter Section */}
+      <div className="mt-4 pt-4 border-t border-gray-200">
+        <h5 className="text-xs font-semibold text-gray-500 uppercase mb-3">🌐 סינון אינטרנט</h5>
+        <div className="mb-3">
+          <label className="text-xs text-gray-500 mb-1 block">מצב סינון</label>
+          <select
+            value={policy.webFilterMode}
+            onChange={e => setPolicy(p => ({ ...p, webFilterMode: e.target.value }))}
+            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm"
+          >
+            <option value="NONE">ללא סינון</option>
+            <option value="BLACKLIST">חסום אתרים ספציפיים (רשימה שחורה)</option>
+            <option value="WHITELIST">אפשר רק אתרים ספציפיים (רשימה לבנה)</option>
+          </select>
+        </div>
+
+        {policy.webFilterMode === 'BLACKLIST' && (
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">דומיינים חסומים (שורה לכל דומיין)</label>
+            <textarea
+              value={domainsInput.blocked}
+              onChange={e => setDomainsInput(d => ({ ...d, blocked: e.target.value }))}
+              placeholder={"instagram.com\ntiktok.com\nyoutube.com"}
+              rows={5}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+              dir="ltr"
+            />
+          </div>
+        )}
+
+        {policy.webFilterMode === 'WHITELIST' && (
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">דומיינים מותרים בלבד (שורה לכל דומיין)</label>
+            <textarea
+              value={domainsInput.allowed}
+              onChange={e => setDomainsInput(d => ({ ...d, allowed: e.target.value }))}
+              placeholder={"google.com\nwikipedia.org\ngmail.com"}
+              rows={5}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+              dir="ltr"
+            />
+            <p className="text-xs text-gray-400 mt-1">הערה: שרת Tether מותר תמיד באופן אוטומטי</p>
+          </div>
+        )}
       </div>
 
       <button

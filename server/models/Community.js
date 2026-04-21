@@ -15,7 +15,14 @@ const policySchema = new mongoose.Schema({
     enum: ['SILENT', 'SHOW_MESSAGE', 'REQUEST_APPROVAL'],
     default: 'SILENT'
   },
-  logsEnabled: { type: Boolean, default: false }
+  logsEnabled: { type: Boolean, default: false },
+  webFilterMode: {
+    type: String,
+    enum: ['NONE', 'BLACKLIST', 'WHITELIST'],
+    default: 'NONE'
+  },
+  allowedDomains: { type: [String], default: [] },
+  blockedDomains: { type: [String], default: [] }
 }, { _id: false });
 
 const communitySchema = new mongoose.Schema({

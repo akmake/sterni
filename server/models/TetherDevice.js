@@ -16,9 +16,10 @@ const tetherDeviceSchema = new mongoose.Schema({
     ref: 'Community',
     required: true
   },
-  isDeviceOwner: { type: Boolean, default: false },
-  lastSeen:      { type: Date,    default: Date.now },
-  active:        { type: Boolean, default: true }
+  isDeviceOwner:  { type: Boolean, default: false },
+  allowUninstall: { type: Boolean, default: false },
+  lastSeen:       { type: Date,    default: Date.now },
+  active:         { type: Boolean, default: true }
 }, {
   timestamps: true,
   versionKey: false

@@ -1,10 +1,14 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import Community from '../models/Community.js';
 import TetherDevice from '../models/TetherDevice.js';
 import ApprovalRequest from '../models/ApprovalRequest.js';
 import TetherAdmin from '../models/TetherAdmin.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const router = express.Router();
 
@@ -134,7 +138,10 @@ router.get('/devices/:deviceId/policy', async (req, res) => {
     const device = await TetherDevice.findOne({ deviceId: req.params.deviceId }).populate('communityId');
     if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
 
-    res.json({ policy: device.communityId.policy });
+    device.lastSeen = new Date();
+    await device.save();
+
+    res.json({ policy: device.communityId.policy, allowUninstall: device.allowUninstall ?? false });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
@@ -161,6 +168,28 @@ router.post('/devices/:deviceId/approval', async (req, res) => {
 
 // ── Admin routes (require Tether auth) ────────────────────────────────────
 
+const formatCommunity = (c, deviceCount = 0) => ({
+  id: c._id.toString(),
+  name: c.name,
+  code: c.code,
+  policy: c.policy,
+  deviceCount,
+  active: c.active,
+  createdAt: c.createdAt
+});
+
+const formatDevice = (d) => ({
+  id: d._id.toString(),
+  deviceId: d.deviceId,
+  deviceModel: d.deviceModel,
+  communityId: d.communityId.toString(),
+  isDeviceOwner: d.isDeviceOwner,
+  allowUninstall: d.allowUninstall ?? false,
+  lastSeen: d.lastSeen,
+  active: d.active,
+  createdAt: d.createdAt
+});
+
 // Create community
 router.post('/admin/communities', requireTetherAuth, async (req, res) => {
   try {
@@ -173,7 +202,7 @@ router.post('/admin/communities', requireTetherAuth, async (req, res) => {
       policy: policy || {}
     });
 
-    res.status(201).json(community);
+    res.status(201).json(formatCommunity(community));
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
@@ -183,7 +212,13 @@ router.post('/admin/communities', requireTetherAuth, async (req, res) => {
 router.get('/admin/communities', requireTetherAuth, async (req, res) => {
   try {
     const communities = await Community.find({ adminId: req.admin._id });
-    res.json(communities);
+    const communityIds = communities.map(c => c._id);
+    const deviceCounts = await TetherDevice.aggregate([
+      { $match: { communityId: { $in: communityIds }, active: true } },
+      { $group: { _id: '$communityId', count: { $sum: 1 } } }
+    ]);
+    const countMap = Object.fromEntries(deviceCounts.map(d => [d._id.toString(), d.count]));
+    res.json(communities.map(c => formatCommunity(c, countMap[c._id.toString()] || 0)));
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
@@ -196,7 +231,7 @@ router.get('/admin/communities/:id', requireTetherAuth, async (req, res) => {
     if (!community) return res.status(404).json({ message: 'קהילה לא נמצאה' });
 
     const devices = await TetherDevice.find({ communityId: community._id, active: true });
-    res.json({ community, devices });
+    res.json({ community: formatCommunity(community, devices.length), devices: devices.map(formatDevice) });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
@@ -251,6 +286,22 @@ router.put('/admin/approvals/:id', requireTetherAuth, async (req, res) => {
     if (!request) return res.status(404).json({ message: 'בקשה לא נמצאה' });
 
     res.json(request);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// Toggle allow-uninstall for a device
+router.put('/admin/devices/:deviceId/allow-uninstall', requireTetherAuth, async (req, res) => {
+  try {
+    const { allowUninstall } = req.body;
+    const device = await TetherDevice.findOneAndUpdate(
+      { deviceId: req.params.deviceId },
+      { allowUninstall: !!allowUninstall },
+      { new: true }
+    );
+    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
+    res.json({ allowUninstall: device.allowUninstall });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
@@ -418,6 +469,14 @@ router.delete('/admin/members/:id', requireTetherAuth, async (req, res) => {
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
+});
+
+// Serve APK for provisioning (public — Android downloads it during device setup)
+router.get('/app/download', (req, res) => {
+  const apkPath = path.join(__dirname, '../../uploads/tether-latest.apk');
+  res.download(apkPath, 'tether-latest.apk', (err) => {
+    if (err) res.status(404).json({ message: 'APK לא נמצא — העלה את הקובץ לשרת' });
+  });
 });
 
 export default router;

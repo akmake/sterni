@@ -58,6 +58,14 @@ export async function fetchArticleContent(url) {
         .map(el => ({ type: 'youtube', src: el.src, videoId: el.src.match(/embed\/([^?&]+)/)?.[1] }))
         .filter(e => e.videoId);
 
+      // Twitter/X embeds
+      const twitterEmbeds = Array.from(document.querySelectorAll('blockquote.twitter-tweet, blockquote[data-twitter-extracted-i]'))
+        .map(el => {
+          const a = el.querySelector('a[href*="twitter.com/"][href*="/status/"]') || el.querySelector('a[href*="x.com/"][href*="/status/"]');
+          return a?.href || null;
+        })
+        .filter(Boolean);
+
       // Telegram embeds
       const tgEmbeds = Array.from(document.querySelectorAll('iframe[src*="t.me"]'))
         .map(el => ({ type: 'telegram', src: el.src }));
@@ -152,7 +160,7 @@ export async function fetchArticleContent(url) {
             .slice(0, 5)
         : [];
 
-      return { text: articleText, comments, images, youtubeEmbeds, tgEmbeds, title };
+      return { text: articleText, comments, images, youtubeEmbeds, twitterEmbeds, tgEmbeds, title };
     });
 
     setCache(url, result);

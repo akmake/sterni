@@ -348,7 +348,8 @@ class CalendarViewModel(app: Application) : AndroidViewModel(app) {
                     val begin  = c.getLong(colBegin)
                     val end    = c.getLong(colEnd)
                     val allDay = c.getInt(colAllDay) == 1
-                    val evColor = c.getInt(colEvColor).takeIf { it != 0 } ?: c.getInt(colCalColor)
+                    val evColor = (if (colEvColor >= 0) c.getInt(colEvColor).takeIf { it != 0 } else null)
+                        ?: c.getInt(colCalColor)
 
                     val bCal = Calendar.getInstance().apply { timeInMillis = begin }
                     val key = "${bCal.get(Calendar.YEAR)}_${bCal.get(Calendar.MONTH)}_${bCal.get(Calendar.DAY_OF_MONTH)}"

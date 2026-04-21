@@ -4,6 +4,8 @@ import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import com.sterni.dailystudy.cache.StudyCache
 import com.sterni.dailystudy.data.model.Section
 import com.sterni.dailystudy.data.api.ApiService
@@ -14,10 +16,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-private const val TEHILLIM_PREFS = "TehillimPrefs"
-private const val KEY_CUSTOM_CHAPTERS = "custom_chapters"
-private const val KEY_LAST_DATE = "last_tehillim_date"
-private const val KEY_LAST_LABEL = "last_tehillim_label"
+private const val TEHILLIM_PREFS          = "TehillimPrefs"
+private const val KEY_CUSTOM_CHAPTERS     = "custom_chapters"
+private const val KEY_LAST_DATE           = "last_tehillim_date"
+private const val KEY_LAST_LABEL          = "last_tehillim_label"
+private const val KEY_CACHED_CHAPTERS_KEY = "cached_chapters_key"
+private const val KEY_CACHED_SECTIONS     = "cached_custom_sections_json"
 
 data class StudyDetailUiState(
     val loading: Boolean = true,
@@ -46,10 +50,42 @@ class StudyDetailViewModel @Inject constructor(
     }
 
     fun saveCustomChapters(chapters: List<Int>, date: String, label: String) {
-        tehillimPrefs().edit()
-            .putString(KEY_CUSTOM_CHAPTERS, chapters.joinToString(","))
-            .apply()
-        load("tehillim", date, label)
+        val prefs = tehillimPrefs()
+        prefs.edit().putString(KEY_CUSTOM_CHAPTERS, chapters.joinToString(",")).apply()
+
+        if (chapters.isEmpty()) {
+            prefs.edit().remove(KEY_CACHED_CHAPTERS_KEY).remove(KEY_CACHED_SECTIONS).apply()
+            load("tehillim", date, label)
+            return
+        }
+
+        // Download once and cache — no more downloading every day
+        viewModelScope.launch {
+            try {
+                val chaptersStr = chapters.joinToString(",")
+                val resp = apiService.getTehillimChapters(chaptersStr)
+                val sections = if (resp.isSuccessful) resp.body()?.sections ?: emptyList() else emptyList()
+                if (sections.isNotEmpty()) {
+                    val json = Gson().toJson(sections)
+                    prefs.edit()
+                        .putString(KEY_CACHED_CHAPTERS_KEY, chaptersStr)
+                        .putString(KEY_CACHED_SECTIONS, json)
+                        .apply()
+                }
+            } catch (_: Exception) {}
+            load("tehillim", date, label)
+        }
+    }
+
+    private fun getCachedCustomSections(chapters: List<Int>): List<Section>? {
+        val prefs = tehillimPrefs()
+        val cachedKey = prefs.getString(KEY_CACHED_CHAPTERS_KEY, null) ?: return null
+        if (cachedKey != chapters.joinToString(",")) return null
+        val json = prefs.getString(KEY_CACHED_SECTIONS, null) ?: return null
+        return try {
+            val type = object : TypeToken<List<Section>>() {}.type
+            Gson().fromJson(json, type)
+        } catch (_: Exception) { null }
     }
 
     fun load(key: String, date: String, label: String) {
@@ -91,25 +127,19 @@ class StudyDetailViewModel @Inject constructor(
                 }
             }
 
-            // Append custom tehillim chapters if needed
+            // Append custom tehillim chapters — use cache, never re-download
             var allSections = dailySections
             if (key == "tehillim" && customChapters.isNotEmpty()) {
-                try {
-                    val chaptersStr = customChapters.joinToString(",")
-                    val resp = apiService.getTehillimChapters(chaptersStr)
-                    val customSections = if (resp.isSuccessful) resp.body()?.sections ?: emptyList() else emptyList()
-                    if (customSections.isNotEmpty()) {
-                        val separator = Section(
-                            id = "custom_sep",
-                            isHeader = true,
-                            isAliyahHeader = true,
-                            he = "— Personal Chapters —",
-                            en = ""
-                        )
-                        allSections = dailySections + separator + customSections
-                    }
-                } catch (_: Exception) {
-                    // custom chapters failed silently — still show daily
+                val cachedSections = getCachedCustomSections(customChapters)
+                if (cachedSections != null) {
+                    val separator = Section(
+                        id = "custom_sep",
+                        isHeader = true,
+                        isAliyahHeader = true,
+                        he = "— פרקים אישיים —",
+                        en = ""
+                    )
+                    allSections = dailySections + separator + cachedSections
                 }
             }
 

@@ -8,8 +8,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
@@ -45,9 +45,6 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
-private val HomeBg = Color(0xFFFDFBF7)
-private val CardBg = Color.White
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -64,66 +61,76 @@ fun HomeScreen(
     onPdfLibraryClick:  () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
-    val uiState  by viewModel.uiState.collectAsStateWithLifecycle()
-    val context  = LocalContext.current
+    val uiState     by viewModel.uiState.collectAsStateWithLifecycle()
+    val context     = LocalContext.current
     var todayStatus by remember { mutableStateOf(StudyTracker.getTodayStatus(context)) }
     var dateOffset  by remember { mutableStateOf(0) }
     val displayDate = remember(dateOffset) { LocalDate.now().plusDays(dateOffset.toLong()) }
 
-    // Reload study data whenever the selected date changes
     LaunchedEffect(dateOffset) {
         viewModel.loadDailyStudy(displayDate.format(DateTimeFormatter.ISO_LOCAL_DATE))
     }
 
     Scaffold(
-        containerColor = HomeBg,
+        containerColor = Color.White,
         contentWindowInsets = WindowInsets(0.dp),
         bottomBar = {
-            NavigationBar(
-                containerColor = CardBg,
-                tonalElevation = 0.dp,
-                modifier       = Modifier
-                    .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                    .navigationBarsPadding()
-            ) {
-                NavigationBarItem(
-                    selected = true,
-                    onClick  = {},
-                    icon     = { Icon(Icons.Default.Home, contentDescription = null, modifier = Modifier.size(22.dp)) },
-                    label    = { Text("בית", fontSize = 11.sp) },
-                    colors   = navColors()
-                )
-                NavigationBarItem(
-                    selected = false,
-                    onClick  = onZmanimClick,
-                    icon     = { Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(22.dp)) },
-                    label    = { Text("זמנים", fontSize = 11.sp) },
-                    colors   = navColors()
-                )
-                NavigationBarItem(
-                    selected = false,
-                    onClick  = onNewsClick,
-                    icon     = { Icon(androidx.compose.material.icons.Icons.Default.Feed, contentDescription = null, modifier = Modifier.size(22.dp)) },
-                    label    = { Text("חדשות", fontSize = 11.sp) },
-                    colors   = navColors()
-                )
-                NavigationBarItem(
-                    selected = false,
-                    onClick  = onCalendarClick,
-                    icon     = { Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(22.dp)) },
-                    label    = { Text("לוח", fontSize = 11.sp) },
-                    colors   = navColors()
-                )
+            Column(Modifier.background(Color.White)) {
+                HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 0.5.dp)
+                NavigationBar(
+                    containerColor = Color.White,
+                    tonalElevation = 0.dp,
+                    modifier       = Modifier.navigationBarsPadding()
+                ) {
+                    NavigationBarItem(
+                        selected = true,
+                        onClick  = {},
+                        icon     = { Icon(Icons.Default.Home, contentDescription = null, modifier = Modifier.size(22.dp)) },
+                        label    = { Text("בית", fontSize = 11.sp, fontFamily = SblHebrew) },
+                        colors   = navColors()
+                    )
+                    NavigationBarItem(
+                        selected = false,
+                        onClick  = onZmanimClick,
+                        icon     = { Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(22.dp)) },
+                        label    = { Text("זמנים", fontSize = 11.sp, fontFamily = SblHebrew) },
+                        colors   = navColors()
+                    )
+                    NavigationBarItem(
+                        selected = false,
+                        onClick  = onNewsClick,
+                        icon     = { Icon(androidx.compose.material.icons.Icons.Default.Feed, contentDescription = null, modifier = Modifier.size(22.dp)) },
+                        label    = { Text("חדשות", fontSize = 11.sp, fontFamily = SblHebrew) },
+                        colors   = navColors()
+                    )
+                    NavigationBarItem(
+                        selected = false,
+                        onClick  = onCalendarClick,
+                        icon     = { Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(22.dp)) },
+                        label    = { Text("לוח", fontSize = 11.sp, fontFamily = SblHebrew) },
+                        colors   = navColors()
+                    )
+                }
             }
         }
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             when {
-                uiState.isLoading -> CircularProgressIndicator(
-                    modifier    = Modifier.align(Alignment.Center),
-                    color       = Primary,
-                    strokeWidth = 2.dp
-                )
+                uiState.isLoading -> LazyColumn(
+                    modifier       = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 24.dp)
+                ) {
+                    item { SkeletonHeader() }
+                    item { SkeletonQuickRow() }
+                    items(6) { index ->
+                        SkeletonStudyRow()
+                        if (index < 5) HorizontalDivider(
+                            modifier  = Modifier.padding(start = 19.dp),
+                            color     = Color(0xFFF0F0F0),
+                            thickness = 0.5.dp
+                        )
+                    }
+                }
                 uiState.error != null -> ErrorState(
                     message  = uiState.error!!,
                     onRetry  = { viewModel.loadDailyStudy(displayDate.format(DateTimeFormatter.ISO_LOCAL_DATE)) },
@@ -137,7 +144,6 @@ fun HomeScreen(
                         modifier       = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(bottom = 24.dp)
                     ) {
-                        // ── Header ──────────────────────────────────────────────
                         item {
                             HomeHeader(
                                 displayDate     = displayDate,
@@ -152,44 +158,39 @@ fun HomeScreen(
                             )
                         }
 
-                        // ── Quick access ─────────────────────────────────────
                         item {
                             QuickAccessRow(
                                 onMamaarimClick   = onMamaarimClick,
                                 onTefilaClick     = onTefilaClick,
                                 onPdfLibraryClick = onPdfLibraryClick,
                                 onToolsClick      = onToolsClick,
-                                modifier          = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                modifier          = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
                             )
                         }
 
-                        // ── Section header ──────────────────────────────────
                         item {
                             Text(
-                                text       = "לימוד היום",
-                                modifier   = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                                fontSize   = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color      = Muted,
-                                fontFamily = SblHebrew
+                                text          = "לימוד היום",
+                                modifier      = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                                fontSize      = 11.sp,
+                                fontWeight    = FontWeight.SemiBold,
+                                color         = Muted.copy(alpha = 0.6f),
+                                fontFamily    = SblHebrew,
+                                letterSpacing = 0.8.sp
                             )
                         }
 
-                        // ── Study cards ──────────────────────────────────────
                         itemsIndexed(orderedStudies, key = { _, pair -> pair.first }) { index, (key, study) ->
                             AnimatedVisibility(
                                 visible = true,
                                 enter = slideInVertically(
-                                    initialOffsetY = { 40 + index * 15 },
-                                    animationSpec  = tween(350, delayMillis = index * 40)
-                                ) + fadeIn(animationSpec = tween(350, delayMillis = index * 40))
+                                    initialOffsetY = { 30 + index * 10 },
+                                    animationSpec  = tween(300, delayMillis = index * 35)
+                                ) + fadeIn(animationSpec = tween(300, delayMillis = index * 35))
                             ) {
-                                StudyCard(
+                                StudyRow(
                                     studyKey = key,
                                     study    = study,
-                                    modifier = Modifier
-                                        .padding(horizontal = 16.dp)
-                                        .padding(bottom = 10.dp),
                                     onClick  = {
                                         if (study.available == true) {
                                             onStudyClick(key, uiState.date, study.title ?: "", study.label ?: "")
@@ -197,8 +198,14 @@ fun HomeScreen(
                                     }
                                 )
                             }
+                            if (index < orderedStudies.size - 1) {
+                                HorizontalDivider(
+                                    modifier  = Modifier.padding(start = 19.dp),
+                                    color     = Color(0xFFF0F0F0),
+                                    thickness = 0.5.dp
+                                )
+                            }
                         }
-
                     }
                 }
             }
@@ -206,15 +213,15 @@ fun HomeScreen(
     }
 }
 
-// ── Nav color helper ──────────────────────────────────────────────────────────
+// ── Nav colors ────────────────────────────────────────────────────────────────
 
 @Composable
 private fun navColors() = NavigationBarItemDefaults.colors(
     selectedIconColor   = Primary,
     selectedTextColor   = Primary,
-    indicatorColor      = Primary.copy(alpha = 0.1f),
-    unselectedIconColor = Muted,
-    unselectedTextColor = Muted
+    indicatorColor      = Color.Transparent,
+    unselectedIconColor = Muted.copy(alpha = 0.45f),
+    unselectedTextColor = Muted.copy(alpha = 0.45f)
 )
 
 // ── Header ────────────────────────────────────────────────────────────────────
@@ -228,89 +235,87 @@ fun HomeHeader(
     onPrevDay:       () -> Unit,
     onNextDay:       () -> Unit
 ) {
-    Surface(color = CardBg, shadowElevation = 0.dp) {
-        Column {
-            Spacer(Modifier.statusBarsPadding())
+    Column(
+        modifier = Modifier.fillMaxWidth().background(Color.White)
+    ) {
+        Spacer(Modifier.statusBarsPadding())
 
-            // Action icons at the top
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment     = Alignment.CenterVertically
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    IconButton(onClick = onRefreshClick, modifier = Modifier.size(40.dp)) {
-                        Icon(
-                            imageVector        = Icons.Rounded.Refresh,
-                            contentDescription = "רענן",
-                            tint               = Primary,
-                            modifier           = Modifier.size(22.dp)
-                        )
-                    }
-                    IconButton(onClick = onSettingsClick, modifier = Modifier.size(40.dp)) {
-                        Icon(
-                            imageVector        = Icons.Rounded.Settings,
-                            contentDescription = "הגדרות",
-                            tint               = Primary,
-                            modifier           = Modifier.size(22.dp)
-                        )
-                    }
-                }
-            }
-
-            // Date navigation (independent area)
-            Row(
-                modifier              = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp)
-                    .padding(bottom = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment     = Alignment.CenterVertically
-            ) {
-                // In RTL Row: first = RIGHT side = go to yesterday
-                IconButton(
-                    onClick = onPrevDay,
-                    modifier = Modifier.size(48.dp).background(Color.Transparent, RoundedCornerShape(8.dp))
-                ) {
-                    Icon(
-                        Icons.Default.KeyboardArrowRight,
-                        contentDescription = "יום קודם",
-                        tint               = Primary,
-                        modifier           = Modifier.size(32.dp)
-                    )
-                }
-
-                Text(
-                    text       = "${displayDate.toHebrewDayOfWeek()} ${com.sterni.dailystudy.util.HebrewDate.format(displayDate.format(DateTimeFormatter.ISO_LOCAL_DATE))}",
-                    fontSize   = 22.sp,
-                    fontFamily = BaHaYetzira,
-                    color      = Primary,
-                    textAlign  = TextAlign.Center,
-                    modifier   = Modifier.weight(1f)
+        // Row 1 — settings + refresh above the date (as requested)
+        Row(
+            modifier              = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp)
+                .height(48.dp),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment     = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onRefreshClick, modifier = Modifier.size(48.dp)) {
+                Icon(
+                    imageVector        = Icons.Rounded.Refresh,
+                    contentDescription = "רענן",
+                    tint               = Muted.copy(alpha = 0.5f),
+                    modifier           = Modifier.size(20.dp)
                 )
+            }
+            IconButton(onClick = onSettingsClick, modifier = Modifier.size(48.dp)) {
+                Icon(
+                    imageVector        = Icons.Rounded.Settings,
+                    contentDescription = "הגדרות",
+                    tint               = Muted.copy(alpha = 0.5f),
+                    modifier           = Modifier.size(20.dp)
+                )
+            }
+        }
 
-                // In RTL Row: last = LEFT side = go to tomorrow
-                IconButton(
-                    onClick = onNextDay,
-                    modifier = Modifier.size(48.dp).background(Color.Transparent, RoundedCornerShape(8.dp))
-                ) {
-                    Icon(
-                        Icons.Default.KeyboardArrowLeft,
-                        contentDescription = "יום הבא",
-                        tint               = Primary,
-                        modifier           = Modifier.size(32.dp)
-                    )
-                }
+        // Row 2 — date navigation (day + Hebrew date)
+        Row(
+            modifier              = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp)
+                .padding(bottom = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment     = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onPrevDay, modifier = Modifier.size(44.dp)) {
+                Icon(
+                    Icons.Default.KeyboardArrowRight,
+                    contentDescription = "יום קודם",
+                    tint               = Muted.copy(alpha = 0.4f),
+                    modifier           = Modifier.size(26.dp)
+                )
             }
 
-            HorizontalDivider(
-                modifier  = Modifier.padding(top = 4.dp),
-                color     = Color(0xFFE4E4E7),
-                thickness = 0.5.dp
-            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text       = displayDate.toHebrewDayOfWeek(),
+                    fontSize   = 12.sp,
+                    fontFamily = SblHebrew,
+                    color      = Muted,
+                    fontWeight = FontWeight.Normal
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text       = com.sterni.dailystudy.util.HebrewDate.format(
+                        displayDate.format(DateTimeFormatter.ISO_LOCAL_DATE)
+                    ),
+                    fontSize   = 26.sp,
+                    fontFamily = BaHaYetzira,
+                    color      = Ink,
+                    textAlign  = TextAlign.Center
+                )
+            }
+
+            IconButton(onClick = onNextDay, modifier = Modifier.size(44.dp)) {
+                Icon(
+                    Icons.Default.KeyboardArrowLeft,
+                    contentDescription = "יום הבא",
+                    tint               = Muted.copy(alpha = 0.4f),
+                    modifier           = Modifier.size(26.dp)
+                )
+            }
         }
+
+        HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 0.5.dp)
     }
 }
 
@@ -324,16 +329,14 @@ private fun QuickAccessRow(
     onToolsClick:      () -> Unit,
     modifier:          Modifier = Modifier
 ) {
-    // Order (RTL — first item appears on the RIGHT):
-    // מאמרים | תפילה | ספריה | כלים
     Row(
         modifier              = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        QuickChip(label = "מאמרים", icon = Icons.AutoMirrored.Filled.List,    onClick = onMamaarimClick,   modifier = Modifier.weight(1f))
-        QuickChip(label = "תפילה",  icon = Icons.AutoMirrored.Filled.MenuBook, onClick = onTefilaClick,     modifier = Modifier.weight(1f))
-        QuickChip(label = "ספריה",  icon = Icons.Default.PictureAsPdf,         onClick = onPdfLibraryClick, modifier = Modifier.weight(1f))
-        QuickChip(label = "כלים",   icon = Icons.Default.Tune,                 onClick = onToolsClick,      modifier = Modifier.weight(1f))
+        QuickChip(label = "מאמרים", icon = Icons.AutoMirrored.Filled.List,     onClick = onMamaarimClick,   modifier = Modifier.weight(1f))
+        QuickChip(label = "תפילה",  icon = Icons.AutoMirrored.Filled.MenuBook,  onClick = onTefilaClick,     modifier = Modifier.weight(1f))
+        QuickChip(label = "ספריה",  icon = Icons.Default.PictureAsPdf,          onClick = onPdfLibraryClick, modifier = Modifier.weight(1f))
+        QuickChip(label = "כלים",   icon = Icons.Default.Tune,                  onClick = onToolsClick,      modifier = Modifier.weight(1f))
     }
 }
 
@@ -344,123 +347,120 @@ private fun QuickChip(
     onClick:  () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        modifier        = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick),
-        shape           = RoundedCornerShape(14.dp),
-        color           = Primary.copy(alpha = 0.07f),
-        shadowElevation = 0.dp
+    Column(
+        modifier            = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(Primary.copy(alpha = 0.07f))
+            .clickable(onClick = onClick)
+            .padding(vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Column(
-            modifier            = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 14.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Box(
-                modifier         = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(Primary.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, contentDescription = null, tint = Primary, modifier = Modifier.size(18.dp))
-            }
-            Text(text = label, fontSize = 12.sp, color = Primary, fontFamily = SblHebrew)
-        }
+        Icon(
+            imageVector        = icon,
+            contentDescription = null,
+            tint               = Primary,
+            modifier           = Modifier.size(20.dp)
+        )
+        Text(
+            text       = label,
+            fontSize   = 11.sp,
+            color      = Primary,
+            fontFamily = SblHebrew,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 
-// ── Study Card ────────────────────────────────────────────────────────────────
+// ── Study Row ─────────────────────────────────────────────────────────────────
 
 @Composable
-private fun StudyCard(
+private fun StudyRow(
     studyKey: String,
     study:    Study,
-    modifier: Modifier = Modifier,
     onClick:  () -> Unit
 ) {
     val available   = study.available == true
     val accentColor = studyAccentColor(study.accent)
-    val icon        = studyIcon(studyKey)
 
-    Surface(
-        modifier        = modifier
+    Row(
+        modifier          = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .height(IntrinsicSize.Min)
+            .background(if (available) Color.White else Color(0xFFFAFAFA))
             .clickable(enabled = available, onClick = onClick),
-        shape           = RoundedCornerShape(16.dp),
-        color           = CardBg,
-        shadowElevation = if (available) 1.5.dp else 0.5.dp
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        // Accent bar — first in RTL Row = physically RIGHT side (start of reading direction)
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .fillMaxHeight()
+                .background(if (available) accentColor else Color.Transparent)
+        )
+
+        // Content
         Row(
-            modifier          = Modifier.fillMaxWidth().padding(14.dp),
+            modifier          = Modifier
+                .weight(1f)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier         = Modifier
-                    .size(46.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(if (available) accentColor.copy(alpha = 0.10f) else Color(0xFFF4F4F5)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector        = icon,
-                    contentDescription = null,
-                    tint               = if (available) accentColor else Muted,
-                    modifier           = Modifier.size(22.dp)
-                )
-            }
-
+            Icon(
+                imageVector        = studyIcon(studyKey),
+                contentDescription = null,
+                tint               = if (available) accentColor else Muted.copy(alpha = 0.35f),
+                modifier           = Modifier.size(22.dp)
+            )
             Spacer(Modifier.width(14.dp))
-
             Column(modifier = Modifier.weight(1f)) {
                 Row(
+                    modifier              = Modifier.fillMaxWidth(),
                     verticalAlignment     = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier              = Modifier.fillMaxWidth()
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
                         text       = study.title ?: "",
-                        fontSize   = 16.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontSize   = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
                         color      = if (available) Ink else Muted,
                         fontFamily = SblHebrew,
                         modifier   = Modifier.weight(1f, fill = false)
                     )
                     if (available && !study.label.isNullOrEmpty()) {
                         Spacer(Modifier.width(8.dp))
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = accentColor.copy(alpha = 0.09f)
-                        ) {
-                            Text(
-                                text       = study.label,
-                                modifier   = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                fontSize   = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color      = accentColor,
-                                fontFamily = SblHebrew,
-                                style      = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl)
-                            )
-                        }
+                        Text(
+                            text      = study.label,
+                            fontSize  = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color     = accentColor,
+                            fontFamily = SblHebrew,
+                            modifier  = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(accentColor.copy(alpha = 0.08f))
+                                .padding(horizontal = 7.dp, vertical = 2.dp),
+                            style = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl)
+                        )
                     }
                 }
 
                 if (!study.subtitle.isNullOrEmpty()) {
-                    Spacer(Modifier.height(2.dp))
-                    Text(text = study.subtitle, fontSize = 13.sp, color = Muted, fontFamily = SblHebrew)
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        text       = study.subtitle,
+                        fontSize   = 13.sp,
+                        color      = Muted,
+                        fontFamily = SblHebrew
+                    )
                 }
 
                 if (available && !study.preview.isNullOrEmpty()) {
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(5.dp))
                     Text(
                         text       = study.preview,
                         fontSize   = 13.sp,
-                        lineHeight = 20.sp,
-                        color      = Muted.copy(alpha = 0.8f),
+                        lineHeight = 19.sp,
+                        color      = Muted.copy(alpha = 0.75f),
                         maxLines   = 2,
                         overflow   = TextOverflow.Ellipsis,
                         fontFamily = SblHebrew,
@@ -469,8 +469,13 @@ private fun StudyCard(
                 }
 
                 if (!available) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(text = "לא נמצאו נתונים להיום", fontSize = 12.sp, color = Muted.copy(alpha = 0.55f), fontFamily = SblHebrew)
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        text       = "לא נמצאו נתונים להיום",
+                        fontSize   = 12.sp,
+                        color      = Muted.copy(alpha = 0.45f),
+                        fontFamily = SblHebrew
+                    )
                 }
             }
 
@@ -479,10 +484,61 @@ private fun StudyCard(
                 Icon(
                     imageVector        = Icons.Default.ChevronLeft,
                     contentDescription = null,
-                    tint               = Muted.copy(alpha = 0.4f),
-                    modifier           = Modifier.size(20.dp)
+                    tint               = Muted.copy(alpha = 0.25f),
+                    modifier           = Modifier.size(18.dp)
                 )
             }
+        }
+    }
+}
+
+// ── Skeleton ──────────────────────────────────────────────────────────────────
+
+@Composable
+private fun SkeletonHeader() {
+    Column(Modifier.fillMaxWidth().background(Color.White)) {
+        Spacer(Modifier.statusBarsPadding())
+        Spacer(Modifier.height(48.dp))
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 4.dp).padding(bottom = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(Modifier.width(80.dp).height(12.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFFEEEEEE)))
+            Box(Modifier.width(180.dp).height(26.dp).clip(RoundedCornerShape(6.dp)).background(Color(0xFFE8E8E8)))
+        }
+        HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 0.5.dp)
+    }
+}
+
+@Composable
+private fun SkeletonQuickRow() {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        repeat(4) {
+            Box(
+                Modifier.weight(1f).height(64.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFFF0F0F0))
+            )
+        }
+    }
+}
+
+@Composable
+private fun SkeletonStudyRow() {
+    Row(
+        Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(Color.White),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(Modifier.width(3.dp).fillMaxHeight().background(Color(0xFFEEEEEE)))
+        Column(Modifier.weight(1f).padding(horizontal = 16.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Box(Modifier.width(120.dp).height(14.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFFEEEEEE)))
+                Box(Modifier.width(60.dp).height(14.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFFF4F4F4)))
+            }
+            Box(Modifier.width(180.dp).height(12.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFFF0F0F0)))
+            Box(Modifier.fillMaxWidth(0.9f).height(12.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFFF4F4F4)))
         }
     }
 }
@@ -492,17 +548,17 @@ private fun StudyCard(
 @Composable
 private fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
     Column(
-        modifier              = modifier.padding(32.dp),
-        horizontalAlignment   = Alignment.CenterHorizontally,
-        verticalArrangement   = Arrangement.spacedBy(16.dp)
+        modifier            = modifier.padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Icon(Icons.Default.CloudOff, contentDescription = null, tint = Muted, modifier = Modifier.size(48.dp))
-        Text("שגיאה בטעינה", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink, fontFamily = SblHebrew)
+        Icon(Icons.Default.CloudOff, contentDescription = null, tint = Muted, modifier = Modifier.size(40.dp))
+        Text("שגיאה בטעינה", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Ink, fontFamily = SblHebrew)
         Text(message, fontSize = 14.sp, color = Muted, textAlign = TextAlign.Center, fontFamily = SblHebrew)
         Button(
             onClick = onRetry,
             colors  = ButtonDefaults.buttonColors(containerColor = Primary),
-            shape   = RoundedCornerShape(12.dp)
+            shape   = RoundedCornerShape(10.dp)
         ) {
             Text("נסה שוב", fontFamily = SblHebrew, fontWeight = FontWeight.SemiBold)
         }

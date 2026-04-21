@@ -589,46 +589,48 @@ async function resolveStudy(calendarItems, config, dateString) {
   // שניים מקרא – כל 7 העליות עם כותרות עליות + כותרות פרקים
   if (config.key === 'shnayimMikra' && item.extraDetails && Array.isArray(item.extraDetails.aliyot)) {
     const ALIYOT_NAMES = ['ראשונה', 'שנייה', 'שלישית', 'רביעית', 'חמישית', 'שישית', 'שביעית'];
+
+    // Fetch all 7 aliyot in parallel
+    const aliyotRefs = item.extraDetails.aliyot.slice(0, 7);
+    const aliyotPayloads = await Promise.all(
+      aliyotRefs.map(async (r, i) => {
+        if (!r) return null;
+        try { return await fetchTextByMode(r, config.detailMode); }
+        catch (err) { console.error(`[shnayimMikra] aliyah ${i + 1} failed:`, err.message); return null; }
+      })
+    );
+
     let allSections = [];
     let globalId = 1;
-    let displayedChapter = null; // הפרק האחרון שהוצג
+    let displayedChapter = null;
 
-    for (let i = 0; i < 7; i++) {
-      const r = item.extraDetails.aliyot[i];
+    for (let i = 0; i < aliyotRefs.length; i++) {
+      const r = aliyotRefs[i];
       if (!r) continue;
 
-      // כותרת עלייה
       allSections.push({ id: String(globalId++), isHeader: true, isAliyahHeader: true, he: `עלייה ${ALIYOT_NAMES[i]}`, en: '', rashi: [] });
 
-      // פרק התחלה של עלייה זו (למשל "Leviticus 2:7-2:16" → 2)
       const chMatch = r.match(/(\d+):/);
       const aliyahStartChapter = chMatch ? parseInt(chMatch[1], 10) : null;
-
-      // אם עלייה זו מתחילה בפרק חדש שטרם הוצג – הצג כותרת פרק
       if (aliyahStartChapter !== null && aliyahStartChapter !== displayedChapter) {
         displayedChapter = aliyahStartChapter;
         allSections.push({ id: String(globalId++), isHeader: true, isChapterHeader: true, he: `פרק ${getHebrewOrdinal(displayedChapter)}`, en: '', rashi: [] });
       }
 
-      try {
-        const payload = await fetchTextByMode(r, config.detailMode);
-        let prevVerse = null;
-        for (const s of payload.sections) {
-          const currentChapter = Number(s.chapterNum) || null;
-          // Preferred: real chapter transitions from parsed API structure.
-          if (currentChapter !== null && currentChapter !== displayedChapter) {
-            displayedChapter = currentChapter;
-            allSections.push({ id: String(globalId++), isHeader: true, isChapterHeader: true, he: `פרק ${getHebrewOrdinal(displayedChapter)}`, en: '', rashi: [] });
-          } else if (currentChapter === null && s.verseNum === 1 && prevVerse !== null && prevVerse > 1) {
-            // Fallback for flat payloads without chapter info.
-            if (displayedChapter !== null) displayedChapter++;
-            allSections.push({ id: String(globalId++), isHeader: true, isChapterHeader: true, he: `פרק ${getHebrewOrdinal(displayedChapter)}`, en: '', rashi: [] });
-          }
-          allSections.push({ ...s, id: String(globalId++) });
-          if (s.verseNum != null) prevVerse = s.verseNum;
+      const payload = aliyotPayloads[i];
+      if (!payload) continue;
+      let prevVerse = null;
+      for (const s of payload.sections) {
+        const currentChapter = Number(s.chapterNum) || null;
+        if (currentChapter !== null && currentChapter !== displayedChapter) {
+          displayedChapter = currentChapter;
+          allSections.push({ id: String(globalId++), isHeader: true, isChapterHeader: true, he: `פרק ${getHebrewOrdinal(displayedChapter)}`, en: '', rashi: [] });
+        } else if (currentChapter === null && s.verseNum === 1 && prevVerse !== null && prevVerse > 1) {
+          if (displayedChapter !== null) displayedChapter++;
+          allSections.push({ id: String(globalId++), isHeader: true, isChapterHeader: true, he: `פרק ${getHebrewOrdinal(displayedChapter)}`, en: '', rashi: [] });
         }
-      } catch (err) {
-        console.error(`[shnayimMikra] aliyah ${i + 1} failed:`, err.message);
+        allSections.push({ ...s, id: String(globalId++) });
+        if (s.verseNum != null) prevVerse = s.verseNum;
       }
     }
     return {
@@ -699,11 +701,13 @@ export const getDailyStudy = async (req, res, next) => {
     console.log(`[study] requested date: "${req.query.date}" → normalized: "${date}"`);
 
     const { items: calendarItems, hebrewDate } = await getDailyCalendar(date);
-    const studies = {};
 
-    for (const config of Object.values(STUDY_CONFIG)) {
-      studies[config.key] = await resolveStudy(calendarItems, config, date);
-    }
+    // Parallel fetch — all 6 studies run concurrently instead of sequentially
+    const configs = Object.values(STUDY_CONFIG);
+    const results = await Promise.all(
+      configs.map(config => resolveStudy(calendarItems, config, date))
+    );
+    const studies = Object.fromEntries(configs.map((c, i) => [c.key, results[i]]));
 
     const rambamLabel = studies.rambam?.label || '–';
     console.log(`[study] response for ${date} | rambam: ${rambamLabel}`);

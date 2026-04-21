@@ -62,9 +62,9 @@ fun RabbenuTamScreen(onBack: () -> Unit) {
                 ) {
                     Text(
                         text = "שְׁמַע יִשְׂרָאֵל יְיָ אֱלֹהֵינוּ יְיָ | אֶחָד:",
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
                         textAlign = TextAlign.Center,
-                        fontSize = 26.sp,
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = SblHebrew,
                         color = Color(0xFF1A1A1A),
@@ -75,7 +75,7 @@ fun RabbenuTamScreen(onBack: () -> Unit) {
                         text = "בָּרוּךְ שֵׁם כְּבוֹד מַלְכוּתוֹ לְעוֹלָם וָעֶד:",
                         modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                         textAlign = TextAlign.Center,
-                        fontSize = 20.sp,
+                        fontSize = 17.sp,
                         fontFamily = SblHebrew,
                         color = Color(0xFF1A1A1A),
                         style = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl)

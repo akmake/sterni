@@ -34,6 +34,7 @@ data class ArticleContent(
     val comments: List<String>? = null,
     val images: List<String>? = null,
     val youtubeEmbeds: List<YoutubeEmbed>? = null,
+    val twitterEmbeds: List<String>? = null,
     val tgEmbeds: List<String>? = null,
     val title: String? = null
 )

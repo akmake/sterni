@@ -32,10 +32,6 @@ class HomeViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    init {
-        loadDailyStudy()
-    }
-
     fun loadDailyStudy(
         dateString: String = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
     ) {

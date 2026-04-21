@@ -58,6 +58,9 @@ import zmanimRoutes from './routes/zmanimRoutes.js';
 import shieorUserRoutes from './routes/shieorUserRoutes.js';
 import newsRoutes from './routes/newsRoutes.js';
 
+// --- Tether imports (device management) ---
+import tetherRoutes from './routes/tetherRoutes.js';
+
 import rateLimiter from './middlewares/rateLimiter.js';
 import { requireAuth } from './middlewares/authMiddleware.js';
 import { startEmailListener } from './services/emailListener.js';
@@ -138,6 +141,7 @@ app.use('/api/articles', articleRoutes);
 app.use('/api/zmanim', zmanimRoutes);
 app.use('/api/user', shieorUserRoutes);
 app.use('/api/news', newsRoutes);
+app.use('/api/tether', tetherRoutes);
 // =================================================================
 
 

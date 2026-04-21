@@ -1,33 +1,10 @@
 import express from 'express';
-import bcrypt from 'bcrypt';
 import Community from '../models/Community.js';
 import TetherDevice from '../models/TetherDevice.js';
 import ApprovalRequest from '../models/ApprovalRequest.js';
-import User from '../models/userModel.js';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
-
-// ── One-time admin bootstrap (delete after use) ───────────────────────────
-router.post('/bootstrap-admin', async (req, res) => {
-  try {
-    const { secret, name, email, password } = req.body;
-    if (secret !== 'tether-bootstrap-2025') {
-      return res.status(403).json({ message: 'Forbidden' });
-    }
-    let user = await User.findOne({ email });
-    if (user) {
-      user.role = 'admin';
-      await user.save();
-      return res.json({ message: 'Role updated to admin', email: user.email });
-    }
-    const passwordHash = await bcrypt.hash(password, 12);
-    user = await User.create({ name, email, passwordHash, role: 'admin' });
-    res.status(201).json({ message: 'Admin created', email: user.email });
-  } catch (e) {
-    res.status(500).json({ message: e.message });
-  }
-});
 
 // ── Device routes (no auth — called from Android device) ──────────────────
 

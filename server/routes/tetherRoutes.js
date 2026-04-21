@@ -1,10 +1,73 @@
 import express from 'express';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 import Community from '../models/Community.js';
 import TetherDevice from '../models/TetherDevice.js';
 import ApprovalRequest from '../models/ApprovalRequest.js';
-import { requireAuth } from '../middlewares/authMiddleware.js';
+import TetherAdmin from '../models/TetherAdmin.js';
 
 const router = express.Router();
+
+// ── Tether-specific auth middleware (reads Authorization: Bearer header) ──
+const requireTetherAuth = async (req, res, next) => {
+  const auth = req.headers['authorization'];
+  if (!auth?.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'לא מחובר' });
+  }
+  try {
+    const decoded = jwt.verify(auth.slice(7), process.env.JWT_ACCESS_SECRET);
+    req.admin = { _id: decoded.id, role: decoded.role };
+    next();
+  } catch {
+    return res.status(401).json({ message: 'טוקן לא חוקי / פג תוקף' });
+  }
+};
+
+// ── Tether Admin Auth ─────────────────────────────────────────────────────
+
+// Login — returns token in body (for Android)
+router.post('/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ message: 'אימייל וסיסמה חובה' });
+
+    const admin = await TetherAdmin.findOne({ email: email.toLowerCase(), active: true });
+    if (!admin) return res.status(401).json({ message: 'אימייל או סיסמה שגויים' });
+
+    const valid = await bcrypt.compare(password, admin.passwordHash);
+    if (!valid) return res.status(401).json({ message: 'אימייל או סיסמה שגויים' });
+
+    const token = jwt.sign(
+      { id: admin._id, role: admin.role },
+      process.env.JWT_ACCESS_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    res.json({
+      token,
+      user: { name: admin.name, email: admin.email, role: admin.role }
+    });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// Bootstrap — create first superadmin (only if no admins exist)
+router.post('/auth/bootstrap', async (req, res) => {
+  try {
+    const count = await TetherAdmin.countDocuments();
+    if (count > 0) return res.status(403).json({ message: 'כבר קיים מנהל' });
+
+    const { name, email, password, secret } = req.body;
+    if (secret !== 'tether-init-2025') return res.status(403).json({ message: 'Forbidden' });
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const admin = await TetherAdmin.create({ name, email, passwordHash, role: 'superadmin' });
+    res.status(201).json({ message: 'Superadmin created', email: admin.email });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
 
 // ── Device routes (no auth — called from Android device) ──────────────────
 
@@ -96,17 +159,17 @@ router.post('/devices/:deviceId/approval', async (req, res) => {
   }
 });
 
-// ── Admin routes (require auth) ────────────────────────────────────────────
+// ── Admin routes (require Tether auth) ────────────────────────────────────
 
 // Create community
-router.post('/admin/communities', requireAuth, async (req, res) => {
+router.post('/admin/communities', requireTetherAuth, async (req, res) => {
   try {
     const { name, policy } = req.body;
     if (!name) return res.status(400).json({ message: 'שם קהילה חובה' });
 
     const community = await Community.create({
       name,
-      adminId: req.user._id,
+      adminId: req.admin._id,
       policy: policy || {}
     });
 
@@ -117,9 +180,9 @@ router.post('/admin/communities', requireAuth, async (req, res) => {
 });
 
 // Get all communities for admin
-router.get('/admin/communities', requireAuth, async (req, res) => {
+router.get('/admin/communities', requireTetherAuth, async (req, res) => {
   try {
-    const communities = await Community.find({ adminId: req.user._id });
+    const communities = await Community.find({ adminId: req.admin._id });
     res.json(communities);
   } catch (e) {
     res.status(500).json({ message: e.message });
@@ -127,9 +190,9 @@ router.get('/admin/communities', requireAuth, async (req, res) => {
 });
 
 // Get community details + devices
-router.get('/admin/communities/:id', requireAuth, async (req, res) => {
+router.get('/admin/communities/:id', requireTetherAuth, async (req, res) => {
   try {
-    const community = await Community.findOne({ _id: req.params.id, adminId: req.user._id });
+    const community = await Community.findOne({ _id: req.params.id, adminId: req.admin._id });
     if (!community) return res.status(404).json({ message: 'קהילה לא נמצאה' });
 
     const devices = await TetherDevice.find({ communityId: community._id, active: true });
@@ -140,10 +203,10 @@ router.get('/admin/communities/:id', requireAuth, async (req, res) => {
 });
 
 // Update community policy
-router.put('/admin/communities/:id/policy', requireAuth, async (req, res) => {
+router.put('/admin/communities/:id/policy', requireTetherAuth, async (req, res) => {
   try {
     const community = await Community.findOneAndUpdate(
-      { _id: req.params.id, adminId: req.user._id },
+      { _id: req.params.id, adminId: req.admin._id },
       { policy: req.body },
       { new: true }
     );
@@ -156,9 +219,9 @@ router.put('/admin/communities/:id/policy', requireAuth, async (req, res) => {
 });
 
 // Get pending approval requests for admin
-router.get('/admin/communities/:id/approvals', requireAuth, async (req, res) => {
+router.get('/admin/communities/:id/approvals', requireTetherAuth, async (req, res) => {
   try {
-    const community = await Community.findOne({ _id: req.params.id, adminId: req.user._id });
+    const community = await Community.findOne({ _id: req.params.id, adminId: req.admin._id });
     if (!community) return res.status(404).json({ message: 'קהילה לא נמצאה' });
 
     const requests = await ApprovalRequest.find({
@@ -173,7 +236,7 @@ router.get('/admin/communities/:id/approvals', requireAuth, async (req, res) => 
 });
 
 // Approve / reject request
-router.put('/admin/approvals/:id', requireAuth, async (req, res) => {
+router.put('/admin/approvals/:id', requireTetherAuth, async (req, res) => {
   try {
     const { status } = req.body;
     if (!['approved', 'rejected'].includes(status)) {
@@ -194,7 +257,7 @@ router.put('/admin/approvals/:id', requireAuth, async (req, res) => {
 });
 
 // Remove device from community
-router.delete('/admin/devices/:deviceId', requireAuth, async (req, res) => {
+router.delete('/admin/devices/:deviceId', requireTetherAuth, async (req, res) => {
   try {
     await TetherDevice.findOneAndUpdate(
       { deviceId: req.params.deviceId },
@@ -207,9 +270,9 @@ router.delete('/admin/devices/:deviceId', requireAuth, async (req, res) => {
 });
 
 // Dashboard stats
-router.get('/admin/dashboard', requireAuth, async (req, res) => {
+router.get('/admin/dashboard', requireTetherAuth, async (req, res) => {
   try {
-    const communities = await Community.find({ adminId: req.user._id });
+    const communities = await Community.find({ adminId: req.admin._id });
     const communityIds = communities.map(c => c._id);
 
     const [totalDevices, pendingApprovals, inactiveDevices] = await Promise.all([
@@ -234,9 +297,9 @@ router.get('/admin/dashboard', requireAuth, async (req, res) => {
 });
 
 // Activity feed
-router.get('/admin/activity', requireAuth, async (req, res) => {
+router.get('/admin/activity', requireTetherAuth, async (req, res) => {
   try {
-    const communities = await Community.find({ adminId: req.user._id }).select('_id name');
+    const communities = await Community.find({ adminId: req.admin._id }).select('_id name');
     const communityIds = communities.map(c => c._id);
     const communityMap = Object.fromEntries(communities.map(c => [c._id.toString(), c.name]));
 
@@ -269,9 +332,9 @@ router.get('/admin/activity', requireAuth, async (req, res) => {
 });
 
 // All approvals across all communities
-router.get('/admin/approvals/all', requireAuth, async (req, res) => {
+router.get('/admin/approvals/all', requireTetherAuth, async (req, res) => {
   try {
-    const communities = await Community.find({ adminId: req.user._id }).select('_id');
+    const communities = await Community.find({ adminId: req.admin._id }).select('_id');
     const communityIds = communities.map(c => c._id);
 
     const approvals = await ApprovalRequest.find({
@@ -286,13 +349,12 @@ router.get('/admin/approvals/all', requireAuth, async (req, res) => {
 });
 
 // Community logs
-router.get('/admin/communities/:id/logs', requireAuth, async (req, res) => {
+router.get('/admin/communities/:id/logs', requireTetherAuth, async (req, res) => {
   try {
-    const community = await Community.findOne({ _id: req.params.id, adminId: req.user._id });
+    const community = await Community.findOne({ _id: req.params.id, adminId: req.admin._id });
     if (!community) return res.status(404).json({ message: 'קהילה לא נמצאה' });
     if (!community.policy.logsEnabled) return res.status(403).json({ message: 'לוגים לא מופעלים לקהילה זו' });
 
-    // Return approval requests as log entries (expandable in future)
     const logs = await ApprovalRequest.find({ communityId: community._id })
       .sort({ createdAt: -1 }).limit(100);
 
@@ -311,10 +373,10 @@ router.get('/admin/communities/:id/logs', requireAuth, async (req, res) => {
 });
 
 // Delete community
-router.delete('/admin/communities/:id', requireAuth, async (req, res) => {
+router.delete('/admin/communities/:id', requireTetherAuth, async (req, res) => {
   try {
     await Community.findOneAndUpdate(
-      { _id: req.params.id, adminId: req.user._id },
+      { _id: req.params.id, adminId: req.admin._id },
       { active: false }
     );
     res.json({ success: true });
@@ -323,31 +385,35 @@ router.delete('/admin/communities/:id', requireAuth, async (req, res) => {
   }
 });
 
-// ── Manage admins (super admin only) ──────────────────────────────────────
+// ── Manage admins (superadmin only) ──────────────────────────────────────
 
-router.get('/admin/members', requireAuth, async (req, res) => {
+router.get('/admin/members', requireTetherAuth, async (req, res) => {
   try {
-    if (req.user.role !== 'admin') return res.status(403).json({ message: 'גישה אסורה' });
-    // Returns users with tether access — extendable
-    res.json([]);
+    if (req.admin.role !== 'superadmin') return res.status(403).json({ message: 'גישה אסורה' });
+    const admins = await TetherAdmin.find({}, 'name email role active createdAt');
+    res.json(admins);
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
 });
 
-router.post('/admin/members/invite', requireAuth, async (req, res) => {
+router.post('/admin/members/invite', requireTetherAuth, async (req, res) => {
   try {
-    if (req.user.role !== 'admin') return res.status(403).json({ message: 'גישה אסורה' });
-    // Invite logic — send email, create user record, etc.
-    res.json({ success: true });
+    if (req.admin.role !== 'superadmin') return res.status(403).json({ message: 'גישה אסורה' });
+    const { name, email, password } = req.body;
+    if (!name || !email || !password) return res.status(400).json({ message: 'שם, אימייל וסיסמה חובה' });
+    const passwordHash = await bcrypt.hash(password, 12);
+    const admin = await TetherAdmin.create({ name, email, passwordHash, role: 'admin' });
+    res.status(201).json({ name: admin.name, email: admin.email, role: admin.role });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
 });
 
-router.delete('/admin/members/:id', requireAuth, async (req, res) => {
+router.delete('/admin/members/:id', requireTetherAuth, async (req, res) => {
   try {
-    if (req.user.role !== 'admin') return res.status(403).json({ message: 'גישה אסורה' });
+    if (req.admin.role !== 'superadmin') return res.status(403).json({ message: 'גישה אסורה' });
+    await TetherAdmin.findByIdAndUpdate(req.params.id, { active: false });
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ message: e.message });

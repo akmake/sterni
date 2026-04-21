@@ -12,7 +12,6 @@ local.properties
 app/build/
 **/build/
 /captures
-*.apk
 *.aar
 
 # Android Studio / IDE

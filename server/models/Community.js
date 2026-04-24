@@ -16,6 +16,7 @@ const policySchema = new mongoose.Schema({
     default: 'SILENT'
   },
   logsEnabled: { type: Boolean, default: false },
+  uninstallPin: { type: String, default: '0000' },
   webFilterMode: {
     type: String,
     enum: ['NONE', 'BLACKLIST', 'WHITELIST'],

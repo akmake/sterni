@@ -1,9 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import { Html5Qrcode } from 'html5-qrcode';
+import QRCode from 'react-qr-code';
 import {
+  Clock, List, AppWindow,
   Shield, LogOut, Users, Smartphone, CheckCircle, XCircle,
   Plus, Trash2, ChevronDown, ChevronUp, RefreshCw, Copy,
-  AlertTriangle, Lock, Unlock, Settings, Eye, EyeOff
+  AlertTriangle, Lock, Unlock, Settings, Eye, EyeOff, QrCode, KeyRound
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -30,77 +33,155 @@ const loadTetherUser = () => {
 // SUB-COMPONENTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// ── QR Scanner ───────────────────────────────────────────────────────────────
+function QrScanner({ onResult }) {
+  const scannerRef = useRef(null);
+  const divId = 'tether-qr-reader';
+
+  useEffect(() => {
+    const scanner = new Html5Qrcode(divId);
+    scannerRef.current = scanner;
+    scanner.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 220, height: 220 } },
+      (text) => {
+        scanner.stop().catch(() => {});
+        onResult(text);
+      },
+      () => {}
+    ).catch(() => toast.error('לא ניתן לגשת למצלמה'));
+
+    return () => {
+      scanner.isScanning && scanner.stop().catch(() => {});
+    };
+  }, [onResult]);
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <div id={divId} className="w-full rounded-xl overflow-hidden" />
+      <p className="text-xs text-gray-400">כוון את המצלמה לברקוד / QR</p>
+    </div>
+  );
+}
+
 // ── Login ────────────────────────────────────────────────────────────────────
 function TetherLogin({ onLogin }) {
+  const [mode, setMode] = useState('password'); // 'password' | 'qr'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const doLogin = async (credentials) => {
     setLoading(true);
     try {
-      const { data } = await tetherApi.post('/auth/login', { email, password });
+      const { data } = await tetherApi.post('/auth/login', credentials);
       saveTetherSession(data.token, data.user);
       onLogin(data.user);
     } catch (err) {
       toast.error(err.response?.data?.message || 'שגיאה בהתחברות');
+      setMode('password');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    doLogin({ email, password });
+  };
+
+  const handleQrResult = (text) => {
+    try {
+      // supports JSON {"email":"...","password":"..."} or "email:password"
+      const parsed = text.startsWith('{') ? JSON.parse(text) : (() => {
+        const i = text.indexOf(':');
+        return { email: text.slice(0, i), password: text.slice(i + 1) };
+      })();
+      if (!parsed.email || !parsed.password) throw new Error();
+      doLogin(parsed);
+    } catch {
+      toast.error('ברקוד לא תקין');
+      setMode('password');
     }
   };
 
   return (
     <div className="flex items-center justify-center min-h-[60vh]">
       <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md border border-gray-100">
-        <div className="flex flex-col items-center mb-8">
+        <div className="flex flex-col items-center mb-6">
           <div className="bg-blue-900 text-white rounded-full p-4 mb-4">
             <Shield size={36} />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Tether — כניסת מנהל</h1>
           <p className="text-gray-500 text-sm mt-1">פאנל ניהול מכשירים</p>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4" dir="rtl">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">אימייל</label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-              placeholder="admin@example.com"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">סיסמה</label>
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-                placeholder="••••••••"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-          </div>
+
+        {/* Mode toggle */}
+        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6">
           <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-900 hover:bg-blue-800 text-white font-semibold py-2.5 rounded-lg transition disabled:opacity-60"
+            onClick={() => setMode('password')}
+            className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-1.5 rounded-lg transition ${mode === 'password' ? 'bg-white text-blue-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
           >
-            {loading ? 'מתחבר...' : 'כניסה'}
+            <KeyRound size={14} /> סיסמה
           </button>
-        </form>
+          <button
+            onClick={() => setMode('qr')}
+            className={`flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-1.5 rounded-lg transition ${mode === 'qr' ? 'bg-white text-blue-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            <QrCode size={14} /> סרוק ברקוד
+          </button>
+        </div>
+
+        {mode === 'password' ? (
+          <form onSubmit={handleSubmit} className="space-y-4" dir="rtl">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">אימייל</label>
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+                placeholder="admin@example.com"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">סיסמה</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                  placeholder="••••••••"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-900 hover:bg-blue-800 text-white font-semibold py-2.5 rounded-lg transition disabled:opacity-60"
+            >
+              {loading ? 'מתחבר...' : 'כניסה'}
+            </button>
+          </form>
+        ) : (
+          <div dir="rtl">
+            {loading
+              ? <div className="text-center py-8 text-gray-400">מתחבר...</div>
+              : <QrScanner onResult={handleQrResult} />
+            }
+          </div>
+        )}
       </div>
     </div>
   );
@@ -313,6 +394,8 @@ function CommunityCard({ community, onDeleted }) {
   const [detail, setDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [editPolicy, setEditPolicy] = useState(false);
+  const [selectedDeviceApps, setSelectedDeviceApps] = useState(null);
+  const [showLockModal, setShowLockModal] = useState(false);
   const [approvals, setApprovals] = useState([]);
 
   const loadDetail = async () => {
@@ -320,8 +403,8 @@ function CommunityCard({ community, onDeleted }) {
     setLoadingDetail(true);
     try {
       const [detRes, appRes] = await Promise.all([
-        tetherApi.get(`/admin/communities/${community._id}`, { headers: authHeader() }),
-        tetherApi.get(`/admin/communities/${community._id}/approvals`, { headers: authHeader() }),
+        tetherApi.get(`/admin/communities/${community?._id || community?.id}`, { headers: authHeader() }),
+        tetherApi.get(`/admin/communities/${community?._id || community?.id}/approvals`, { headers: authHeader() }),
       ]);
       setDetail(detRes.data);
       setApprovals(appRes.data);
@@ -335,6 +418,18 @@ function CommunityCard({ community, onDeleted }) {
   const handleToggle = () => {
     if (!open) loadDetail();
     setOpen(!open);
+  };
+
+  const toggleAllowUninstall = async (device) => {
+    if (!confirm(device.allowUninstall ? 'לבטל את אישור המחיקה למכשיר זה?' : 'לאשר למכשיר זה להסיר את האפליקציה?')) return;
+    try {
+      await tetherApi.put(`/admin/devices/${device.deviceId}/allow-uninstall`, { allowUninstall: !device.allowUninstall }, { headers: authHeader() });
+      setDetail(d => ({
+        ...d,
+        devices: d.devices.map(dev => dev.deviceId === device.deviceId ? { ...dev, allowUninstall: !dev.allowUninstall } : dev)
+      }));
+      toast.success(device.allowUninstall ? 'אישור מחיקה בוטל' : 'אישור מחיקה ניתן');
+    } catch(err) { toast.error('שגיאה: ' + err.message); }
   };
 
   const removeDevice = async (deviceId) => {
@@ -361,9 +456,9 @@ function CommunityCard({ community, onDeleted }) {
   const deleteCommunity = async () => {
     if (!confirm(`למחוק את קהילה "${community.name}"?`)) return;
     try {
-      await tetherApi.delete(`/admin/communities/${community._id}`, { headers: authHeader() });
+      await tetherApi.delete(`/admin/communities/${community?._id || community?.id}`, { headers: authHeader() });
       toast.success('קהילה נמחקה');
-      onDeleted(community._id);
+      onDeleted(community?._id || community?.id);
     } catch {
       toast.error('שגיאה במחיקה');
     }
@@ -376,9 +471,9 @@ function CommunityCard({ community, onDeleted }) {
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-      <button
+      <div
         onClick={handleToggle}
-        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition text-right"
+        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition text-right cursor-pointer"
       >
         <div className="flex items-center gap-3">
           <div className="bg-blue-100 text-blue-800 rounded-lg p-2">
@@ -400,11 +495,32 @@ function CommunityCard({ community, onDeleted }) {
           </span>
           {open ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
         </div>
-      </button>
+      </div>
 
       {open && (
         <div className="border-t border-gray-100 px-4 pb-4" dir="rtl">
-          {loadingDetail ? (
+          {showLockModal && <LockCommunityModal community={community} onClose={() => setShowLockModal(false)} />}
+{selectedDeviceApps && <DeviceAppsModal device={selectedDeviceApps} community={community} onClose={() => setSelectedDeviceApps(null)} />}
+<div className="flex justify-end mb-4 pt-2 px-4"><button onClick={() => setShowLockModal(true)} className="flex items-center gap-1 bg-red-100 text-red-700 font-bold px-3 py-1.5 rounded"><Lock size={16}/> אפשרויות נעילת מכשירים</button></div>
+            {/* QR Code + join code */}
+            <div className="flex flex-col items-center gap-3 py-4 border-b border-gray-100 mb-2">
+              <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
+                <QRCode value={community.code} size={160} />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-mono font-bold tracking-widest text-blue-900">{community.code}</span>
+                <button
+                  onClick={copyCode}
+                  className="text-gray-400 hover:text-gray-600 p-1 rounded"
+                  title="העתק קוד"
+                >
+                  <Copy size={16} />
+                </button>
+              </div>
+              <p className="text-xs text-gray-400">סרוק את הQR או הכנס את הקוד באפליקציה</p>
+            </div>
+
+            {loadingDetail ? (
             <div className="text-center py-6 text-gray-400 text-sm">טוען...</div>
           ) : detail ? (
             <div className="space-y-4 pt-4">
@@ -430,6 +546,9 @@ function CommunityCard({ community, onDeleted }) {
                             className="text-red-400 hover:text-red-600 p-1 rounded"
                           >
                             <Trash2 size={14} />
+                            </button>
+                            <button onClick={() => setSelectedDeviceApps(dev)} className="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100" title="ניהול אפליקציות">
+                              <List size={14} />
                           </button>
                         </div>
                       ))}
@@ -476,7 +595,7 @@ function CommunityCard({ community, onDeleted }) {
                 </button>
                 {editPolicy && (
                   <PolicyEditor
-                    communityId={community._id}
+                    communityId={community?._id || community?.id}
                     initialPolicy={detail.community.policy}
                     onSaved={(p) => setDetail(d => ({ ...d, community: { ...d.community, policy: p } }))}
                   />
@@ -573,8 +692,9 @@ function CommunitiesTab() {
         </div>
       ) : (
         <div className="space-y-3">
-          {communities.map(c => (
+          {communities.map((c, i) => (
             <CommunityCard
+              key={c._id || i}
               key={c._id}
               community={c}
               onDeleted={(id) => setCommunities(prev => prev.filter(x => x._id !== id))}
@@ -793,6 +913,135 @@ const TABS = [
   { id: 'approvals', label: 'אישורים' },
   { id: 'admins', label: 'מנהלים' },
 ];
+
+
+// ─── Apps & Lock Modals ──────────────────────────────────────────────
+function DeviceAppsModal({ device, community, onClose }) {
+  const [saving, setSaving] = React.useState(false);
+  const apps = device.installedApps || [];
+  
+  const isAllowed = (pkg) => community.policy?.allowedApps?.includes(pkg);
+  const isBlocked = (pkg) => community.policy?.blockedApps?.includes(pkg);
+
+  const toggleApp = async (pkg, action) => {
+    setSaving(true);
+    try {
+      let allowed = [...(community.policy?.allowedApps || [])];
+      let blocked = [...(community.policy?.blockedApps || [])];
+      
+      if (action === 'allow') {
+        if (!allowed.includes(pkg)) allowed.push(pkg);
+        blocked = blocked.filter(a => a !== pkg);
+      } else if (action === 'block') {
+        if (!blocked.includes(pkg)) blocked.push(pkg);
+        allowed = allowed.filter(a => a !== pkg);
+      } else {
+        allowed = allowed.filter(a => a !== pkg);
+        blocked = blocked.filter(a => a !== pkg);
+      }
+
+      await tetherApi.put(`/admin/communities/${community?._id || community?.id}/policy`, {
+        ...community.policy,
+        allowedApps: allowed,
+        blockedApps: blocked
+      }, { headers: { Authorization: `Bearer ${localStorage.getItem('tetherToken')}` } });
+      
+      if(!community.policy) community.policy = {};
+      community.policy.allowedApps = allowed;
+      community.policy.blockedApps = blocked;
+      toast.success('עודכן בהצלחה');
+    } catch(err) {
+      toast.error('שגיאה בעדכון הרשאות');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" dir="rtl">
+      <div className="bg-white rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+        <div className="p-4 border-b flex items-center justify-between">
+          <h2 className="text-xl font-bold flex items-center gap-2"><AppWindow /> מנהל אפליקציות חסומות/מותורת</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><XCircle /></button>
+        </div>
+        <div className="p-4 overflow-y-auto flex-1 bg-gray-50">
+          {apps.length === 0 ? <p className="text-center py-10 text-gray-500">אין אפליקציות מהמכשיר</p> : (
+            <ul className="space-y-2">
+              {apps.map((app, i) => (
+                <li key={i} className="bg-white p-3 rounded shadow-sm flex items-center justify-between">
+                  <div>
+                    <div className="font-semibold text-gray-800">{app.appName}</div>
+                    <div className="text-xs text-gray-500">{app.packageName} {app.isSystemApp ? '(מערכת)' : ''}</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button disabled={saving} onClick={() => toggleApp(app.packageName, 'allow')} className={`px-3 py-1 rounded text-sm ${isAllowed(app.packageName) ? 'bg-green-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}>אפשר תמיד</button>
+                    <button disabled={saving} onClick={() => toggleApp(app.packageName, 'block')} className={`px-3 py-1 rounded text-sm ${isBlocked(app.packageName) ? 'bg-red-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}>חסום תמיד</button>
+                    <button disabled={saving} onClick={() => toggleApp(app.packageName, 'reset')} className={`px-3 py-1 rounded text-sm ${!isAllowed(app.packageName) && !isBlocked(app.packageName) ? 'bg-blue-600 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}>מחדל רגיל</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LockCommunityModal({ community, onClose }) {
+  const [lockType, setLockType] = React.useState('30m');
+  const [adminPassword, setAdminPassword] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+
+  const handleLock = async () => {
+    if (!adminPassword) return toast.error('סיסמת מנהל נדרשת');
+    setLoading(true);
+    try {
+      let lockedUntilTs = null;
+      const now = new Date();
+      if (lockType === '30m') lockedUntilTs = now.getTime() + 30 * 60 * 1000;
+      else if (lockType === '8am') {
+        const tmrw = new Date(now); tmrw.setDate(tmrw.getDate() + 1); tmrw.setHours(8,0,0,0); lockedUntilTs = tmrw.getTime();
+      } else if (lockType === 'unlock') lockedUntilTs = 0;
+
+      await tetherApi.post(`/community/${community?._id || community?.id}/lock`, { lockedUntilTs, adminPassword }, 
+        { headers: { Authorization: `Bearer ${localStorage.getItem('tetherToken')}` } });
+      
+      toast.success('פעולת הנעילה בוצעה בהצלחה ונשלחה למכשירים');
+      onClose();
+    } catch(err) {
+      toast.error('שגיאה. ודא סיסמת מנהל ונסה שוב');
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" dir="rtl">
+      <div className="bg-white rounded-xl max-w-sm w-full p-6">
+        <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Lock /> נעילת קהילה זמנית</h2>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm mb-1">סוג הפעולה:</label>
+            <select value={lockType} onChange={e=>setLockType(e.target.value)} className="w-full border p-2 rounded">
+              <option value="30m">נעל לחצי שעה</option>
+              <option value="8am">נעל עד 8:00 מחר בבוקר</option>
+              <option value="unlock">בטל נעילה באופן מיידי (Unlock)</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm mb-1">אישור בסיסמת מנהל הקשור לחשבון:</label>
+            <input type="password" value={adminPassword} onChange={e=>setAdminPassword(e.target.value)} className="w-full border p-2 rounded" />
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <button onClick={onClose} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">ביטול</button>
+            <button disabled={loading} onClick={handleLock} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+              {loading ? 'מבצע...' : 'אשר חסימה'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function TetherAdminPage() {
   const [tetherUser, setTetherUser] = useState(() => loadTetherUser());

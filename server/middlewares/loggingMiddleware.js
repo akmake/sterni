@@ -74,9 +74,9 @@ const getGeolocation = async (ipAddress) => {
   }
 
   try {
-    // Using ip-api.com (HTTPS pro endpoint or fallback)
-    const response = await axios.get(`https://pro.ip-api.com/json/${ipAddress}?fields=country,city,region,lat,lon&key=${process.env.IP_API_KEY || ''}`, {
-      timeout: 2000, // 2 seconds timeout
+    // Using ip-api.com free endpoint (no key required)
+    const response = await axios.get(`http://ip-api.com/json/${ipAddress}?fields=status,country,city,region,lat,lon`, {
+      timeout: 2000,
     });
 
     if (response.data.status === 'success') {

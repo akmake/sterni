@@ -132,16 +132,23 @@ router.post('/devices/join', async (req, res) => {
   }
 });
 
-// Get policy for device
+// Get policy for device — also returns and clears any pending commands
 router.get('/devices/:deviceId/policy', async (req, res) => {
   try {
-    const device = await TetherDevice.findOne({ deviceId: req.params.deviceId }).populate('communityId');
+    // Atomically read + clear pendingCommands so commands are delivered exactly once
+    const device = await TetherDevice.findOneAndUpdate(
+      { deviceId: req.params.deviceId },
+      { lastSeen: new Date(), $set: { pendingCommands: [] } }
+      // default: new:false → returns pre-update document (with the commands)
+    ).populate('communityId');
+
     if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
 
-    device.lastSeen = new Date();
-    await device.save();
-
-    res.json({ policy: device.communityId.policy, allowUninstall: device.allowUninstall ?? false });
+    res.json({
+      policy: device.communityId.policy,
+      allowUninstall: device.allowUninstall ?? false,
+      pendingCommands: device.pendingCommands ?? []
+    });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
@@ -288,6 +295,28 @@ router.put('/admin/approvals/:id', requireTetherAuth, async (req, res) => {
     res.json(request);
   } catch (e) {
     res.status(500).json({ message: e.message });
+  }
+});
+
+// Verify PIN from Android app locally to allow uninstall
+router.post('/devices/:deviceId/verify-uninstall-pin', async (req, res) => {
+  try {
+    const { pin } = req.body;
+    const device = await TetherDevice.findOne({ deviceId: req.params.deviceId }).populate('communityId');
+    
+    if (!device) return res.status(404).json({ message: 'Device not found' });
+    if (!device.communityId) return res.status(404).json({ message: 'Community not found' });
+
+    const communityPin = device.communityId.policy.uninstallPin || '0000';
+    if (pin === communityPin) {
+      device.allowUninstall = true;
+      await device.save();
+      return res.json({ success: true, allowUninstall: true });
+    } else {
+      return res.status(401).json({ message: 'קוד שגוי' });
+    }
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
   }
 });
 
@@ -477,6 +506,147 @@ router.get('/app/download', (req, res) => {
   res.download(apkPath, 'tether-latest.apk', (err) => {
     if (err) res.status(404).json({ message: 'APK לא נמצא — העלה את הקובץ לשרת' });
   });
+});
+
+// דיווח אפליקציות מהמכשיר
+router.post('/devices/:deviceId/apps', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const apps = req.body.installedApps || req.body.apps;
+    await TetherDevice.findOneAndUpdate(
+      { deviceId },
+      { installedApps: apps, lastSeen: new Date() }
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// נעילת קהילה לפי זמן
+router.post('/community/:id/lock', async (req, res) => {
+  try {
+    const { lockedUntilTs } = req.body;
+    await Community.findByIdAndUpdate(req.params.id, {
+      'policy.lockedUntilTs': lockedUntilTs
+    });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Heartbeat — device reports its protection-layer status every 5 min ────────
+router.post('/devices/:deviceId/heartbeat', async (req, res) => {
+  try {
+    const { accessibilityEnabled, isDeviceAdmin, isDeviceOwner, vpnActive } = req.body;
+    await TetherDevice.findOneAndUpdate(
+      { deviceId: req.params.deviceId },
+      {
+        lastSeen: new Date(),
+        'protectionStatus.accessibilityEnabled': !!accessibilityEnabled,
+        'protectionStatus.isDeviceAdmin':        !!isDeviceAdmin,
+        'protectionStatus.isDeviceOwner':        !!isDeviceOwner,
+        'protectionStatus.vpnActive':            !!vpnActive,
+        'protectionStatus.lastHeartbeat':        new Date()
+      }
+    );
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// ── Security events — device reports each intercepted threat ──────────────────
+router.post('/devices/:deviceId/events', async (req, res) => {
+  try {
+    const { type, packageName } = req.body;
+    const validTypes = [
+      'UNINSTALL_ATTEMPT', 'ADMIN_DEACTIVATE_ATTEMPT',
+      'BLOCKED_APP_OPENED', 'TIME_LOCK_BLOCKED'
+    ];
+    if (!validTypes.includes(type)) {
+      return res.status(400).json({ message: 'סוג אירוע לא חוקי' });
+    }
+
+    const event = { type, packageName: packageName || null, timestamp: new Date() };
+
+    // Keep only the last 50 events (push + trim)
+    await TetherDevice.findOneAndUpdate(
+      { deviceId: req.params.deviceId },
+      {
+        $push: {
+          securityEvents: {
+            $each: [event],
+            $slice: -50   // keep newest 50
+          }
+        },
+        lastSeen: new Date()
+      }
+    );
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// ── Admin: view security events for a device ──────────────────────────────────
+router.get('/admin/devices/:deviceId/events', requireTetherAuth, async (req, res) => {
+  try {
+    const device = await TetherDevice.findOne({ deviceId: req.params.deviceId }).select('securityEvents protectionStatus');
+    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
+    res.json({
+      protectionStatus: device.protectionStatus,
+      events: device.securityEvents.slice().reverse() // newest first
+    });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// ── Admin: push a command to a specific device ────────────────────────────────
+// The command is delivered on the device's next policy poll (at most 15 min later).
+router.post('/admin/devices/:deviceId/commands', requireTetherAuth, async (req, res) => {
+  try {
+    const { type, payload } = req.body;
+    if (!type) return res.status(400).json({ message: 'type חובה' });
+
+    const device = await TetherDevice.findOneAndUpdate(
+      { deviceId: req.params.deviceId },
+      { $push: { pendingCommands: { type, payload: payload || '' } } },
+      { new: true }
+    );
+    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
+    res.json({ success: true, pendingCount: device.pendingCommands.length });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// ── Admin: protection health summary for all devices in a community ───────────
+router.get('/admin/communities/:id/devices/status', requireTetherAuth, async (req, res) => {
+  try {
+    const community = await Community.findOne({ _id: req.params.id, adminId: req.admin._id });
+    if (!community) return res.status(404).json({ message: 'קהילה לא נמצאה' });
+
+    const devices = await TetherDevice.find(
+      { communityId: community._id, active: true },
+      'deviceId deviceModel protectionStatus lastSeen'
+    );
+
+    const staleThreshold = new Date(Date.now() - 30 * 60 * 1000); // 30 min
+    const summary = devices.map(d => ({
+      deviceId:    d.deviceId,
+      deviceModel: d.deviceModel,
+      lastSeen:    d.lastSeen,
+      isOnline:    d.lastSeen > staleThreshold,
+      protection:  d.protectionStatus
+    }));
+
+    res.json(summary);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 });
 
 export default router;

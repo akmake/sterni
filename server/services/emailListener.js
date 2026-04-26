@@ -51,15 +51,26 @@ const getImapConfig = async () => {
 // ==========================================
 // === 🧹 המטאטא ===
 // ==========================================
+const SIGNATURE_ANCHORS = [
+    /טלפון[\s:]*[\d\-\+]/,
+    /נייד[\s:]*[\d\-\+]/,
+    /פקס[\s:]*[\d\-\+]/,
+    /tel[\s.:]*[\d\-\+]/i,
+    /phone[\s.:]*[\d\-\+]/i,
+    /mobile[\s.:]*[\d\-\+]/i,
+    /בע"מ/,
+    /ושות'/,
+];
+
 const cleanEmailBody = (text) => {
     if (!text) return "";
 
     const lines = text.split(/\r?\n/);
-    const cleanLines = [];
+    let bodyLines = [];
 
-    for (let line of lines) {
-        let trimmed = line.trim();
-
+    // Step 1: Strip reply chains
+    for (const line of lines) {
+        const trimmed = line.trim();
         if (trimmed.includes("On ") && trimmed.includes(" at ") && (trimmed.includes("wrote") || trimmed.includes("<"))) break;
         if (/^On .* wrote:$/i.test(trimmed)) break;
         if (trimmed.includes("בתאריך") && trimmed.includes("מאת")) break;
@@ -69,11 +80,50 @@ const cleanEmailBody = (text) => {
         if (trimmed.startsWith('>')) break;
         if (trimmed.includes("Sent from my iPhone")) continue;
         if (trimmed.includes("נשלח מה-iPhone שלי")) continue;
-
-        cleanLines.push(line);
+        bodyLines.push(line);
     }
 
-    return cleanLines.join('\n').trim();
+    // Step 2: RFC 2822 signature separator "-- "
+    const sepIdx = bodyLines.findIndex(l => /^--\s*$/.test(l.trim()));
+    if (sepIdx !== -1) {
+        return bodyLines.slice(0, sepIdx).join('\n').trim();
+    }
+
+    // Step 3: Anchor-based paragraph signature detection
+    const isAnchor = (line) => SIGNATURE_ANCHORS.some(p => p.test(line));
+    const isShort = (line) => line.trim().length <= 45;
+
+    const paragraphs = [];
+    let current = [];
+    for (const line of bodyLines) {
+        if (line.trim() === '') {
+            if (current.length > 0) { paragraphs.push(current); current = []; }
+        } else {
+            current.push(line);
+        }
+    }
+    if (current.length > 0) paragraphs.push(current);
+
+    let anchorParaIdx = -1;
+    for (let i = paragraphs.length - 1; i >= 0; i--) {
+        if (paragraphs[i].some(l => isAnchor(l))) { anchorParaIdx = i; break; }
+    }
+
+    if (anchorParaIdx !== -1) {
+        const tailAllShort = paragraphs.slice(anchorParaIdx).every(p => p.every(l => isShort(l)));
+        if (tailAllShort) {
+            let sigParaStart = anchorParaIdx;
+            let count = 0;
+            for (let i = anchorParaIdx - 1; i >= 0 && count < 3; i--) {
+                if (paragraphs[i].every(l => isShort(l))) { sigParaStart = i; count++; }
+                else break;
+            }
+            const kept = paragraphs.slice(0, sigParaStart);
+            bodyLines = kept.flatMap((p, i) => i < kept.length - 1 ? [...p, ''] : p);
+        }
+    }
+
+    return bodyLines.join('\n').trim();
 };
 
 export const startEmailListener = async () => {

@@ -23,7 +23,8 @@ const policySchema = new mongoose.Schema({
     default: 'NONE'
   },
   allowedDomains: { type: [String], default: [] },
-  blockedDomains: { type: [String], default: [] }
+  blockedDomains: { type: [String], default: [] },
+  lockedUntilTs:  { type: Number,  default: null }
 }, { _id: false });
 
 const communitySchema = new mongoose.Schema({

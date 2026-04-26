@@ -11,10 +11,26 @@ const securityEventSchema = new mongoose.Schema({
 }, { _id: false });
 
 const pendingCommandSchema = new mongoose.Schema({
-  type:    { type: String, required: true }, // SHOW_MESSAGE | FORCE_SYNC
+  type:    { type: String, required: true },
   payload: { type: String, default: '' },
   createdAt: { type: Date, default: Date.now }
 }, { _id: true });
+
+const appTimeLockSchema = new mongoose.Schema({
+  packageName:  { type: String, required: true },
+  lockedUntilTs: { type: Number, default: null }, // epoch ms — null = permanent block
+}, { _id: false });
+
+const devicePolicySchema = new mongoose.Schema({
+  blockInstallApps:  { type: Boolean, default: null }, // null = inherit from community
+  hideGooglePlay:    { type: Boolean, default: null },
+  blockAllStores:    { type: Boolean, default: null },
+  blockApkInstall:   { type: Boolean, default: null },
+  blockedApps:       { type: [String], default: [] },  // extra per-device blocks
+  allowedApps:       { type: [String], default: [] },  // per-device overrides (force-allow)
+  appTimeLocks:      { type: [appTimeLockSchema], default: [] },
+  lockedUntilTs:     { type: Number, default: null },  // full device lock
+}, { _id: false });
 
 const tetherDeviceSchema = new mongoose.Schema({
   deviceId: {
@@ -27,6 +43,7 @@ const tetherDeviceSchema = new mongoose.Schema({
     type: String,
     default: 'Unknown'
   },
+  deviceNickname: { type: String, default: null },
   communityId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Community',
@@ -42,6 +59,12 @@ const tetherDeviceSchema = new mongoose.Schema({
     isSystemApp: Boolean
   }],
 
+  // Per-device policy overrides (merged on top of community policy)
+  devicePolicy: {
+    type: devicePolicySchema,
+    default: () => ({})
+  },
+
   // Live protection-layer status (updated by heartbeat)
   protectionStatus: {
     accessibilityEnabled: { type: Boolean, default: false },
@@ -51,7 +74,6 @@ const tetherDeviceSchema = new mongoose.Schema({
     lastHeartbeat:        { type: Date,    default: null }
   },
 
-  // Rolling log of the last 50 security events
   securityEvents: {
     type: [securityEventSchema],
     default: [],
@@ -61,7 +83,6 @@ const tetherDeviceSchema = new mongoose.Schema({
     }
   },
 
-  // Commands queued by admin — cleared atomically on next policy poll
   pendingCommands: {
     type: [pendingCommandSchema],
     default: []

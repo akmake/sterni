@@ -54,6 +54,26 @@ Full-stack event management + household + finance platform.
 | Payments module | `docs/modules/payments.md` |
 | Admin module | `docs/modules/admin.md` |
 | Chat/WhatsApp/Email | `docs/modules/communication.md` |
+| Tether MDM module | use `/tether` skill |
+
+## Tether MDM Module (summary)
+
+Android MDM system for religious communities. Separate auth — Tether admins are NOT the same as main app users.
+
+**Key files:**
+- `server/routes/tetherRoutes.js` — all Tether API (prefix `/api/tether`)
+- `server/models/TetherDevice.js`, `TetherCommunity.js`, `TetherAdmin.js`
+- `client/src/pages/TetherAdminPage.jsx` — entry point (65 lines, imports from `pages/tether/`)
+- `client/src/pages/tether/` — all Tether UI components
+
+**Architecture:**
+- Two-layer Android protection: Accessibility Service (UI blocking) + VPN (DNS-level blocking)
+- Policy: community policy (base) merged with device policy (per-device overrides, `null` = inherit from community)
+- `mergePolicy(communityPolicy, devicePolicy)` on server — null fields inherit
+- `pendingCommands` queue: `SHOW_MESSAGE`, `FORCE_SYNC`, `RELEASE_ALL` — fetched atomically by device heartbeat
+- Heartbeat every 5 min: reports `accessibilityEnabled`, `isDeviceAdmin`, `isDeviceOwner`, `vpnActive`
+
+**Admin route:** `/admin/tether` — requires `role === 'admin'` in main app + separate Tether JWT login
 
 ## Route Guards
 - `ProtectedRoute` — requires login

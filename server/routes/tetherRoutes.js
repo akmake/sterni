@@ -132,20 +132,43 @@ router.post('/devices/join', async (req, res) => {
   }
 });
 
-// Get policy for device — also returns and clears any pending commands
+// Merge community policy with per-device overrides
+function mergePolicy(communityPolicy, devicePolicy = {}) {
+  const merged = { ...communityPolicy.toObject?.() ?? communityPolicy };
+
+  // Boolean overrides — only apply if explicitly set (not null)
+  if (devicePolicy.blockInstallApps != null) merged.blockInstallApps = devicePolicy.blockInstallApps;
+  if (devicePolicy.hideGooglePlay    != null) merged.hideGooglePlay   = devicePolicy.hideGooglePlay;
+  if (devicePolicy.blockAllStores    != null) merged.blockAllStores   = devicePolicy.blockAllStores;
+  if (devicePolicy.blockApkInstall   != null) merged.blockApkInstall  = devicePolicy.blockApkInstall;
+  if (devicePolicy.lockedUntilTs     != null) merged.lockedUntilTs    = devicePolicy.lockedUntilTs;
+
+  // Merge blocked/allowed app lists (union)
+  const baseBlocked = merged.blockedApps ?? [];
+  const baseAllowed = merged.allowedApps ?? [];
+  const devBlocked  = devicePolicy.blockedApps ?? [];
+  const devAllowed  = devicePolicy.allowedApps ?? [];
+  merged.blockedApps  = [...new Set([...baseBlocked, ...devBlocked])];
+  merged.allowedApps  = [...new Set([...baseAllowed, ...devAllowed])];
+  merged.appTimeLocks = devicePolicy.appTimeLocks ?? [];
+
+  return merged;
+}
+
+// Get policy for device — merges community + device overrides, clears pending commands
 router.get('/devices/:deviceId/policy', async (req, res) => {
   try {
-    // Atomically read + clear pendingCommands so commands are delivered exactly once
     const device = await TetherDevice.findOneAndUpdate(
       { deviceId: req.params.deviceId },
       { lastSeen: new Date(), $set: { pendingCommands: [] } }
-      // default: new:false → returns pre-update document (with the commands)
     ).populate('communityId');
 
     if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
 
+    const merged = mergePolicy(device.communityId.policy, device.devicePolicy);
+
     res.json({
-      policy: device.communityId.policy,
+      policy: merged,
       allowUninstall: device.allowUninstall ?? false,
       pendingCommands: device.pendingCommands ?? []
     });
@@ -189,11 +212,13 @@ const formatDevice = (d) => ({
   id: d._id.toString(),
   deviceId: d.deviceId,
   deviceModel: d.deviceModel,
+  deviceNickname: d.deviceNickname ?? null,
   communityId: d.communityId.toString(),
   isDeviceOwner: d.isDeviceOwner,
   allowUninstall: d.allowUninstall ?? false,
   lastSeen: d.lastSeen,
   active: d.active,
+  protectionStatus: d.protectionStatus ?? {},
   createdAt: d.createdAt
 });
 
@@ -344,6 +369,69 @@ router.delete('/admin/devices/:deviceId', requireTetherAuth, async (req, res) =>
       { active: false }
     );
     res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// Get full details for a single device
+router.get('/admin/devices/:deviceId', requireTetherAuth, async (req, res) => {
+  try {
+    const device = await TetherDevice.findOne({ deviceId: req.params.deviceId }).populate('communityId');
+    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
+    const communityDoc = device.communityId; // populated document
+    res.json({
+      id: device._id.toString(),
+      deviceId: device.deviceId,
+      deviceModel: device.deviceModel,
+      deviceNickname: device.deviceNickname ?? null,
+      communityId: communityDoc?._id?.toString() ?? '',
+      communityName: communityDoc?.name ?? '',
+      isDeviceOwner: device.isDeviceOwner,
+      allowUninstall: device.allowUninstall ?? false,
+      lastSeen: device.lastSeen,
+      active: device.active,
+      createdAt: device.createdAt,
+      devicePolicy: device.devicePolicy ?? {},
+      installedApps: device.installedApps ?? [],
+      protectionStatus: device.protectionStatus ?? {},
+      securityEvents: device.securityEvents ?? [],
+      mergedPolicy: mergePolicy(communityDoc?.policy ?? {}, device.devicePolicy)
+    });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// Update per-device policy overrides
+router.put('/admin/devices/:deviceId/device-policy', requireTetherAuth, async (req, res) => {
+  try {
+    const device = await TetherDevice.findOneAndUpdate(
+      { deviceId: req.params.deviceId },
+      { devicePolicy: req.body },
+      { new: true }
+    ).populate('communityId');
+    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
+    // Push FORCE_SYNC so device picks up changes on next poll
+    device.pendingCommands.push({ type: 'FORCE_SYNC', payload: '' });
+    await device.save();
+    res.json({ devicePolicy: device.devicePolicy, mergedPolicy: mergePolicy(device.communityId.policy, device.devicePolicy) });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// Rename device (nickname)
+router.put('/admin/devices/:deviceId/nickname', requireTetherAuth, async (req, res) => {
+  try {
+    const { nickname } = req.body;
+    const device = await TetherDevice.findOneAndUpdate(
+      { deviceId: req.params.deviceId },
+      { deviceNickname: nickname || null },
+      { new: true }
+    );
+    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
+    res.json({ deviceNickname: device.deviceNickname });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
@@ -533,6 +621,26 @@ router.post('/community/:id/lock', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// List all devices across admin's communities
+router.get('/admin/devices', requireTetherAuth, async (req, res) => {
+  try {
+    const communities = await Community.find({ adminId: req.admin._id }).select('_id name');
+    const communityIds = communities.map(c => c._id);
+    const communityMap = Object.fromEntries(communities.map(c => [c._id.toString(), c.name]));
+    const devices = await TetherDevice.find({ communityId: { $in: communityIds }, active: true });
+    const staleThreshold = new Date(Date.now() - 30 * 60 * 1000);
+    res.json(devices.map(d => ({
+      ...formatDevice(d),
+      deviceNickname: d.deviceNickname ?? null,
+      communityName: communityMap[d.communityId.toString()] ?? '',
+      protectionStatus: d.protectionStatus ?? {},
+      isOnline: d.lastSeen > staleThreshold,
+    })));
+  } catch (e) {
+    res.status(500).json({ message: e.message });
   }
 });
 

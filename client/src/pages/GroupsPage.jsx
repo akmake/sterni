@@ -100,6 +100,23 @@ export default function GroupsPage() {
         : new Date(b) - new Date(a);
   });
 
+  const toGematria = (n) => {
+    if (n === 15) return 'ט"ו';
+    if (n === 16) return 'ט"ז';
+    const tens  = ['', 'י', 'כ', 'ל'];
+    const ones  = ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט'];
+    const t = Math.floor(n / 10), o = n % 10;
+    if (t === 0) return ones[o] + "'";
+    if (o === 0) return tens[t] + "'";
+    return tens[t] + '"' + ones[o];
+  };
+
+  const hebrewDate = (date) => {
+    const day   = parseInt(new Intl.DateTimeFormat('he-IL-u-ca-hebrew', { day: 'numeric' }).format(date));
+    const month = new Intl.DateTimeFormat('he-IL-u-ca-hebrew', { month: 'long' }).format(date);
+    return `${toGematria(day)} ב${month}`;
+  };
+
   // פורמט כותרת השבוע (למשל: 14.01 - 20.01)
   const formatWeekRange = (dateString) => {
     const start = new Date(dateString);
@@ -107,7 +124,9 @@ export default function GroupsPage() {
     end.setDate(start.getDate() + 6); // שבת
 
     const options = { day: '2-digit', month: '2-digit' };
-    return `${start.toLocaleDateString('he-IL', options)} - ${end.toLocaleDateString('he-IL', options)}`;
+    const greg = `${start.toLocaleDateString('he-IL', options)} - ${end.toLocaleDateString('he-IL', options)}`;
+    const heb  = `${hebrewDate(start)} - ${hebrewDate(end)}`;
+    return { greg, heb };
   };
 
   return (
@@ -201,9 +220,11 @@ export default function GroupsPage() {
                 
                 {/* כותרת השבוע */}
                 <div className="flex items-center gap-4 mb-6">
-                  <div className="bg-white px-4 py-2 rounded-full border border-slate-200 shadow-sm flex items-center gap-2 text-slate-600 font-semibold">
+                  <div className="bg-white px-4 py-2 rounded-full border border-slate-200 shadow-sm flex items-center gap-3 text-slate-600 font-semibold">
                     <Clock size={18} className="text-blue-500" />
-                    <span>שבוע: {formatWeekRange(weekStart)}</span>
+                    <span>{formatWeekRange(weekStart).greg}</span>
+                    <span className="text-slate-300">|</span>
+                    <span className="text-slate-400 font-medium text-sm">{formatWeekRange(weekStart).heb}</span>
                   </div>
                   <div className="h-px bg-slate-200 flex-1"></div>
                 </div>

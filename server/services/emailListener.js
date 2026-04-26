@@ -5,7 +5,7 @@ import { Contact } from '../models/Contact.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { isConnected, sendMessageHuman } from './whatsappService.js';
+import { isConnected, sendMessageHuman, logDiag } from './whatsappService.js';
 import SystemConfig from '../models/SystemConfig.js';
 import EmailAccount from '../models/EmailAccount.js';
 import { decrypt } from '../utils/encryption.js';
@@ -23,6 +23,24 @@ if (!fs.existsSync(UPLOADS_DIR)){
 
 let connection = null;
 let healthCheckInterval = null;
+
+// ============================================================
+// ===  EMAIL LISTENER STATUS (לניטור)  ===
+// ============================================================
+
+const emailStats = {
+    connected: false,
+    lastPoll: null,
+    lastReconnect: null,
+    reconnectCount: 0,
+    emailsBridged: 0,
+    emailsSkippedWaDown: 0,
+};
+
+export const getEmailListenerStatus = () => ({
+    ...emailStats,
+    processingQueueSize: processingEmails.size,
+});
 
 const getImapConfig = async () => {
     const sysConfig = await SystemConfig.findOne();
@@ -138,6 +156,10 @@ export const startEmailListener = async () => {
 
         connection = await imap.connect(config);
         console.log("✅ מחובר! מאזין למיילים...");
+        emailStats.connected = true;
+        emailStats.lastReconnect = new Date().toISOString();
+        emailStats.reconnectCount++;
+        logDiag('IMAP_CONNECTED', config.systemEmail);
 
         await connection.openBox('INBOX');
 
@@ -149,6 +171,8 @@ export const startEmailListener = async () => {
             try {
                 if (!connection || connection.imap.state === 'disconnected') {
                     console.warn('⚠️ IMAP health check: חיבור מת, מתחבר מחדש...');
+                    logDiag('IMAP_HEALTHCHECK_DEAD', 'reconnecting');
+                    emailStats.connected = false;
                     clearInterval(emailInterval);
                     clearInterval(healthCheckInterval);
                     healthCheckInterval = null;
@@ -162,12 +186,16 @@ export const startEmailListener = async () => {
 
         connection.on('error', (err) => {
             console.error('IMAP Connection Error:', err);
+            logDiag('IMAP_ERROR', err.message);
+            emailStats.connected = false;
             clearInterval(emailInterval);
             setTimeout(startEmailListener, 10000);
         });
 
     } catch (err) {
         console.error("❌ שגיאת IMAP (חיבור נכשל):", err.message);
+        logDiag('IMAP_CONNECT_FAIL', err.message);
+        emailStats.connected = false;
         setTimeout(startEmailListener, 30000);
     }
 };
@@ -180,6 +208,7 @@ const checkForNewEmails = async (systemEmail) => {
         const fetchOptions = { bodies: ['HEADER', 'TEXT', ''], markSeen: false, struct: true };
 
         const messages = await connection.search(searchCriteria, fetchOptions);
+        emailStats.lastPoll = new Date().toISOString();
         if (messages.length === 0) return;
 
         const sysConfig = await SystemConfig.findOne();
@@ -210,9 +239,12 @@ const checkForNewEmails = async (systemEmail) => {
             // =========================================================
             if ((fromEmail === TARGET_EMAIL || fromEmail === systemEmail) && subject.includes('WA_MSG:')) {
 
-                // ★ שימוש ב-isConnected() במקום בדיקה ישירה של sock
                 if (!isConnected()) {
                     console.warn(`⏳ וואצאפ לא מחובר, לא מסמנים כנקרא — ננסה שוב בסבב הבא`);
+                    // BUG FIX: קודם ה-UID נשאר ב-processingEmails לנצח → מייל לעולם לא ייצא.
+                    processingEmails.delete(id);
+                    logDiag('EMAIL_WA_SKIP', `uid=${id} from=${fromEmail || '?'}`);
+                    emailStats.emailsSkippedWaDown++;
                     continue; // לא מסמנים כ-seen — ננסה שוב ב-10 שניות
                 }
 
@@ -248,11 +280,14 @@ const checkForNewEmails = async (systemEmail) => {
                             }
                         }
 
+                        logDiag('EMAIL_BRIDGED', `to=${phoneNumber}`);
+                        emailStats.emailsBridged++;
                         shouldMarkAsSeen = true;
 
                     } catch (waError) {
                         console.error(`❌ שגיאה בשליחה לוואצאפ:`, waError.message);
-                        // לא מסמנים כנקרא — ננסה שוב
+                        logDiag('EMAIL_WA_FAIL', `to=${phoneNumber || '?'} err=${waError.message}`);
+                        processingEmails.delete(id); // תן לו לנסות שוב בסבב הבא
                     }
                 } else {
                      shouldMarkAsSeen = true;
@@ -301,7 +336,9 @@ const checkForNewEmails = async (systemEmail) => {
         }
     } catch (err) {
         console.error("❌ שגיאה ב-Listener:", err.message);
+        logDiag('IMAP_POLL_ERROR', err.message);
         if (err.message.includes('Socket') || err.message.includes('Ended')) {
+            emailStats.connected = false;
             setTimeout(startEmailListener, 5000);
         }
     }

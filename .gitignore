@@ -24,9 +24,13 @@ server/credentials/
 credentials/
 
 # Uploads (user-generated)
+uploads/
 
 # Docker
 mongo-data/
+
+# Claude Code
+.claude/settings.local.json
 
 # IDE / OS files
 .idea/

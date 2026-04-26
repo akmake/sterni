@@ -40,6 +40,27 @@ const BASE_RECONNECT_DELAY = 3000;
 const msgCache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
 
 // ============================================================
+// ===  DIAGNOSTICS RING BUFFER  ===
+// ============================================================
+
+const MAX_DIAG = 200;
+const diagLog = [];
+
+export const logDiag = (type, detail = '') => {
+    if (diagLog.length >= MAX_DIAG) diagLog.shift();
+    diagLog.push({ ts: new Date().toISOString(), type, detail });
+};
+
+// מונים
+let waStats = { msgsIn: 0, msgsEmailFail: 0, reconnects: 0, reconnectStops: 0 };
+
+export const getDiagnostics = () => ({
+    wa: getConnectionStatus(),
+    stats: { ...waStats },
+    events: [...diagLog].reverse(), // חדש → ישן
+});
+
+// ============================================================
 // ===  HUMAN-LIKE HELPERS  ===
 // ============================================================
 
@@ -184,12 +205,15 @@ const scheduleReconnect = (reason = 'unknown') => {
 
     if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
         console.error(`🚫 ${MAX_RECONNECT_ATTEMPTS} ניסיונות reconnect נכשלו. עוצר.`);
+        logDiag('WA_RECONNECT_STOPPED', `after ${reconnectAttempts} attempts`);
         connectionState = 'disconnected';
         return;
     }
 
     const delay = getReconnectDelay();
     console.log(`🔄 Reconnect #${reconnectAttempts + 1} בעוד ${Math.round(delay / 1000)} שניות (סיבה: ${reason})`);
+    logDiag('WA_RECONNECT_SCHEDULED', `#${reconnectAttempts + 1} in ${Math.round(delay / 1000)}s reason=${reason}`);
+    waStats.reconnects++;
 
     setTimeout(() => connectToWhatsApp(), delay);
 };
@@ -208,23 +232,22 @@ const startHeartbeat = () => {
 
         if (silentMinutes > 10) {
             console.warn(`💀 HEARTBEAT: שתיקה של ${Math.round(silentMinutes)} דקות`);
+            logDiag('WA_HEARTBEAT_SILENT', `${Math.round(silentMinutes)}min`);
 
             try {
                 if (sock?.user) {
+                    // BUG FIX: אם sendPresenceUpdate לא זורק — החיבור חי.
+                    // קודם: המתנה של 15 שניות + בדיקה שתמיד נכשלת (touch לא עדכן).
                     await sock.sendPresenceUpdate('available');
-                    await new Promise(resolve => setTimeout(resolve, 15000));
-
-                    if ((Date.now() - lastEventTimestamp) / 1000 / 60 > 10) {
-                        console.warn('💀 Ping לא עזר — force reconnect');
-                        await forceReconnect('silent_death');
-                    } else {
-                        console.log('✅ Ping הצליח — חזרנו לחיים');
-                    }
+                    touch(); // מאשר שהחיבור חי
+                    console.log(`✅ HEARTBEAT ping OK — חיבור חי (${Math.round(silentMinutes)} דק׳ שקט)`);
+                    logDiag('WA_HEARTBEAT_PING_OK', `${Math.round(silentMinutes)}min quiet`);
                 } else {
                     await forceReconnect('no_user_in_heartbeat');
                 }
             } catch (err) {
                 console.error('💀 Heartbeat ping נכשל:', err.message);
+                logDiag('WA_HEARTBEAT_PING_FAIL', err.message);
                 await forceReconnect('heartbeat_error');
             }
         }
@@ -246,13 +269,22 @@ const forceReconnect = async (reason) => {
 
     stopHeartbeat();
     connectionState = 'disconnected';
+    logDiag('WA_FORCE_RECONNECT', reason);
 
-    try { sock?.end(); } catch (e) { /* ok */ }
-    sock = null;
-
-    reconnectLock = false;
-    reconnectAttempts++;
-    scheduleReconnect(reason);
+    if (sock) {
+        // BUG FIX: קודם גם forceReconnect וגם close-handler הוסיפו ל-reconnectAttempts,
+        // מה שהכפיל את הסאונטר ומהר מאוד הגיע ל-15 → עצר לנצח.
+        // עכשיו: forceReconnect רק סוגר את הsocket — close-handler יטפל בreconnect.
+        try { sock.end(); } catch (e) { /* ok */ }
+        sock = null;
+        reconnectLock = false;
+    } else {
+        // אין socket לסגור — נתזמן reconnect ידנית
+        sock = null;
+        reconnectLock = false;
+        reconnectAttempts++;
+        scheduleReconnect(reason);
+    }
 };
 
 // ============================================================
@@ -312,6 +344,8 @@ const handleIncomingMessage = async (m) => {
             let finalBodyText = textContent || (messageType === 'audioMessage' ? '[הודעה קולית]' : '');
 
             console.log(`📩 מעביר מייל מ-${senderName} (${finalPhone})`);
+            logDiag('WA_MSG_IN', `from=${finalPhone} type=${messageType}`);
+            waStats.msgsIn++;
 
             let htmlContent = `<div dir="rtl" style="font-family: Arial; text-align: right;">`;
 
@@ -347,6 +381,10 @@ const handleIncomingMessage = async (m) => {
                     sent = true;
                 } catch (emailErr) {
                     console.error(`❌ שליחת מייל נכשלה (${attempt + 1}/3):`, emailErr.message);
+                    if (attempt === 2) {
+                        logDiag('WA_MSG_EMAIL_FAIL', `from=${finalPhone} err=${emailErr.message}`);
+                        waStats.msgsEmailFail++;
+                    }
                     if (attempt < 2) await new Promise(r => setTimeout(r, 2000));
                 }
             }
@@ -416,6 +454,7 @@ export const connectToWhatsApp = async () => {
                 connectionState = 'connected';
                 currentQRDataURL = null;
                 reconnectAttempts = 0;
+                logDiag('WA_CONNECTED', sock?.user?.id || '');
                 startHeartbeat();
             }
 
@@ -423,7 +462,6 @@ export const connectToWhatsApp = async () => {
                 stopHeartbeat();
                 connectionState = 'disconnected';
 
-                // ★ תיקון הבאג הקריטי — הקוד המקורי היה שבור כאן
                 const error = lastDisconnect?.error;
                 const statusCode = (error instanceof Boom)
                     ? error.output?.statusCode
@@ -433,6 +471,7 @@ export const connectToWhatsApp = async () => {
                 const isRequiredRestart = statusCode === DisconnectReason.restartRequired;
 
                 console.log(`🔌 חיבור נסגר | status: ${statusCode} | loggedOut: ${isLoggedOut}`);
+                logDiag('WA_DISCONNECTED', `status=${statusCode} loggedOut=${isLoggedOut}`);
 
                 if (isLoggedOut) {
                     console.warn('⛔ Logged Out — מוחק session...');

@@ -1,12 +1,42 @@
+# === Dependencies ===
 node_modules/
+server/node_modules/
+
+# === Build outputs ===
 client/dist/
 client/.vite/
 client/.vite-cache/
+
+# === Logs & debug ===
 server/logs/
-uploads/
-.git/
 *.log
-*.lock
+LOGS_FULL_FILES.md
+LOGGING_IMPLEMENTATION.md
+
+# === Secrets & session data ===
+server/.env
+server/auth_info_baileys/
+.env*
+
+# === Giant generated files (809KB+ — never useful to read) ===
+directory_structure.txt
+
+# === Separate sub-projects (not part of main app) ===
+android/
+Microsoft/
+python/
+
+# === Static & uploaded assets ===
+uploads/
+client/public/
+
+# === Git & OS ===
+.git/
 .DS_Store
-coverage/
+*.lock
 .nyc_output/
+coverage/
+
+# === Utility scripts ===
+*.ps1
+*.py

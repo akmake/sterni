@@ -25,6 +25,14 @@ Every new route, model, store, component, or env var MUST be documented before t
 
 ---
 
+## Production Server
+
+**URL:** `https://dahanswebsite.com/`
+- API: `https://dahanswebsite.com/api/...`
+- אל תנסה localhost — השרת רץ בפרודקשן בלבד
+
+---
+
 ## Project Overview
 
 Full-stack event management + household + finance platform.
@@ -87,3 +95,19 @@ Android MDM system for religious communities. Separate auth — Tether admins ar
 ## Print Pages (outside Layout)
 - `/print/kitchen-a3` → `KitchenPrintPageA3`
 - `/print/group-schedule` → `GroupSchedulePrintPage`
+
+---
+
+## Token-saving rules (mandatory)
+
+**NEVER read these — they are huge and useless to AI:**
+- `directory_structure.txt` — 809 KB auto-generated, use Glob/Grep instead
+- `LOGS_FULL_FILES.md` — raw logs dump
+- `server/auth_info_baileys/` — WhatsApp binary session data
+- `node_modules/`, `client/dist/`, `uploads/` — already in .claudeignore
+
+**Navigation strategy — read only what you need:**
+1. Check `docs/sync-map.md` FIRST to know which files are coupled
+2. Read the specific `docs/` file for the area you're working in
+3. Read source files only after knowing what you're looking for
+4. Never glob `server/routes/` blindly — 41 route files, use Grep to find the one you need

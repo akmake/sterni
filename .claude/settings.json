@@ -1,8 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "Bash(wc -l \"c:\\\\Users\\\\yosef dahan\\\\Documents\\\\GitHub\\\\AppHome/app/src/main/java/com/example/goodstart/ui/viewmodel\"/*.kt)",
-      "Bash(JAVA_HOME=\"C:/Program Files/Android/Android Studio/jbr\" ./gradlew installDebug)"
+      "Bash(git log*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git show*)",
+      "Bash(git branch*)",
+      "Bash(git stash*)",
+      "Bash(wc -l *)",
+      "Bash(ls *)",
+      "Bash(node --version)",
+      "Bash(npm --version)",
+      "Bash(npm run lint*)"
     ]
   }
 }

@@ -104,6 +104,7 @@ router.post('/devices/join', async (req, res) => {
       device.communityId = community._id;
       device.deviceModel = deviceModel || device.deviceModel;
       device.lastSeen = new Date();
+      device.active = true; // re-activate if previously removed from admin panel
       await device.save();
     } else {
       device = await TetherDevice.create({ deviceId, deviceModel, communityId: community._id });
@@ -278,6 +279,12 @@ router.put('/admin/communities/:id/policy', requireTetherAuth, async (req, res) 
       { new: true }
     );
     if (!community) return res.status(404).json({ message: 'קהילה לא נמצאה' });
+
+    // Wake up all active devices so they pick up the change within one poll cycle
+    await TetherDevice.updateMany(
+      { communityId: community._id, active: true },
+      { $push: { pendingCommands: { type: 'FORCE_SYNC', payload: '' } } }
+    );
 
     res.json({ policy: community.policy });
   } catch (e) {
@@ -594,6 +601,32 @@ router.get('/app/download', (req, res) => {
   res.download(apkPath, 'tether-latest.apk', (err) => {
     if (err) res.status(404).json({ message: 'APK לא נמצא — העלה את הקובץ לשרת' });
   });
+});
+
+// Current APK version — devices poll this to decide whether to self-update
+router.get('/app/version', (req, res) => {
+  try {
+    const versionPath = path.join(__dirname, '../../uploads/tether-version.json');
+    const data = JSON.parse(require('fs').readFileSync(versionPath, 'utf8'));
+    res.json(data);
+  } catch {
+    res.status(404).json({ message: 'קובץ גרסה לא נמצא' });
+  }
+});
+
+// Update APK version metadata (admin only — call after uploading a new APK)
+router.post('/admin/app/version', requireTetherAuth, (req, res) => {
+  try {
+    const { versionCode, versionName } = req.body;
+    if (!versionCode || !versionName) {
+      return res.status(400).json({ message: 'versionCode ו-versionName חובה' });
+    }
+    const versionPath = path.join(__dirname, '../../uploads/tether-version.json');
+    require('fs').writeFileSync(versionPath, JSON.stringify({ versionCode, versionName }, null, 2));
+    res.json({ versionCode, versionName });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 });
 
 // דיווח אפליקציות מהמכשיר

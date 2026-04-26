@@ -153,12 +153,13 @@ function mergePolicy(communityPolicy, devicePolicy = {}) {
   return merged;
 }
 
-// Get policy for device — merges community + device overrides, clears pending commands
+// Get policy for device — merges community + device overrides, clears pending commands.
+// allowUninstall is delivered once then reset to false (app handles the 1-hour window locally).
 router.get('/devices/:deviceId/policy', async (req, res) => {
   try {
     const device = await TetherDevice.findOneAndUpdate(
       { deviceId: req.params.deviceId },
-      { lastSeen: new Date(), $set: { pendingCommands: [] } }
+      { lastSeen: new Date(), $set: { pendingCommands: [], allowUninstall: false } }
     ).populate('communityId');
 
     if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
@@ -366,6 +367,89 @@ router.post('/devices/:deviceId/verify-uninstall-pin', async (req, res) => {
     }
   } catch (err) {
     return res.status(500).json({ message: err.message });
+  }
+});
+
+// ── Global overview — all devices across all communities, no filters ──────────
+router.get('/admin/global/devices', requireTetherAuth, async (req, res) => {
+  try {
+    const devices = await TetherDevice.find({}).populate('communityId', 'name code').sort({ createdAt: -1 });
+    const staleThreshold = new Date(Date.now() - 30 * 60 * 1000);
+    res.json(devices.map(d => ({
+      id:              d._id.toString(),
+      deviceId:        d.deviceId,
+      deviceModel:     d.deviceModel,
+      deviceNickname:  d.deviceNickname ?? null,
+      communityId:     d.communityId?._id?.toString() ?? null,
+      communityName:   d.communityId?.name ?? 'לא משויך',
+      communityCode:   d.communityId?.code ?? '',
+      isDeviceOwner:   d.isDeviceOwner,
+      allowUninstall:  d.allowUninstall ?? false,
+      active:          d.active,
+      lastSeen:        d.lastSeen,
+      createdAt:       d.createdAt,
+      isOnline:        d.lastSeen > staleThreshold,
+      protectionStatus: d.protectionStatus ?? {}
+    })));
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// All communities across all admins, no filters
+router.get('/admin/global/communities', requireTetherAuth, async (req, res) => {
+  try {
+    const communities = await Community.find({}).populate('adminId', 'name email').sort({ createdAt: -1 });
+    const counts = await TetherDevice.aggregate([
+      { $group: { _id: '$communityId', total: { $sum: 1 }, active: { $sum: { $cond: ['$active', 1, 0] } } } }
+    ]);
+    const countMap = Object.fromEntries(counts.map(c => [c._id.toString(), c]));
+    res.json(communities.map(c => ({
+      id:                c._id.toString(),
+      name:              c.name,
+      code:              c.code,
+      active:            c.active,
+      adminName:         c.adminId?.name  ?? 'לא ידוע',
+      adminEmail:        c.adminId?.email ?? '',
+      deviceCount:       countMap[c._id.toString()]?.total  ?? 0,
+      activeDeviceCount: countMap[c._id.toString()]?.active ?? 0,
+      createdAt:         c.createdAt
+    })));
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// Hard-delete device by MongoDB _id
+router.delete('/admin/global/devices/:id', requireTetherAuth, async (req, res) => {
+  try {
+    await TetherDevice.findByIdAndDelete(req.params.id);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// Hard-delete community by MongoDB _id
+router.delete('/admin/global/communities/:id', requireTetherAuth, async (req, res) => {
+  try {
+    await Community.findByIdAndDelete(req.params.id);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// Rename community
+router.put('/admin/global/communities/:id/rename', requireTetherAuth, async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name?.trim()) return res.status(400).json({ message: 'שם חובה' });
+    const c = await Community.findByIdAndUpdate(req.params.id, { name: name.trim() }, { new: true });
+    if (!c) return res.status(404).json({ message: 'קהילה לא נמצאה' });
+    res.json({ name: c.name });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// ── One-time maintenance: revoke allowUninstall on ALL devices ────────────────
+router.post('/admin/maintenance/reset-allow-uninstall', requireTetherAuth, async (req, res) => {
+  try {
+    const result = await TetherDevice.updateMany({ allowUninstall: true }, { $set: { allowUninstall: false } });
+    res.json({ revoked: result.modifiedCount });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
   }
 });
 

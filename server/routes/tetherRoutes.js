@@ -244,7 +244,7 @@ router.post('/admin/communities', requireTetherAuth, async (req, res) => {
 // Get all communities for admin
 router.get('/admin/communities', requireTetherAuth, async (req, res) => {
   try {
-    const communities = await Community.find({ adminId: req.admin._id });
+    const communities = await Community.find({ adminId: req.admin._id, active: true });
     const communityIds = communities.map(c => c._id);
     const deviceCounts = await TetherDevice.aggregate([
       { $match: { communityId: { $in: communityIds }, active: true } },
@@ -579,7 +579,7 @@ router.post('/admin/members/invite', requireTetherAuth, async (req, res) => {
     if (!name || !email || !password) return res.status(400).json({ message: 'שם, אימייל וסיסמה חובה' });
     const passwordHash = await bcrypt.hash(password, 12);
     const admin = await TetherAdmin.create({ name, email, passwordHash, role: 'admin' });
-    res.status(201).json({ name: admin.name, email: admin.email, role: admin.role });
+    res.status(201).json({ _id: admin._id, name: admin.name, email: admin.email, role: admin.role, active: admin.active });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }

@@ -24,8 +24,8 @@ function CommunityCard({ community, onDeleted }) {
     setLoadingDetail(true);
     try {
       const [detRes, appRes] = await Promise.all([
-        tetherApi.get(`/admin/communities/${community?._id || community?.id}`, { headers: authHeader() }),
-        tetherApi.get(`/admin/communities/${community?._id || community?.id}/approvals`, { headers: authHeader() }),
+        tetherApi.get(`/admin/communities/${community.id}`, { headers: authHeader() }),
+        tetherApi.get(`/admin/communities/${community.id}/approvals`, { headers: authHeader() }),
       ]);
       setDetail(detRes.data);
       setApprovals(appRes.data);
@@ -54,9 +54,9 @@ function CommunityCard({ community, onDeleted }) {
   const deleteCommunity = async () => {
     if (!confirm(`למחוק את קהילה "${community.name}"?`)) return;
     try {
-      await tetherApi.delete(`/admin/communities/${community?._id || community?.id}`, { headers: authHeader() });
+      await tetherApi.delete(`/admin/communities/${community.id}`, { headers: authHeader() });
       toast.success('קהילה נמחקה');
-      onDeleted(community?._id || community?.id);
+      onDeleted(community.id);
     } catch { toast.error('שגיאה במחיקה'); }
   };
 
@@ -133,7 +133,7 @@ function CommunityCard({ community, onDeleted }) {
                   : (
                     <div className="space-y-2">
                       {detail.devices.map(dev => (
-                        <div key={dev._id || dev.deviceId}
+                        <div key={dev.id || dev.deviceId}
                           className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 text-sm">
                           <div className="flex items-center gap-2 min-w-0">
                             <span className={`w-2 h-2 rounded-full shrink-0 ${dev.isOnline ? 'bg-green-500' : 'bg-gray-300'}`} />
@@ -190,7 +190,7 @@ function CommunityCard({ community, onDeleted }) {
                 </button>
                 {editPolicy && (
                   <PolicyEditor
-                    communityId={community?._id || community?.id}
+                    communityId={community.id}
                     initialPolicy={detail.community.policy}
                     onSaved={(p) => setDetail(d => ({ ...d, community: { ...d.community, policy: p } }))}
                   />
@@ -274,8 +274,8 @@ export default function CommunitiesTab() {
       ) : (
         <div className="space-y-3">
           {communities.map((c) => (
-            <CommunityCard key={c._id} community={c}
-              onDeleted={(id) => setCommunities(prev => prev.filter(x => x._id !== id))} />
+            <CommunityCard key={c.id} community={c}
+              onDeleted={(id) => setCommunities(prev => prev.filter(x => x.id !== id))} />
           ))}
         </div>
       )}

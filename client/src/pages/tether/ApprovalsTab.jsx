@@ -21,7 +21,7 @@ export default function ApprovalsTab() {
   const resolve = async (id, status) => {
     try {
       await tetherApi.put(`/admin/approvals/${id}`, { status }, { headers: authHeader() });
-      setApprovals(a => a.filter(r => r._id !== id));
+      setApprovals(a => a.filter(r => r.id !== id));
       toast.success(status === 'approved' ? 'אושר' : 'נדחה');
     } catch { toast.error('שגיאה'); }
   };
@@ -43,18 +43,18 @@ export default function ApprovalsTab() {
       ) : (
         <div className="space-y-3">
           {approvals.map(req => (
-            <div key={req._id} className="bg-white border border-orange-200 rounded-xl p-4 flex items-center justify-between">
+            <div key={req.id} className="bg-white border border-orange-200 rounded-xl p-4 flex items-center justify-between">
               <div>
                 <div className="font-medium text-gray-800">{req.action}</div>
                 {req.packageName && <div className="text-xs text-gray-500 mt-0.5">{req.packageName}</div>}
                 <div className="text-xs text-gray-400 mt-1">מכשיר: {req.deviceId?.slice(-12)} · {timeAgo(req.createdAt)}</div>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => resolve(req._id, 'approved')}
+                <button onClick={() => resolve(req.id, 'approved')}
                   className="flex items-center gap-1 bg-green-100 text-green-700 px-3 py-1.5 rounded-lg text-sm hover:bg-green-200 transition">
                   <CheckCircle size={14} /> אשר
                 </button>
-                <button onClick={() => resolve(req._id, 'rejected')}
+                <button onClick={() => resolve(req.id, 'rejected')}
                   className="flex items-center gap-1 bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-sm hover:bg-red-200 transition">
                   <XCircle size={14} /> דחה
                 </button>

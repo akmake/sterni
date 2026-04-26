@@ -199,6 +199,26 @@ router.post('/devices/:deviceId/approval', async (req, res) => {
 
 // ── Admin routes (require Tether auth) ────────────────────────────────────
 
+const formatAdmin = (a) => ({
+  id: a._id.toString(),
+  name: a.name,
+  email: a.email,
+  role: a.role,
+  active: a.active ?? true,
+  createdAt: a.createdAt
+});
+
+const formatApproval = (r) => ({
+  id: r._id.toString(),
+  deviceId: r.deviceId,
+  communityId: r.communityId?.toString(),
+  action: r.action,
+  packageName: r.packageName ?? null,
+  status: r.status,
+  createdAt: r.createdAt,
+  requestedAt: r.createdAt  // alias for Android compatibility
+});
+
 const formatCommunity = (c, deviceCount = 0) => ({
   id: c._id.toString(),
   name: c.name,
@@ -303,7 +323,7 @@ router.get('/admin/communities/:id/approvals', requireTetherAuth, async (req, re
       status: 'pending'
     }).sort({ createdAt: -1 });
 
-    res.json(requests);
+    res.json(requests.map(formatApproval));
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
@@ -324,7 +344,7 @@ router.put('/admin/approvals/:id', requireTetherAuth, async (req, res) => {
     );
     if (!request) return res.status(404).json({ message: 'בקשה לא נמצאה' });
 
-    res.json(request);
+    res.json(formatApproval(request));
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
@@ -517,7 +537,7 @@ router.get('/admin/approvals/all', requireTetherAuth, async (req, res) => {
       status: 'pending'
     }).sort({ createdAt: -1 });
 
-    res.json(approvals);
+    res.json(approvals.map(formatApproval));
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
@@ -566,7 +586,7 @@ router.get('/admin/members', requireTetherAuth, async (req, res) => {
   try {
     if (req.admin.role !== 'superadmin') return res.status(403).json({ message: 'גישה אסורה' });
     const admins = await TetherAdmin.find({}, 'name email role active createdAt');
-    res.json(admins);
+    res.json(admins.map(formatAdmin));
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
@@ -579,7 +599,7 @@ router.post('/admin/members/invite', requireTetherAuth, async (req, res) => {
     if (!name || !email || !password) return res.status(400).json({ message: 'שם, אימייל וסיסמה חובה' });
     const passwordHash = await bcrypt.hash(password, 12);
     const admin = await TetherAdmin.create({ name, email, passwordHash, role: 'admin' });
-    res.status(201).json({ _id: admin._id, name: admin.name, email: admin.email, role: admin.role, active: admin.active });
+    res.status(201).json(formatAdmin(admin));
   } catch (e) {
     res.status(500).json({ message: e.message });
   }

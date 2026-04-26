@@ -45,7 +45,7 @@ export default function AdminsTab() {
     if (!confirm('להסיר מנהל זה?')) return;
     try {
       await tetherApi.delete(`/admin/members/${id}`, { headers: authHeader() });
-      setAdmins(a => a.filter(m => m._id !== id));
+      setAdmins(a => a.filter(m => m.id !== id));
       toast.success('מנהל הוסר');
     } catch { toast.error('שגיאה'); }
   };
@@ -85,7 +85,7 @@ export default function AdminsTab() {
 
       <div className="space-y-2">
         {admins.map(a => (
-          <div key={a._id} className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div key={a.id} className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between">
             <div>
               <div className="font-medium text-gray-800">{a.name}</div>
               <div className="text-xs text-gray-500">{a.email}</div>
@@ -94,7 +94,7 @@ export default function AdminsTab() {
               </span>
             </div>
             {a.active !== false && (
-              <button onClick={() => removeAdmin(a._id)} className="text-red-400 hover:text-red-600 p-1.5 rounded">
+              <button onClick={() => removeAdmin(a.id)} className="text-red-400 hover:text-red-600 p-1.5 rounded">
                 <Trash2 size={15} />
               </button>
             )}

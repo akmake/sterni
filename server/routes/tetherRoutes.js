@@ -93,22 +93,19 @@ router.get('/communities/:code/verify', async (req, res) => {
 // Join community
 router.post('/devices/join', async (req, res) => {
   try {
-    const { code, deviceId, deviceModel } = req.body;
+    const { code, deviceId, deviceModel, hardwareId } = req.body;
     if (!code || !deviceId) return res.status(400).json({ message: 'code ו-deviceId חובה' });
 
     const community = await Community.findOne({ code: code.toUpperCase(), active: true });
     if (!community) return res.status(404).json({ message: 'קוד קהילה לא נמצא' });
 
-    let device = await TetherDevice.findOne({ deviceId });
-    if (device) {
-      device.communityId = community._id;
-      device.deviceModel = deviceModel || device.deviceModel;
-      device.lastSeen = new Date();
-      device.active = true; // re-activate if previously removed from admin panel
-      await device.save();
-    } else {
-      device = await TetherDevice.create({ deviceId, deviceModel, communityId: community._id });
+    // Delete ALL previous records for this physical device (by hardwareId if provided,
+    // otherwise fall back to deviceId). This guarantees every join is truly fresh.
+    if (hardwareId) {
+      await TetherDevice.deleteMany({ hardwareId });
     }
+    await TetherDevice.findOneAndDelete({ deviceId });
+    const device = await TetherDevice.create({ deviceId, deviceModel, hardwareId: hardwareId || null, communityId: community._id });
 
     res.json({
       success: true,

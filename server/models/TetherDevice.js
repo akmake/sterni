@@ -39,6 +39,11 @@ const tetherDeviceSchema = new mongoose.Schema({
     unique: true,
     trim: true
   },
+  hardwareId: {
+    type: String,
+    index: true,
+    default: null
+  },
   deviceModel: {
     type: String,
     default: 'Unknown'

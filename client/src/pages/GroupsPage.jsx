@@ -10,7 +10,8 @@ export default function GroupsPage() {
   const { groups, fetchGroups, deleteGroup, loading } = useGroupsStore();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState('all'); // 'all' | 'groups' | 'quotes' | 'archive'
+  const [viewMode, setViewMode] = useState('groups'); // 'groups' | 'quotes' | 'archive'
+  const [showQuotes, setShowQuotes] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [quotes, setQuotes] = useState([]);
 
@@ -62,8 +63,8 @@ export default function GroupsPage() {
       processedGroups.forEach(g => items.push({ ...g, _itemType: 'group' }));
     }
 
-    // הצעות מחיר (רק בtabs שלא ארכיון)
-    if (viewMode !== 'groups' && viewMode !== 'archive') {
+    // הצעות מחיר — רק אם המשתמש הפעיל את הטוגל
+    if (viewMode !== 'quotes' && viewMode !== 'archive' && showQuotes) {
       quotes
         .filter(q => (q.clientName || q.name || '').toLowerCase().includes(searchTerm.toLowerCase()))
         .forEach(q => items.push({ ...q, _itemType: 'quote' }));
@@ -137,28 +138,47 @@ export default function GroupsPage() {
 
         {/* שורת חיפוש וטאבים */}
         <div className="flex flex-col md:flex-row gap-4 mb-8 justify-between items-center">
-           <div className="bg-white p-1 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap gap-1">
-              {[
-                { id: 'all',     label: 'הכל',              icon: LayoutGrid },
-                { id: 'groups',  label: 'קבוצות קיימות',    icon: Users },
-                { id: 'quotes',  label: 'הצעות בהמתנה',     icon: FileText },
-                { id: 'archive', label: 'ארכיון',            icon: Archive },
-              ].map(({ id, label, icon: Icon }) => (
-                <button
-                  key={id}
-                  onClick={() => setViewMode(id)}
-                  className={`flex items-center gap-2 px-5 py-3 rounded-xl transition-all duration-200 font-medium ${
-                    viewMode === id ? 'bg-slate-100 text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  <Icon size={18} /> {label}
-                  {id === 'quotes' && quotes.length > 0 && (
-                    <span className="bg-amber-100 text-amber-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
-                      {quotes.length}
-                    </span>
-                  )}
-                </button>
-              ))}
+           <div className="flex items-center gap-2 flex-wrap">
+             <div className="bg-white p-1 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap gap-1">
+               {[
+                 { id: 'groups',  label: 'קבוצות קיימות',    icon: Users },
+                 { id: 'quotes',  label: 'הצעות בהמתנה',     icon: FileText },
+                 { id: 'archive', label: 'ארכיון',            icon: Archive },
+               ].map(({ id, label, icon: Icon }) => (
+                 <button
+                   key={id}
+                   onClick={() => setViewMode(id)}
+                   className={`flex items-center gap-2 px-5 py-3 rounded-xl transition-all duration-200 font-medium ${
+                     viewMode === id ? 'bg-slate-100 text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                   }`}
+                 >
+                   <Icon size={18} /> {label}
+                   {id === 'quotes' && quotes.length > 0 && (
+                     <span className="bg-amber-100 text-amber-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
+                       {quotes.length}
+                     </span>
+                   )}
+                 </button>
+               ))}
+             </div>
+             {viewMode === 'groups' && (
+               <button
+                 onClick={() => setShowQuotes(v => !v)}
+                 className={`flex items-center gap-2 px-4 py-3 rounded-2xl border transition-all duration-200 font-medium text-sm shadow-sm ${
+                   showQuotes
+                     ? 'bg-amber-100 border-amber-300 text-amber-800'
+                     : 'bg-white border-slate-200 text-slate-500 hover:text-slate-700'
+                 }`}
+               >
+                 <FileText size={16} />
+                 הצג הצעות מחיר
+                 {quotes.length > 0 && (
+                   <span className="bg-amber-200 text-amber-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
+                     {quotes.length}
+                   </span>
+                 )}
+               </button>
+             )}
            </div>
 
            <input 

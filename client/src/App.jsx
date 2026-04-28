@@ -30,6 +30,8 @@ import ChatPage from './pages/ChatPage';
 import WhatsAppPage from './pages/WhatsAppPage';
 import NewsPage from './pages/NewsPage';
 import PriceQuoteGenerator from './components/PriceQuoteGenerator';
+import PriceQuoteGeneratorPdf from './components/PriceQuoteGeneratorPdf';
+import QuoteTemplateEditorPage from './pages/QuoteTemplateEditorPage';
 import PaymentRequestGenerator from './components/PaymentRequestGenerator';
 import SystemSettings from './pages/SystemSettings';
 import KitchenStaffManager from './pages/KitchenStaffManager';
@@ -104,6 +106,8 @@ export default function App() {
           <Route path="software-library"      element={<SoftwareLibraryPage />} />
           <Route path="settings"              element={<SystemSettings />} />
           <Route path="price-quote"           element={<PriceQuoteGenerator />} />
+          <Route path="price-quote-v2"        element={<PriceQuoteGeneratorPdf />} />
+          <Route path="price-quote-template"  element={<QuoteTemplateEditorPage />} />
           <Route path="payment-requests"      element={<PaymentRequestsPage />} />
           <Route path="payment-request/new"   element={<PaymentRequestEditorPage />} />
           <Route path="payment-request/:id"   element={<PaymentRequestEditorPage />} />

@@ -49,6 +49,8 @@ const getManagementNav = (isAuthenticated, isAdmin, hasTzitzitAccess) => {
     type: 'dropdown',
     children: [
       { to: '/price-quote', label: 'הצעות מחיר', icon: FileText },
+      { to: '/price-quote-v2', label: 'Price Quotes V2 (PDF)', icon: FileText },
+      { to: '/price-quote-template', label: 'Quote Template Editor', icon: FileText },
       { to: '/payment-requests', label: 'דרישות תשלום', icon: CreditCard },
     ]
   });

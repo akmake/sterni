@@ -25,6 +25,7 @@ import chatRoutes from './routes/chatRoutes.js';
 import mealsRoutes from './routes/mealsRoutes.js';
 import { connectToWhatsApp } from './services/whatsappService.js';
 import quoteRouter from './routes/quoteRoutes.js';
+import quotePdfRoutes from './routes/quotePdfRoutes.js';
 import paymentRequestRoutes from './routes/paymentRequestRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
@@ -169,6 +170,7 @@ app.use('/api/meals', mealsRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/quotes', requireAuth, quoteRouter);
+app.use('/api/quotes-pdf', requireAuth, quotePdfRoutes);
 app.use('/api/payments', requireAuth, paymentRoutes);
 app.use('/api/payment-requests', requireAuth, paymentRequestRoutes);
 app.use('/api/tzitzit', requireAuth, tzitzitRoutes);
@@ -210,4 +212,3 @@ const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => console.log(`נ€ Server running on port ${PORT}`));
 
 export default app;
-

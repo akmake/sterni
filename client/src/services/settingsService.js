@@ -24,3 +24,38 @@ export const updateRouting = async (routingData) => {
   const { data } = await api.post('/settings/routing', routingData);
   return data;
 };
+
+export const getQuoteTemplate = async () => {
+  const { data } = await api.get('/settings/quote-template');
+  return data;
+};
+
+export const updateQuoteTemplate = async (templateData) => {
+  const { data } = await api.post('/settings/quote-template', templateData);
+  return data;
+};
+
+export const getQuoteTemplates = async () => {
+  const { data } = await api.get('/settings/quote-templates');
+  return data;
+};
+
+export const createQuoteTemplate = async (templateData) => {
+  const { data } = await api.post('/settings/quote-templates', templateData);
+  return data;
+};
+
+export const updateQuoteTemplateById = async (id, templateData) => {
+  const { data } = await api.put(`/settings/quote-templates/${id}`, templateData);
+  return data;
+};
+
+export const deleteQuoteTemplateById = async (id) => {
+  const { data } = await api.delete(`/settings/quote-templates/${id}`);
+  return data;
+};
+
+export const activateQuoteTemplateById = async (id) => {
+  const { data } = await api.post(`/settings/quote-templates/${id}/activate`);
+  return data;
+};

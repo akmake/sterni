@@ -9,7 +9,10 @@ const approvalRequestSchema = new mongoose.Schema({
     type: String,
     enum: ['pending', 'approved', 'rejected'],
     default: 'pending'
-  }
+  },
+  resolvedByAdminId: { type: mongoose.Schema.Types.ObjectId, ref: 'TetherAdmin', default: null },
+  resolvedAt: { type: Date, default: null },
+  grantExpiresAt: { type: Number, default: null }
 }, {
   timestamps: true,
   versionKey: false

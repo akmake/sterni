@@ -4,18 +4,36 @@ import crypto from 'crypto';
 const policySchema = new mongoose.Schema({
   blockInstallApps:      { type: Boolean, default: true },
   hideGooglePlay:        { type: Boolean, default: true },
+  blockAllStores:        { type: Boolean, default: false },
+  blockApkInstall:       { type: Boolean, default: true },
   blockSafeBoot:         { type: Boolean, default: true },
   blockFactoryReset:     { type: Boolean, default: true },
   blockUsbTransfer:      { type: Boolean, default: false },
   maxInstalledApps:      { type: Number,  default: null },
   allowedApps:           { type: [String], default: [] },
   blockedApps:           { type: [String], default: [] },
+  appTimeLocks: {
+    type: [{
+      packageName: { type: String, required: true },
+      lockedUntilTs: { type: Number, default: null }
+    }],
+    default: []
+  },
   blockedActionBehavior: {
     type: String,
     enum: ['SILENT', 'SHOW_MESSAGE', 'REQUEST_APPROVAL'],
     default: 'SILENT'
   },
+  approvalResolverMode: {
+    type: String,
+    enum: ['OWNER_ONLY', 'SUPERADMIN_ONLY', 'OWNER_OR_SUPERADMIN'],
+    default: 'OWNER_ONLY'
+  },
   logsEnabled: { type: Boolean, default: false },
+  blockWhatsAppChannels: { type: Boolean, default: false },
+  supportWhatsApp: { type: String, default: null },
+  supportEmail: { type: String, default: null },
+  supportName: { type: String, default: 'Community Manager' },
   uninstallPin: { type: String, default: '0000' },
   webFilterMode: {
     type: String,
@@ -24,13 +42,14 @@ const policySchema = new mongoose.Schema({
   },
   allowedDomains: { type: [String], default: [] },
   blockedDomains: { type: [String], default: [] },
-  lockedUntilTs:  { type: Number,  default: null }
+  lockedUntilTs:  { type: Number,  default: null },
+  adminEmergencyCode: { type: String, default: null }
 }, { _id: false });
 
 const communitySchema = new mongoose.Schema({
   name: {
     type: String,
-    required: [true, 'שם קהילה חובה'],
+    required: [true, 'Community name is required'],
     trim: true
   },
   code: {

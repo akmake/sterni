@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const securityEventSchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['UNINSTALL_ATTEMPT', 'ADMIN_DEACTIVATE_ATTEMPT', 'BLOCKED_APP_OPENED', 'TIME_LOCK_BLOCKED'],
+    enum: ['UNINSTALL_ATTEMPT', 'ADMIN_DEACTIVATE_ATTEMPT', 'BLOCKED_APP_OPENED', 'TIME_LOCK_BLOCKED', 'NEW_APP_INSTALLED'],
     required: true
   },
   packageName: { type: String, default: null },
@@ -26,6 +26,28 @@ const devicePolicySchema = new mongoose.Schema({
   hideGooglePlay:    { type: Boolean, default: null },
   blockAllStores:    { type: Boolean, default: null },
   blockApkInstall:   { type: Boolean, default: null },
+  blockSafeBoot:     { type: Boolean, default: null },
+  blockFactoryReset: { type: Boolean, default: null },
+  blockUsbTransfer:  { type: Boolean, default: null },
+  maxInstalledApps:  { type: Number, default: null },
+  blockedActionBehavior: {
+    type: String,
+    enum: ['SILENT', 'SHOW_MESSAGE', 'REQUEST_APPROVAL'],
+    default: null
+  },
+  logsEnabled:          { type: Boolean, default: null },
+  blockWhatsAppChannels:{ type: Boolean, default: null },
+  supportWhatsApp:      { type: String, default: null },
+  supportEmail:         { type: String, default: null },
+  supportName:          { type: String, default: null },
+  webFilterMode: {
+    type: String,
+    enum: ['NONE', 'BLACKLIST', 'WHITELIST'],
+    default: null
+  },
+  allowedDomains:    { type: [String], default: undefined },
+  blockedDomains:    { type: [String], default: undefined },
+  adminEmergencyCode:{ type: String, default: null },
   blockedApps:       { type: [String], default: [] },  // extra per-device blocks
   allowedApps:       { type: [String], default: [] },  // per-device overrides (force-allow)
   appTimeLocks:      { type: [appTimeLockSchema], default: [] },

@@ -1,45 +1,47 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import Community from '../models/Community.js';
 import TetherDevice from '../models/TetherDevice.js';
 import ApprovalRequest from '../models/ApprovalRequest.js';
 import TetherAdmin from '../models/TetherAdmin.js';
+import TetherApprovedApp from '../models/TetherApprovedApp.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const router = express.Router();
 
-// ── Tether-specific auth middleware (reads Authorization: Bearer header) ──
+// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ Tether-specific auth middleware (reads Authorization: Bearer header) ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 const requireTetherAuth = async (req, res, next) => {
   const auth = req.headers['authorization'];
   if (!auth?.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'לא מחובר' });
+    return res.status(401).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³ײ²ֲ¨' });
   }
   try {
     const decoded = jwt.verify(auth.slice(7), process.env.JWT_ACCESS_SECRET);
     req.admin = { _id: decoded.id, role: decoded.role };
     next();
   } catch {
-    return res.status(401).json({ message: 'טוקן לא חוקי / פג תוקף' });
+    return res.status(401).json({ message: '׳³ֲ³ײ»ֲ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ§׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג€ֲ¢ / ׳³ֲ³׳’ג€ֳ—׳³ֲ³׳’ג‚¬ג„¢ ׳³ֲ³ײ³ג€”׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ§׳³ֲ³ײ²ֲ£' });
   }
 };
 
-// ── Tether Admin Auth ─────────────────────────────────────────────────────
+// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ Tether Admin Auth ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 
-// Login — returns token in body (for Android)
+// Login ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ returns token in body (for Android)
 router.post('/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ message: 'אימייל וסיסמה חובה' });
+    if (!email || !password) return res.status(400).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ¡׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¡׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³׳’ג‚¬ֲ' });
 
     const admin = await TetherAdmin.findOne({ email: email.toLowerCase(), active: true });
-    if (!admin) return res.status(401).json({ message: 'אימייל או סיסמה שגויים' });
+    if (!admin) return res.status(401).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ¢ ׳³ֲ³ײ²ֲ¡׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¡׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ' });
 
     const valid = await bcrypt.compare(password, admin.passwordHash);
-    if (!valid) return res.status(401).json({ message: 'אימייל או סיסמה שגויים' });
+    if (!valid) return res.status(401).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ¢ ׳³ֲ³ײ²ֲ¡׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¡׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ' });
 
     const token = jwt.sign(
       { id: admin._id, role: admin.role },
@@ -56,11 +58,11 @@ router.post('/auth/login', async (req, res) => {
   }
 });
 
-// Bootstrap — create first superadmin (only if no admins exist)
+// Bootstrap ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ create first superadmin (only if no admins exist)
 router.post('/auth/bootstrap', async (req, res) => {
   try {
     const count = await TetherAdmin.countDocuments();
-    if (count > 0) return res.status(403).json({ message: 'כבר קיים מנהל' });
+    if (count > 0) return res.status(403).json({ message: '׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³׳’ג‚¬ֻ׳³ֲ³ײ²ֲ¨ ׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³׳’ג‚¬ֲ׳³ֲ³ײ²ֲ' });
 
     const { name, email, password, secret } = req.body;
     if (secret !== 'tether-init-2025') return res.status(403).json({ message: 'Forbidden' });
@@ -73,7 +75,7 @@ router.post('/auth/bootstrap', async (req, res) => {
   }
 });
 
-// ── Device routes (no auth — called from Android device) ──────────────────
+// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ Device routes (no auth ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ called from Android device) ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 
 // Verify community code before joining
 router.get('/communities/:code/verify', async (req, res) => {
@@ -83,7 +85,7 @@ router.get('/communities/:code/verify', async (req, res) => {
       active: true
     }).select('name code');
 
-    if (!community) return res.status(404).json({ message: 'קוד קהילה לא נמצא' });
+    if (!community) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
     res.json({ name: community.name, code: community.code });
   } catch (e) {
     res.status(500).json({ message: e.message });
@@ -94,10 +96,10 @@ router.get('/communities/:code/verify', async (req, res) => {
 router.post('/devices/join', async (req, res) => {
   try {
     const { code, deviceId, deviceModel, hardwareId } = req.body;
-    if (!code || !deviceId) return res.status(400).json({ message: 'code ו-deviceId חובה' });
+    if (!code || !deviceId) return res.status(400).json({ message: 'code ׳³ֲ³׳’ג‚¬ֲ¢-deviceId ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³׳’ג‚¬ֲ' });
 
     const community = await Community.findOne({ code: code.toUpperCase(), active: true });
-    if (!community) return res.status(404).json({ message: 'קוד קהילה לא נמצא' });
+    if (!community) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
 
     // Delete ALL previous records for this physical device (by hardwareId if provided,
     // otherwise fall back to deviceId). This guarantees every join is truly fresh.
@@ -132,28 +134,48 @@ router.post('/devices/join', async (req, res) => {
 
 // Merge community policy with per-device overrides
 function mergePolicy(communityPolicy, devicePolicy = {}) {
-  const merged = { ...communityPolicy.toObject?.() ?? communityPolicy };
+  const merged = { ...(communityPolicy?.toObject?.() ?? communityPolicy ?? {}) };
 
-  // Boolean overrides — only apply if explicitly set (not null)
-  if (devicePolicy.blockInstallApps != null) merged.blockInstallApps = devicePolicy.blockInstallApps;
-  if (devicePolicy.hideGooglePlay    != null) merged.hideGooglePlay   = devicePolicy.hideGooglePlay;
-  if (devicePolicy.blockAllStores    != null) merged.blockAllStores   = devicePolicy.blockAllStores;
-  if (devicePolicy.blockApkInstall   != null) merged.blockApkInstall  = devicePolicy.blockApkInstall;
-  if (devicePolicy.lockedUntilTs     != null) merged.lockedUntilTs    = devicePolicy.lockedUntilTs;
+  // Boolean overrides - only apply if explicitly set (not null)
+  const booleanOverrideKeys = [
+    'blockInstallApps',
+    'hideGooglePlay',
+    'blockAllStores',
+    'blockApkInstall',
+    'blockSafeBoot',
+    'blockFactoryReset',
+    'blockUsbTransfer',
+    'logsEnabled',
+    'blockWhatsAppChannels'
+  ];
+  booleanOverrideKeys.forEach((key) => {
+    if (devicePolicy[key] != null) merged[key] = devicePolicy[key];
+  });
+
+  if (devicePolicy.maxInstalledApps != null) merged.maxInstalledApps = devicePolicy.maxInstalledApps;
+  if (devicePolicy.blockedActionBehavior != null) merged.blockedActionBehavior = devicePolicy.blockedActionBehavior;
+  if (devicePolicy.webFilterMode != null) merged.webFilterMode = devicePolicy.webFilterMode;
+  if (devicePolicy.supportWhatsApp != null) merged.supportWhatsApp = devicePolicy.supportWhatsApp;
+  if (devicePolicy.supportEmail != null) merged.supportEmail = devicePolicy.supportEmail;
+  if (devicePolicy.supportName != null) merged.supportName = devicePolicy.supportName;
+  if (devicePolicy.adminEmergencyCode != null) merged.adminEmergencyCode = devicePolicy.adminEmergencyCode;
+  if (devicePolicy.lockedUntilTs != null) merged.lockedUntilTs = devicePolicy.lockedUntilTs;
+  if (Array.isArray(devicePolicy.allowedDomains)) merged.allowedDomains = devicePolicy.allowedDomains;
+  if (Array.isArray(devicePolicy.blockedDomains)) merged.blockedDomains = devicePolicy.blockedDomains;
 
   // Merge blocked/allowed app lists (union)
   const baseBlocked = merged.blockedApps ?? [];
   const baseAllowed = merged.allowedApps ?? [];
-  const devBlocked  = devicePolicy.blockedApps ?? [];
-  const devAllowed  = devicePolicy.allowedApps ?? [];
-  merged.blockedApps  = [...new Set([...baseBlocked, ...devBlocked])];
-  merged.allowedApps  = [...new Set([...baseAllowed, ...devAllowed])];
-  merged.appTimeLocks = devicePolicy.appTimeLocks ?? [];
+  const devBlocked = devicePolicy.blockedApps ?? [];
+  const devAllowed = devicePolicy.allowedApps ?? [];
+  merged.blockedApps = [...new Set([...baseBlocked, ...devBlocked])];
+  merged.allowedApps = [...new Set([...baseAllowed, ...devAllowed])];
+  if (Array.isArray(devicePolicy.appTimeLocks)) merged.appTimeLocks = devicePolicy.appTimeLocks;
 
   return merged;
 }
 
-// Get policy for device — merges community + device overrides, clears pending commands.
+// Get policy for device ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ merges community + device overrides, clears pending commands.
 // allowUninstall is delivered once then reset to false (app handles the 1-hour window locally).
 router.get('/devices/:deviceId/policy', async (req, res) => {
   try {
@@ -162,7 +184,7 @@ router.get('/devices/:deviceId/policy', async (req, res) => {
       { lastSeen: new Date(), $set: { pendingCommands: [], allowUninstall: false } }
     ).populate('communityId');
 
-    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
+    if (!device) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
 
     const merged = mergePolicy(device.communityId.policy, device.devicePolicy);
 
@@ -179,23 +201,44 @@ router.get('/devices/:deviceId/policy', async (req, res) => {
 // Request approval for blocked action
 router.post('/devices/:deviceId/approval', async (req, res) => {
   try {
+    const rlKey = `approval:${req.ip}:${req.params.deviceId}`;
+    if (hitRateLimit({ key: rlKey, limit: 30, windowMs: 60 * 1000 })) {
+      return res.status(429).json({ message: 'Too many approval requests. Try again in a minute.' });
+    }
+
     const device = await TetherDevice.findOne({ deviceId: req.params.deviceId });
-    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
+    if (!device) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
+
+    const action = sanitizeApprovalAction(req.query.action);
+    const packageName = String(req.query.packageName || '').trim() || null;
+    if (action === 'APP_ACCESS' && !packageName) {
+      return res.status(400).json({ message: 'packageName is required for APP_ACCESS.' });
+    }
+
+    const existingPending = await ApprovalRequest.findOne({
+      deviceId: req.params.deviceId,
+      action,
+      packageName,
+      status: 'pending'
+    }).sort({ createdAt: -1 });
+    if (existingPending) {
+      return res.json(formatApproval(existingPending));
+    }
 
     const request = await ApprovalRequest.create({
       deviceId: req.params.deviceId,
       communityId: device.communityId,
-      action: req.query.action || 'UNKNOWN',
-      packageName: req.query.packageName || null
+      action,
+      packageName
     });
 
-    res.json(request);
+    res.json(formatApproval(request));
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
 });
 
-// ── Admin routes (require Tether auth) ────────────────────────────────────
+// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ Admin routes (require Tether auth) ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 
 const formatAdmin = (a) => ({
   id: a._id.toString(),
@@ -213,6 +256,9 @@ const formatApproval = (r) => ({
   action: r.action,
   packageName: r.packageName ?? null,
   status: r.status,
+  resolvedByAdminId: r.resolvedByAdminId?.toString() ?? null,
+  resolvedAt: r.resolvedAt ?? null,
+  grantExpiresAt: r.grantExpiresAt ?? null,
   createdAt: r.createdAt,
   requestedAt: r.createdAt  // alias for Android compatibility
 });
@@ -241,11 +287,133 @@ const formatDevice = (d) => ({
   createdAt: d.createdAt
 });
 
+const isSuperAdmin = (admin) => admin?.role === 'superadmin';
+
+const getOwnedCommunityIds = async (admin) => {
+  if (isSuperAdmin(admin)) return null;
+  const communities = await Community.find({ adminId: admin._id }).select('_id');
+  return communities.map((community) => community._id);
+};
+
+const findOwnedDevice = async (admin, deviceId, { populateCommunity = false, activeOnly = false } = {}) => {
+  const ownedCommunityIds = await getOwnedCommunityIds(admin);
+  const query = { deviceId };
+  if (activeOnly) query.active = true;
+  if (ownedCommunityIds) query.communityId = { $in: ownedCommunityIds };
+
+  let dbQuery = TetherDevice.findOne(query);
+  if (populateCommunity) dbQuery = dbQuery.populate('communityId');
+  return dbQuery;
+};
+
+const sanitizeStringList = (value) => {
+  if (!Array.isArray(value)) return undefined;
+  return [...new Set(value.map((item) => String(item || '').trim()).filter(Boolean))];
+};
+
+const sanitizeAppTimeLocks = (value) => {
+  if (!Array.isArray(value)) return undefined;
+  return value
+    .map((item) => ({
+      packageName: String(item?.packageName || '').trim(),
+      lockedUntilTs: item?.lockedUntilTs == null ? null : Number(item.lockedUntilTs)
+    }))
+    .filter((item) => item.packageName.length > 0 && (item.lockedUntilTs == null || Number.isFinite(item.lockedUntilTs)));
+};
+
+const sanitizeDevicePolicyPayload = (payload = {}) => {
+  const out = {};
+  const nullableBooleanKeys = [
+    'blockInstallApps',
+    'hideGooglePlay',
+    'blockAllStores',
+    'blockApkInstall',
+    'blockSafeBoot',
+    'blockFactoryReset',
+    'blockUsbTransfer',
+    'logsEnabled',
+    'blockWhatsAppChannels'
+  ];
+
+  nullableBooleanKeys.forEach((key) => {
+    if (payload[key] == null) return;
+    out[key] = !!payload[key];
+  });
+
+  if (payload.maxInstalledApps != null) {
+    const parsed = Number(payload.maxInstalledApps);
+    if (Number.isFinite(parsed) && parsed >= 0) out.maxInstalledApps = Math.floor(parsed);
+  }
+
+  if (payload.blockedActionBehavior != null) {
+    const allowed = ['SILENT', 'SHOW_MESSAGE', 'REQUEST_APPROVAL'];
+    if (allowed.includes(payload.blockedActionBehavior)) out.blockedActionBehavior = payload.blockedActionBehavior;
+  }
+  if (payload.webFilterMode != null) {
+    const allowed = ['NONE', 'BLACKLIST', 'WHITELIST'];
+    if (allowed.includes(payload.webFilterMode)) out.webFilterMode = payload.webFilterMode;
+  }
+
+  const blockedApps = sanitizeStringList(payload.blockedApps);
+  if (blockedApps) out.blockedApps = blockedApps;
+  const allowedApps = sanitizeStringList(payload.allowedApps);
+  if (allowedApps) out.allowedApps = allowedApps;
+  const blockedDomains = sanitizeStringList(payload.blockedDomains);
+  if (blockedDomains) out.blockedDomains = blockedDomains;
+  const allowedDomains = sanitizeStringList(payload.allowedDomains);
+  if (allowedDomains) out.allowedDomains = allowedDomains;
+  const appTimeLocks = sanitizeAppTimeLocks(payload.appTimeLocks);
+  if (appTimeLocks) out.appTimeLocks = appTimeLocks;
+
+  if (payload.lockedUntilTs != null) {
+    const parsed = Number(payload.lockedUntilTs);
+    if (Number.isFinite(parsed)) out.lockedUntilTs = parsed;
+  }
+  if (payload.supportWhatsApp != null) out.supportWhatsApp = sanitizeOptionalString(payload.supportWhatsApp);
+  if (payload.supportEmail != null) out.supportEmail = sanitizeOptionalString(payload.supportEmail);
+  if (payload.supportName != null) out.supportName = sanitizeOptionalString(payload.supportName);
+  if (payload.adminEmergencyCode != null) out.adminEmergencyCode = sanitizeOptionalString(payload.adminEmergencyCode);
+
+  return out;
+};
+
+const sanitizeApprovalAction = (action) => {
+  const normalized = String(action || '').trim().toUpperCase();
+  const allowed = new Set(['APP_ACCESS', 'URL_ACCESS', 'UNKNOWN']);
+  return allowed.has(normalized) ? normalized : 'UNKNOWN';
+};
+
+const buildApprovalGrantPayload = ({ packageName, action, expiresAt }) => JSON.stringify({
+  packageName,
+  action,
+  expiresAt
+});
+
+const sanitizeOptionalString = (value) => {
+  if (value == null) return null;
+  const trimmed = String(value).trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const requestCounters = new Map();
+const hitRateLimit = ({ key, limit, windowMs }) => {
+  const now = Date.now();
+  const item = requestCounters.get(key);
+  if (!item || (now - item.windowStartMs) > windowMs) {
+    requestCounters.set(key, { count: 1, windowStartMs: now });
+    return false;
+  }
+  if (item.count >= limit) return true;
+  item.count += 1;
+  requestCounters.set(key, item);
+  return false;
+};
+
 // Create community
 router.post('/admin/communities', requireTetherAuth, async (req, res) => {
   try {
     const { name, policy } = req.body;
-    if (!name) return res.status(400).json({ message: 'שם קהילה חובה' });
+    if (!name) return res.status(400).json({ message: '׳³ֲ³ײ²ֲ©׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³׳’ג‚¬ֲ' });
 
     const community = await Community.create({
       name,
@@ -279,7 +447,7 @@ router.get('/admin/communities', requireTetherAuth, async (req, res) => {
 router.get('/admin/communities/:id', requireTetherAuth, async (req, res) => {
   try {
     const community = await Community.findOne({ _id: req.params.id, adminId: req.admin._id });
-    if (!community) return res.status(404).json({ message: 'קהילה לא נמצאה' });
+    if (!community) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ' });
 
     const devices = await TetherDevice.find({ communityId: community._id, active: true });
     res.json({ community: formatCommunity(community, devices.length), devices: devices.map(formatDevice) });
@@ -296,7 +464,7 @@ router.put('/admin/communities/:id/policy', requireTetherAuth, async (req, res) 
       { policy: req.body },
       { new: true }
     );
-    if (!community) return res.status(404).json({ message: 'קהילה לא נמצאה' });
+    if (!community) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ' });
 
     // Wake up all active devices so they pick up the change within one poll cycle
     await TetherDevice.updateMany(
@@ -314,7 +482,7 @@ router.put('/admin/communities/:id/policy', requireTetherAuth, async (req, res) 
 router.get('/admin/communities/:id/approvals', requireTetherAuth, async (req, res) => {
   try {
     const community = await Community.findOne({ _id: req.params.id, adminId: req.admin._id });
-    if (!community) return res.status(404).json({ message: 'קהילה לא נמצאה' });
+    if (!community) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ' });
 
     const requests = await ApprovalRequest.find({
       communityId: community._id,
@@ -332,15 +500,59 @@ router.put('/admin/approvals/:id', requireTetherAuth, async (req, res) => {
   try {
     const { status } = req.body;
     if (!['approved', 'rejected'].includes(status)) {
-      return res.status(400).json({ message: 'סטטוס לא תקין' });
+      return res.status(400).json({ message: '׳³ֲ³ײ²ֲ¡׳³ֲ³ײ»ֲ׳³ֲ³ײ»ֲ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ¡ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ³ג€”׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ' });
     }
 
-    const request = await ApprovalRequest.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true }
-    );
-    if (!request) return res.status(404).json({ message: 'בקשה לא נמצאה' });
+    const request = await ApprovalRequest.findById(req.params.id);
+    if (!request) return res.status(404).json({ message: '׳³ֲ³׳’ג‚¬ֻ׳³ֲ³ײ²ֲ§׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ' });
+
+    const community = await Community.findById(request.communityId).select('adminId policy.approvalResolverMode');
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+
+    const isOwner = String(community.adminId) === String(req.admin._id);
+    const isSuper = isSuperAdmin(req.admin);
+    const approvalMode = community.policy?.approvalResolverMode || 'OWNER_ONLY';
+
+    if (approvalMode === 'OWNER_ONLY' && !isOwner) {
+      return res.status(403).json({ message: 'Only the community manager can resolve approvals.' });
+    }
+    if (approvalMode === 'SUPERADMIN_ONLY' && !isSuper) {
+      return res.status(403).json({ message: 'Only superadmin can resolve approvals.' });
+    }
+    if (approvalMode === 'OWNER_OR_SUPERADMIN' && !(isOwner || isSuper)) {
+      return res.status(403).json({ message: 'Only manager or superadmin can resolve approvals.' });
+    }
+
+    let grantExpiresAt = null;
+    if (status === 'approved' && request.action === 'APP_ACCESS' && request.packageName) {
+      const requestedMinutes = Number(req.body?.grantMinutes);
+      const grantMinutes = Number.isFinite(requestedMinutes)
+        ? Math.max(1, Math.min(120, Math.floor(requestedMinutes)))
+        : 15;
+      grantExpiresAt = Date.now() + grantMinutes * 60 * 1000;
+
+      const device = await TetherDevice.findOne({
+        deviceId: request.deviceId,
+        communityId: request.communityId
+      });
+      if (device) {
+        device.pendingCommands.push({
+          type: 'APPROVAL_GRANTED',
+          payload: buildApprovalGrantPayload({
+            packageName: request.packageName,
+            action: request.action,
+            expiresAt: grantExpiresAt
+          })
+        });
+        await device.save();
+      }
+    }
+
+    request.status = status;
+    request.resolvedByAdminId = req.admin._id;
+    request.resolvedAt = new Date();
+    request.grantExpiresAt = grantExpiresAt;
+    await request.save();
 
     res.json(formatApproval(request));
   } catch (e) {
@@ -352,27 +564,39 @@ router.put('/admin/approvals/:id', requireTetherAuth, async (req, res) => {
 router.post('/devices/:deviceId/verify-uninstall-pin', async (req, res) => {
   try {
     const { pin } = req.body;
+    const rlKey = `uninstall-pin:${req.ip}:${req.params.deviceId}`;
+    if (hitRateLimit({ key: rlKey, limit: 8, windowMs: 10 * 60 * 1000 })) {
+      return res.status(429).json({ message: 'Too many attempts. Try again later.' });
+    }
+
     const device = await TetherDevice.findOne({ deviceId: req.params.deviceId }).populate('communityId');
     
     if (!device) return res.status(404).json({ message: 'Device not found' });
     if (!device.communityId) return res.status(404).json({ message: 'Community not found' });
 
-    const communityPin = device.communityId.policy.uninstallPin || '0000';
-    if (pin === communityPin) {
+    const communityPolicy = device.communityId.policy || {};
+    const validPins = new Set([
+      communityPolicy.uninstallPin || '0000',
+      communityPolicy.adminEmergencyCode || null,
+      device.devicePolicy?.adminEmergencyCode || null
+    ].filter(Boolean));
+
+    if (validPins.has(String(pin || '').trim())) {
       device.allowUninstall = true;
       await device.save();
       return res.json({ success: true, allowUninstall: true });
     } else {
-      return res.status(401).json({ message: 'קוד שגוי' });
+      return res.status(401).json({ message: '׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג€ֲ¢' });
     }
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 });
 
-// ── Global overview — all devices across all communities, no filters ──────────
+// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ Global overview ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ all devices across all communities, no filters ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 router.get('/admin/global/devices', requireTetherAuth, async (req, res) => {
   try {
+    if (!isSuperAdmin(req.admin)) return res.status(403).json({ message: '׳³ג€™׳³ג„¢׳³ֲ©׳³ג€ ׳³ֲ׳³ֲ¡׳³ג€¢׳³ֲ¨׳³ג€' });
     const devices = await TetherDevice.find({}).populate('communityId', 'name code').sort({ createdAt: -1 });
     const staleThreshold = new Date(Date.now() - 30 * 60 * 1000);
     res.json(devices.map(d => ({
@@ -381,7 +605,7 @@ router.get('/admin/global/devices', requireTetherAuth, async (req, res) => {
       deviceModel:     d.deviceModel,
       deviceNickname:  d.deviceNickname ?? null,
       communityId:     d.communityId?._id?.toString() ?? null,
-      communityName:   d.communityId?.name ?? 'לא משויך',
+      communityName:   d.communityId?.name ?? '׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ',
       communityCode:   d.communityId?.code ?? '',
       isDeviceOwner:   d.isDeviceOwner,
       allowUninstall:  d.allowUninstall ?? false,
@@ -397,6 +621,7 @@ router.get('/admin/global/devices', requireTetherAuth, async (req, res) => {
 // All communities across all admins, no filters
 router.get('/admin/global/communities', requireTetherAuth, async (req, res) => {
   try {
+    if (!isSuperAdmin(req.admin)) return res.status(403).json({ message: '׳³ג€™׳³ג„¢׳³ֲ©׳³ג€ ׳³ֲ׳³ֲ¡׳³ג€¢׳³ֲ¨׳³ג€' });
     const communities = await Community.find({}).populate('adminId', 'name email').sort({ createdAt: -1 });
     const counts = await TetherDevice.aggregate([
       { $group: { _id: '$communityId', total: { $sum: 1 }, active: { $sum: { $cond: ['$active', 1, 0] } } } }
@@ -407,7 +632,7 @@ router.get('/admin/global/communities', requireTetherAuth, async (req, res) => {
       name:              c.name,
       code:              c.code,
       active:            c.active,
-      adminName:         c.adminId?.name  ?? 'לא ידוע',
+      adminName:         c.adminId?.name  ?? '׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ¢',
       adminEmail:        c.adminId?.email ?? '',
       deviceCount:       countMap[c._id.toString()]?.total  ?? 0,
       activeDeviceCount: countMap[c._id.toString()]?.active ?? 0,
@@ -419,6 +644,7 @@ router.get('/admin/global/communities', requireTetherAuth, async (req, res) => {
 // Hard-delete device by MongoDB _id
 router.delete('/admin/global/devices/:id', requireTetherAuth, async (req, res) => {
   try {
+    if (!isSuperAdmin(req.admin)) return res.status(403).json({ message: '׳³ג€™׳³ג„¢׳³ֲ©׳³ג€ ׳³ֲ׳³ֲ¡׳³ג€¢׳³ֲ¨׳³ג€' });
     await TetherDevice.findByIdAndDelete(req.params.id);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ message: e.message }); }
@@ -427,6 +653,7 @@ router.delete('/admin/global/devices/:id', requireTetherAuth, async (req, res) =
 // Hard-delete community by MongoDB _id
 router.delete('/admin/global/communities/:id', requireTetherAuth, async (req, res) => {
   try {
+    if (!isSuperAdmin(req.admin)) return res.status(403).json({ message: '׳³ג€™׳³ג„¢׳³ֲ©׳³ג€ ׳³ֲ׳³ֲ¡׳³ג€¢׳³ֲ¨׳³ג€' });
     await Community.findByIdAndDelete(req.params.id);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ message: e.message }); }
@@ -435,17 +662,19 @@ router.delete('/admin/global/communities/:id', requireTetherAuth, async (req, re
 // Rename community
 router.put('/admin/global/communities/:id/rename', requireTetherAuth, async (req, res) => {
   try {
+    if (!isSuperAdmin(req.admin)) return res.status(403).json({ message: '׳³ג€™׳³ג„¢׳³ֲ©׳³ג€ ׳³ֲ׳³ֲ¡׳³ג€¢׳³ֲ¨׳³ג€' });
     const { name } = req.body;
-    if (!name?.trim()) return res.status(400).json({ message: 'שם חובה' });
+    if (!name?.trim()) return res.status(400).json({ message: '׳³ֲ³ײ²ֲ©׳³ֲ³ײ²ֲ ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³׳’ג‚¬ֲ' });
     const c = await Community.findByIdAndUpdate(req.params.id, { name: name.trim() }, { new: true });
-    if (!c) return res.status(404).json({ message: 'קהילה לא נמצאה' });
+    if (!c) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ' });
     res.json({ name: c.name });
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// ── One-time maintenance: revoke allowUninstall on ALL devices ────────────────
+// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ One-time maintenance: revoke allowUninstall on ALL devices ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 router.post('/admin/maintenance/reset-allow-uninstall', requireTetherAuth, async (req, res) => {
   try {
+    if (!isSuperAdmin(req.admin)) return res.status(403).json({ message: '׳³ג€™׳³ג„¢׳³ֲ©׳³ג€ ׳³ֲ׳³ֲ¡׳³ג€¢׳³ֲ¨׳³ג€' });
     const result = await TetherDevice.updateMany({ allowUninstall: true }, { $set: { allowUninstall: false } });
     res.json({ revoked: result.modifiedCount });
   } catch (e) {
@@ -457,12 +686,10 @@ router.post('/admin/maintenance/reset-allow-uninstall', requireTetherAuth, async
 router.put('/admin/devices/:deviceId/allow-uninstall', requireTetherAuth, async (req, res) => {
   try {
     const { allowUninstall } = req.body;
-    const device = await TetherDevice.findOneAndUpdate(
-      { deviceId: req.params.deviceId },
-      { allowUninstall: !!allowUninstall },
-      { new: true }
-    );
-    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
+    const device = await findOwnedDevice(req.admin, req.params.deviceId);
+    if (!device) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
+    device.allowUninstall = !!allowUninstall;
+    await device.save();
     res.json({ allowUninstall: device.allowUninstall });
   } catch (e) {
     res.status(500).json({ message: e.message });
@@ -472,10 +699,10 @@ router.put('/admin/devices/:deviceId/allow-uninstall', requireTetherAuth, async 
 // Remove device from community
 router.delete('/admin/devices/:deviceId', requireTetherAuth, async (req, res) => {
   try {
-    await TetherDevice.findOneAndUpdate(
-      { deviceId: req.params.deviceId },
-      { active: false }
-    );
+    const device = await findOwnedDevice(req.admin, req.params.deviceId);
+    if (!device) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
+    device.active = false;
+    await device.save();
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ message: e.message });
@@ -485,8 +712,8 @@ router.delete('/admin/devices/:deviceId', requireTetherAuth, async (req, res) =>
 // Get full details for a single device
 router.get('/admin/devices/:deviceId', requireTetherAuth, async (req, res) => {
   try {
-    const device = await TetherDevice.findOne({ deviceId: req.params.deviceId }).populate('communityId');
-    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
+    const device = await findOwnedDevice(req.admin, req.params.deviceId, { populateCommunity: true });
+    if (!device) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
     const communityDoc = device.communityId; // populated document
     res.json({
       id: device._id.toString(),
@@ -514,12 +741,9 @@ router.get('/admin/devices/:deviceId', requireTetherAuth, async (req, res) => {
 // Update per-device policy overrides
 router.put('/admin/devices/:deviceId/device-policy', requireTetherAuth, async (req, res) => {
   try {
-    const device = await TetherDevice.findOneAndUpdate(
-      { deviceId: req.params.deviceId },
-      { devicePolicy: req.body },
-      { new: true }
-    ).populate('communityId');
-    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
+    const device = await findOwnedDevice(req.admin, req.params.deviceId, { populateCommunity: true });
+    if (!device) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
+    device.devicePolicy = sanitizeDevicePolicyPayload(req.body);
     // Push FORCE_SYNC so device picks up changes on next poll
     device.pendingCommands.push({ type: 'FORCE_SYNC', payload: '' });
     await device.save();
@@ -533,12 +757,10 @@ router.put('/admin/devices/:deviceId/device-policy', requireTetherAuth, async (r
 router.put('/admin/devices/:deviceId/nickname', requireTetherAuth, async (req, res) => {
   try {
     const { nickname } = req.body;
-    const device = await TetherDevice.findOneAndUpdate(
-      { deviceId: req.params.deviceId },
-      { deviceNickname: nickname || null },
-      { new: true }
-    );
-    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
+    const device = await findOwnedDevice(req.admin, req.params.deviceId);
+    if (!device) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
+    device.deviceNickname = nickname || null;
+    await device.save();
     res.json({ deviceNickname: device.deviceNickname });
   } catch (e) {
     res.status(500).json({ message: e.message });
@@ -548,21 +770,24 @@ router.put('/admin/devices/:deviceId/nickname', requireTetherAuth, async (req, r
 // Dashboard stats
 router.get('/admin/dashboard', requireTetherAuth, async (req, res) => {
   try {
-    const communities = await Community.find({ adminId: req.admin._id });
-    const communityIds = communities.map(c => c._id);
+    const ownedCommunityIds = await getOwnedCommunityIds(req.admin);
+    const communityScope = ownedCommunityIds ? { communityId: { $in: ownedCommunityIds } } : {};
+    const totalCommunities = ownedCommunityIds
+      ? ownedCommunityIds.length
+      : await Community.countDocuments({});
 
     const [totalDevices, pendingApprovals, inactiveDevices] = await Promise.all([
-      TetherDevice.countDocuments({ communityId: { $in: communityIds }, active: true }),
-      ApprovalRequest.countDocuments({ communityId: { $in: communityIds }, status: 'pending' }),
+      TetherDevice.countDocuments({ ...communityScope, active: true }),
+      ApprovalRequest.countDocuments({ ...communityScope, status: 'pending' }),
       TetherDevice.countDocuments({
-        communityId: { $in: communityIds },
+        ...communityScope,
         active: true,
         lastSeen: { $lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
       })
     ]);
 
     res.json({
-      totalCommunities: communities.length,
+      totalCommunities,
       totalDevices,
       pendingApprovals,
       inactiveDevices
@@ -575,7 +800,9 @@ router.get('/admin/dashboard', requireTetherAuth, async (req, res) => {
 // Activity feed
 router.get('/admin/activity', requireTetherAuth, async (req, res) => {
   try {
-    const communities = await Community.find({ adminId: req.admin._id }).select('_id name');
+    const communities = isSuperAdmin(req.admin)
+      ? await Community.find({}).select('_id name')
+      : await Community.find({ adminId: req.admin._id }).select('_id name');
     const communityIds = communities.map(c => c._id);
     const communityMap = Object.fromEntries(communities.map(c => [c._id.toString(), c.name]));
 
@@ -589,13 +816,13 @@ router.get('/admin/activity', requireTetherAuth, async (req, res) => {
     const activity = [
       ...recentDevices.map(d => ({
         type: 'device_joined',
-        description: `מכשיר חדש הצטרף: ${d.deviceModel}`,
+        description: `׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨ ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ׳³ֲ³ײ²ֲ© ׳³ֲ³׳’ג‚¬ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ»ֲ׳³ֲ³ײ²ֲ¨׳³ֲ³ײ²ֲ£: ${d.deviceModel}`,
         communityName: communityMap[d.communityId.toString()] || '',
         timestamp: d.createdAt
       })),
       ...recentApprovals.map(a => ({
         type: 'approval_request',
-        description: `בקשת אישור: ${a.action}`,
+        description: `׳³ֲ³׳’ג‚¬ֻ׳³ֲ³ײ²ֲ§׳³ֲ³ײ²ֲ©׳³ֲ³ײ³ג€” ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ¨: ${a.action}`,
         communityName: communityMap[a.communityId.toString()] || '',
         timestamp: a.createdAt
       }))
@@ -610,11 +837,9 @@ router.get('/admin/activity', requireTetherAuth, async (req, res) => {
 // All approvals across all communities
 router.get('/admin/approvals/all', requireTetherAuth, async (req, res) => {
   try {
-    const communities = await Community.find({ adminId: req.admin._id }).select('_id');
-    const communityIds = communities.map(c => c._id);
-
+    const ownedCommunityIds = await getOwnedCommunityIds(req.admin);
     const approvals = await ApprovalRequest.find({
-      communityId: { $in: communityIds },
+      ...(ownedCommunityIds ? { communityId: { $in: ownedCommunityIds } } : {}),
       status: 'pending'
     }).sort({ createdAt: -1 });
 
@@ -628,8 +853,8 @@ router.get('/admin/approvals/all', requireTetherAuth, async (req, res) => {
 router.get('/admin/communities/:id/logs', requireTetherAuth, async (req, res) => {
   try {
     const community = await Community.findOne({ _id: req.params.id, adminId: req.admin._id });
-    if (!community) return res.status(404).json({ message: 'קהילה לא נמצאה' });
-    if (!community.policy.logsEnabled) return res.status(403).json({ message: 'לוגים לא מופעלים לקהילה זו' });
+    if (!community) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ' });
+    if (!community.policy.logsEnabled) return res.status(403).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג€ֳ—׳³ֲ³ײ²ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢' });
 
     const logs = await ApprovalRequest.find({ communityId: community._id })
       .sort({ createdAt: -1 }).limit(100);
@@ -661,11 +886,11 @@ router.delete('/admin/communities/:id', requireTetherAuth, async (req, res) => {
   }
 });
 
-// ── Manage admins (superadmin only) ──────────────────────────────────────
+// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ Manage admins (superadmin only) ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 
 router.get('/admin/members', requireTetherAuth, async (req, res) => {
   try {
-    if (req.admin.role !== 'superadmin') return res.status(403).json({ message: 'גישה אסורה' });
+    if (req.admin.role !== 'superadmin') return res.status(403).json({ message: '׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¡׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ¨׳³ֲ³׳’ג‚¬ֲ' });
     const admins = await TetherAdmin.find({}, 'name email role active createdAt');
     res.json(admins.map(formatAdmin));
   } catch (e) {
@@ -675,9 +900,9 @@ router.get('/admin/members', requireTetherAuth, async (req, res) => {
 
 router.post('/admin/members/invite', requireTetherAuth, async (req, res) => {
   try {
-    if (req.admin.role !== 'superadmin') return res.status(403).json({ message: 'גישה אסורה' });
+    if (req.admin.role !== 'superadmin') return res.status(403).json({ message: '׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¡׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ¨׳³ֲ³׳’ג‚¬ֲ' });
     const { name, email, password } = req.body;
-    if (!name || !email || !password) return res.status(400).json({ message: 'שם, אימייל וסיסמה חובה' });
+    if (!name || !email || !password) return res.status(400).json({ message: '׳³ֲ³ײ²ֲ©׳³ֲ³ײ²ֲ, ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ¡׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¡׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³׳’ג‚¬ֲ' });
     const passwordHash = await bcrypt.hash(password, 12);
     const admin = await TetherAdmin.create({ name, email, passwordHash, role: 'admin' });
     res.status(201).json(formatAdmin(admin));
@@ -688,7 +913,7 @@ router.post('/admin/members/invite', requireTetherAuth, async (req, res) => {
 
 router.delete('/admin/members/:id', requireTetherAuth, async (req, res) => {
   try {
-    if (req.admin.role !== 'superadmin') return res.status(403).json({ message: 'גישה אסורה' });
+    if (req.admin.role !== 'superadmin') return res.status(403).json({ message: '׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¡׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ¨׳³ֲ³׳’ג‚¬ֲ' });
     await TetherAdmin.findByIdAndUpdate(req.params.id, { active: false });
     res.json({ success: true });
   } catch (e) {
@@ -696,41 +921,123 @@ router.delete('/admin/members/:id', requireTetherAuth, async (req, res) => {
   }
 });
 
-// Serve APK for provisioning (public — Android downloads it during device setup)
-router.get('/app/download', (req, res) => {
-  const apkPath = path.join(__dirname, '../../uploads/tether-latest.apk');
-  res.download(apkPath, 'tether-latest.apk', (err) => {
-    if (err) res.status(404).json({ message: 'APK לא נמצא — העלה את הקובץ לשרת' });
-  });
-});
-
-// Current APK version — devices poll this to decide whether to self-update
-router.get('/app/version', (req, res) => {
+// Approved apps list for device updater/store
+router.get('/apps/approved', async (_req, res) => {
   try {
-    const versionPath = path.join(__dirname, '../../uploads/tether-version.json');
-    const data = JSON.parse(require('fs').readFileSync(versionPath, 'utf8'));
-    res.json(data);
-  } catch {
-    res.status(404).json({ message: 'קובץ גרסה לא נמצא' });
+    const apps = await TetherApprovedApp.find({ active: true })
+      .sort({ appName: 1 })
+      .select('packageName appName versionCode downloadUrl iconUrl');
+    res.json(apps.map((app) => ({
+      packageName: app.packageName,
+      appName: app.appName,
+      versionCode: app.versionCode,
+      downloadUrl: app.downloadUrl,
+      iconUrl: app.iconUrl || null
+    })));
+  } catch (e) {
+    res.status(500).json({ message: e.message });
   }
 });
 
-// Update APK version metadata (admin only — call after uploading a new APK)
+// Admin: manage approved app catalog
+router.get('/admin/apps/approved', requireTetherAuth, async (_req, res) => {
+  try {
+    const apps = await TetherApprovedApp.find({}).sort({ appName: 1 });
+    res.json(apps);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+router.post('/admin/apps/approved', requireTetherAuth, async (req, res) => {
+  try {
+    const packageName = String(req.body?.packageName || '').trim();
+    const appName = String(req.body?.appName || '').trim();
+    const versionCode = Number(req.body?.versionCode || 1);
+    const downloadUrl = String(req.body?.downloadUrl || '').trim();
+    const iconUrl = sanitizeOptionalString(req.body?.iconUrl);
+
+    if (!packageName || !appName || !downloadUrl || !Number.isFinite(versionCode) || versionCode < 1) {
+      return res.status(400).json({ message: 'packageName, appName, versionCode>=1, downloadUrl are required.' });
+    }
+
+    const app = await TetherApprovedApp.findOneAndUpdate(
+      { packageName },
+      { packageName, appName, versionCode: Math.floor(versionCode), downloadUrl, iconUrl, active: true },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    res.status(201).json(app);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+router.put('/admin/apps/approved/:id', requireTetherAuth, async (req, res) => {
+  try {
+    const updates = {};
+    if (req.body?.appName != null) updates.appName = String(req.body.appName).trim();
+    if (req.body?.versionCode != null) {
+      const parsed = Number(req.body.versionCode);
+      if (!Number.isFinite(parsed) || parsed < 1) return res.status(400).json({ message: 'versionCode must be >= 1' });
+      updates.versionCode = Math.floor(parsed);
+    }
+    if (req.body?.downloadUrl != null) updates.downloadUrl = String(req.body.downloadUrl).trim();
+    if (req.body?.iconUrl != null) updates.iconUrl = sanitizeOptionalString(req.body.iconUrl);
+    if (req.body?.active != null) updates.active = !!req.body.active;
+
+    const app = await TetherApprovedApp.findByIdAndUpdate(req.params.id, updates, { new: true });
+    if (!app) return res.status(404).json({ message: 'App not found' });
+    res.json(app);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+router.delete('/admin/apps/approved/:id', requireTetherAuth, async (req, res) => {
+  try {
+    const app = await TetherApprovedApp.findByIdAndUpdate(req.params.id, { active: false }, { new: true });
+    if (!app) return res.status(404).json({ message: 'App not found' });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// Serve APK for provisioning (public ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ Android downloads it during device setup)
+router.get('/app/download', (req, res) => {
+  const apkPath = path.join(__dirname, '../../uploads/tether-latest.apk');
+  res.download(apkPath, 'tether-latest.apk', (err) => {
+    if (err) res.status(404).json({ message: 'APK ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ ׳³ֲ³׳’ג‚¬ֲ׳³ֲ³ײ²ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ³ג€” ׳³ֲ³׳’ג‚¬ֲ׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³ײ²ֲ¥ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ©׳³ֲ³ײ²ֲ¨׳³ֲ³ײ³ג€”' });
+  });
+});
+
+// Current APK version ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ devices poll this to decide whether to self-update
+router.get('/app/version', (req, res) => {
+  try {
+    const versionPath = path.join(__dirname, '../../uploads/tether-version.json');
+    const data = JSON.parse(fs.readFileSync(versionPath, 'utf8'));
+    res.json(data);
+  } catch {
+    res.status(404).json({ message: '׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³ײ²ֲ¥ ׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³ײ²ֲ¨׳³ֲ³ײ²ֲ¡׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
+  }
+});
+
+// Update APK version metadata (admin only ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ call after uploading a new APK)
 router.post('/admin/app/version', requireTetherAuth, (req, res) => {
   try {
     const { versionCode, versionName } = req.body;
     if (!versionCode || !versionName) {
-      return res.status(400).json({ message: 'versionCode ו-versionName חובה' });
+      return res.status(400).json({ message: 'versionCode ׳³ֲ³׳’ג‚¬ֲ¢-versionName ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³׳’ג‚¬ֲ' });
     }
     const versionPath = path.join(__dirname, '../../uploads/tether-version.json');
-    require('fs').writeFileSync(versionPath, JSON.stringify({ versionCode, versionName }, null, 2));
+    fs.writeFileSync(versionPath, JSON.stringify({ versionCode, versionName }, null, 2));
     res.json({ versionCode, versionName });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
 });
 
-// דיווח אפליקציות מהמכשיר
+// ׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ג€ ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֳ—׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ§׳³ֲ³ײ²ֲ¦׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ³ג€” ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨
 router.post('/devices/:deviceId/apps', async (req, res) => {
   try {
     const { deviceId } = req.params;
@@ -745,13 +1052,17 @@ router.post('/devices/:deviceId/apps', async (req, res) => {
   }
 });
 
-// נעילת קהילה לפי זמן
-router.post('/community/:id/lock', async (req, res) => {
+// ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³ײ³ג€” ׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֳ—׳³ֲ³׳’ג€ֲ¢ ׳³ֲ³׳’ג‚¬ג€׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ
+router.post('/community/:id/lock', requireTetherAuth, async (req, res) => {
   try {
     const { lockedUntilTs } = req.body;
-    await Community.findByIdAndUpdate(req.params.id, {
+    const communityFilter = isSuperAdmin(req.admin)
+      ? { _id: req.params.id }
+      : { _id: req.params.id, adminId: req.admin._id };
+    const community = await Community.findOneAndUpdate(communityFilter, {
       'policy.lockedUntilTs': lockedUntilTs
     });
+    if (!community) return res.status(404).json({ message: '׳³ֲ§׳³ג€׳³ג„¢׳³ֲ׳³ג€ ׳³ֲ׳³ֲ ׳³ֲ ׳³ֲ׳³ֲ¦׳³ֲ׳³ג€' });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -761,7 +1072,9 @@ router.post('/community/:id/lock', async (req, res) => {
 // List all devices across admin's communities
 router.get('/admin/devices', requireTetherAuth, async (req, res) => {
   try {
-    const communities = await Community.find({ adminId: req.admin._id }).select('_id name');
+    const communities = isSuperAdmin(req.admin)
+      ? await Community.find({}).select('_id name')
+      : await Community.find({ adminId: req.admin._id }).select('_id name');
     const communityIds = communities.map(c => c._id);
     const communityMap = Object.fromEntries(communities.map(c => [c._id.toString(), c.name]));
     const devices = await TetherDevice.find({ communityId: { $in: communityIds }, active: true });
@@ -778,7 +1091,7 @@ router.get('/admin/devices', requireTetherAuth, async (req, res) => {
   }
 });
 
-// ── Heartbeat — device reports its protection-layer status every 5 min ────────
+// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ Heartbeat ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ device reports its protection-layer status every 5 min ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 router.post('/devices/:deviceId/heartbeat', async (req, res) => {
   try {
     const { accessibilityEnabled, isDeviceAdmin, isDeviceOwner, vpnActive } = req.body;
@@ -799,16 +1112,16 @@ router.post('/devices/:deviceId/heartbeat', async (req, res) => {
   }
 });
 
-// ── Security events — device reports each intercepted threat ──────────────────
+// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ Security events ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ device reports each intercepted threat ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 router.post('/devices/:deviceId/events', async (req, res) => {
   try {
     const { type, packageName } = req.body;
     const validTypes = [
       'UNINSTALL_ATTEMPT', 'ADMIN_DEACTIVATE_ATTEMPT',
-      'BLOCKED_APP_OPENED', 'TIME_LOCK_BLOCKED'
+      'BLOCKED_APP_OPENED', 'TIME_LOCK_BLOCKED', 'NEW_APP_INSTALLED'
     ];
     if (!validTypes.includes(type)) {
-      return res.status(400).json({ message: 'סוג אירוע לא חוקי' });
+      return res.status(400).json({ message: '׳³ֲ³ײ²ֲ¡׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ג„¢ ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ¢ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג€ֲ¢' });
     }
 
     const event = { type, packageName: packageName || null, timestamp: new Date() };
@@ -832,11 +1145,11 @@ router.post('/devices/:deviceId/events', async (req, res) => {
   }
 });
 
-// ── Admin: view security events for a device ──────────────────────────────────
+// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ Admin: view security events for a device ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 router.get('/admin/devices/:deviceId/events', requireTetherAuth, async (req, res) => {
   try {
-    const device = await TetherDevice.findOne({ deviceId: req.params.deviceId }).select('securityEvents protectionStatus');
-    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
+    const device = await findOwnedDevice(req.admin, req.params.deviceId);
+    if (!device) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
     res.json({
       protectionStatus: device.protectionStatus,
       events: device.securityEvents.slice().reverse() // newest first
@@ -846,30 +1159,28 @@ router.get('/admin/devices/:deviceId/events', requireTetherAuth, async (req, res
   }
 });
 
-// ── Admin: push a command to a specific device ────────────────────────────────
+// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ Admin: push a command to a specific device ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 // The command is delivered on the device's next policy poll (at most 15 min later).
 router.post('/admin/devices/:deviceId/commands', requireTetherAuth, async (req, res) => {
   try {
     const { type, payload } = req.body;
-    if (!type) return res.status(400).json({ message: 'type חובה' });
+    if (!type) return res.status(400).json({ message: 'type ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³׳’ג‚¬ֲ' });
 
-    const device = await TetherDevice.findOneAndUpdate(
-      { deviceId: req.params.deviceId },
-      { $push: { pendingCommands: { type, payload: payload || '' } } },
-      { new: true }
-    );
-    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
+    const device = await findOwnedDevice(req.admin, req.params.deviceId);
+    if (!device) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
+    device.pendingCommands.push({ type, payload: payload || '' });
+    await device.save();
     res.json({ success: true, pendingCount: device.pendingCommands.length });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
 });
 
-// ── Admin: protection health summary for all devices in a community ───────────
+// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ Admin: protection health summary for all devices in a community ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 router.get('/admin/communities/:id/devices/status', requireTetherAuth, async (req, res) => {
   try {
     const community = await Community.findOne({ _id: req.params.id, adminId: req.admin._id });
-    if (!community) return res.status(404).json({ message: 'קהילה לא נמצאה' });
+    if (!community) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ' });
 
     const devices = await TetherDevice.find(
       { communityId: community._id, active: true },
@@ -892,3 +1203,7 @@ router.get('/admin/communities/:id/devices/status', requireTetherAuth, async (re
 });
 
 export default router;
+
+
+
+

@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import fs from 'fs';
@@ -14,34 +14,31 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const router = express.Router();
 
-// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ Tether-specific auth middleware (reads Authorization: Bearer header) ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 const requireTetherAuth = async (req, res, next) => {
   const auth = req.headers['authorization'];
   if (!auth?.startsWith('Bearer ')) {
-    return res.status(401).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³ײ²ֲ¨' });
+    return res.status(401).json({ message: 'לא מחובר' });
   }
   try {
     const decoded = jwt.verify(auth.slice(7), process.env.JWT_ACCESS_SECRET);
     req.admin = { _id: decoded.id, role: decoded.role };
     next();
   } catch {
-    return res.status(401).json({ message: '׳³ֲ³ײ»ֲ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ§׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג€ֲ¢ / ׳³ֲ³׳’ג€ֳ—׳³ֲ³׳’ג‚¬ג„¢ ׳³ֲ³ײ³ג€”׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ§׳³ֲ³ײ²ֲ£' });
+    return res.status(401).json({ message: 'טוקן לא חוקי / פג תוקף' });
   }
 };
 
-// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ Tether Admin Auth ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 
-// Login ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ returns token in body (for Android)
 router.post('/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ¡׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¡׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³׳’ג‚¬ֲ' });
+    if (!email || !password) return res.status(400).json({ message: 'אימייל וסיסמה חובה' });
 
     const admin = await TetherAdmin.findOne({ email: email.toLowerCase(), active: true });
-    if (!admin) return res.status(401).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ¢ ׳³ֲ³ײ²ֲ¡׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¡׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ' });
+    if (!admin) return res.status(401).json({ message: 'אימייל או סיסמה שגויים' });
 
     const valid = await bcrypt.compare(password, admin.passwordHash);
-    if (!valid) return res.status(401).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ¢ ׳³ֲ³ײ²ֲ¡׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¡׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ' });
+    if (!valid) return res.status(401).json({ message: 'אימייל או סיסמה שגויים' });
 
     const token = jwt.sign(
       { id: admin._id, role: admin.role },
@@ -58,11 +55,10 @@ router.post('/auth/login', async (req, res) => {
   }
 });
 
-// Bootstrap ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ create first superadmin (only if no admins exist)
 router.post('/auth/bootstrap', async (req, res) => {
   try {
     const count = await TetherAdmin.countDocuments();
-    if (count > 0) return res.status(403).json({ message: '׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³׳’ג‚¬ֻ׳³ֲ³ײ²ֲ¨ ׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³׳’ג‚¬ֲ׳³ֲ³ײ²ֲ' });
+    if (count > 0) return res.status(403).json({ message: 'כבר קיים מנהל' });
 
     const { name, email, password, secret } = req.body;
     if (secret !== 'tether-init-2025') return res.status(403).json({ message: 'Forbidden' });
@@ -75,7 +71,6 @@ router.post('/auth/bootstrap', async (req, res) => {
   }
 });
 
-// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ Device routes (no auth ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ called from Android device) ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 
 // Verify community code before joining
 router.get('/communities/:code/verify', async (req, res) => {
@@ -85,7 +80,7 @@ router.get('/communities/:code/verify', async (req, res) => {
       active: true
     }).select('name code');
 
-    if (!community) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
+    if (!community) return res.status(404).json({ message: 'קוד קהילה לא נמצא' });
     res.json({ name: community.name, code: community.code });
   } catch (e) {
     res.status(500).json({ message: e.message });
@@ -96,10 +91,10 @@ router.get('/communities/:code/verify', async (req, res) => {
 router.post('/devices/join', async (req, res) => {
   try {
     const { code, deviceId, deviceModel, hardwareId } = req.body;
-    if (!code || !deviceId) return res.status(400).json({ message: 'code ׳³ֲ³׳’ג‚¬ֲ¢-deviceId ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³׳’ג‚¬ֲ' });
+    if (!code || !deviceId) return res.status(400).json({ message: 'code ׳•-deviceId ׳—׳•׳‘׳”' });
 
     const community = await Community.findOne({ code: code.toUpperCase(), active: true });
-    if (!community) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
+    if (!community) return res.status(404).json({ message: 'קוד קהילה לא נמצא' });
 
     // Delete ALL previous records for this physical device (by hardwareId if provided,
     // otherwise fall back to deviceId). This guarantees every join is truly fresh.
@@ -175,7 +170,6 @@ function mergePolicy(communityPolicy, devicePolicy = {}) {
   return merged;
 }
 
-// Get policy for device ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ merges community + device overrides, clears pending commands.
 // allowUninstall is delivered once then reset to false (app handles the 1-hour window locally).
 router.get('/devices/:deviceId/policy', async (req, res) => {
   try {
@@ -184,7 +178,7 @@ router.get('/devices/:deviceId/policy', async (req, res) => {
       { lastSeen: new Date(), $set: { pendingCommands: [], allowUninstall: false } }
     ).populate('communityId');
 
-    if (!device) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
+    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
 
     const merged = mergePolicy(device.communityId.policy, device.devicePolicy);
 
@@ -207,7 +201,7 @@ router.post('/devices/:deviceId/approval', async (req, res) => {
     }
 
     const device = await TetherDevice.findOne({ deviceId: req.params.deviceId });
-    if (!device) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
+    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
 
     const action = sanitizeApprovalAction(req.query.action);
     const packageName = String(req.query.packageName || '').trim() || null;
@@ -238,7 +232,6 @@ router.post('/devices/:deviceId/approval', async (req, res) => {
   }
 });
 
-// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ Admin routes (require Tether auth) ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 
 const formatAdmin = (a) => ({
   id: a._id.toString(),
@@ -413,7 +406,7 @@ const hitRateLimit = ({ key, limit, windowMs }) => {
 router.post('/admin/communities', requireTetherAuth, async (req, res) => {
   try {
     const { name, policy } = req.body;
-    if (!name) return res.status(400).json({ message: '׳³ֲ³ײ²ֲ©׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³׳’ג‚¬ֲ' });
+    if (!name) return res.status(400).json({ message: 'שם קהילה חובה' });
 
     const community = await Community.create({
       name,
@@ -447,7 +440,7 @@ router.get('/admin/communities', requireTetherAuth, async (req, res) => {
 router.get('/admin/communities/:id', requireTetherAuth, async (req, res) => {
   try {
     const community = await Community.findOne({ _id: req.params.id, adminId: req.admin._id });
-    if (!community) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ' });
+    if (!community) return res.status(404).json({ message: 'קהילה לא נמצאה' });
 
     const devices = await TetherDevice.find({ communityId: community._id, active: true });
     res.json({ community: formatCommunity(community, devices.length), devices: devices.map(formatDevice) });
@@ -464,7 +457,7 @@ router.put('/admin/communities/:id/policy', requireTetherAuth, async (req, res) 
       { policy: req.body },
       { new: true }
     );
-    if (!community) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ' });
+    if (!community) return res.status(404).json({ message: 'קהילה לא נמצאה' });
 
     // Wake up all active devices so they pick up the change within one poll cycle
     await TetherDevice.updateMany(
@@ -482,7 +475,7 @@ router.put('/admin/communities/:id/policy', requireTetherAuth, async (req, res) 
 router.get('/admin/communities/:id/approvals', requireTetherAuth, async (req, res) => {
   try {
     const community = await Community.findOne({ _id: req.params.id, adminId: req.admin._id });
-    if (!community) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ' });
+    if (!community) return res.status(404).json({ message: 'קהילה לא נמצאה' });
 
     const requests = await ApprovalRequest.find({
       communityId: community._id,
@@ -500,11 +493,11 @@ router.put('/admin/approvals/:id', requireTetherAuth, async (req, res) => {
   try {
     const { status } = req.body;
     if (!['approved', 'rejected'].includes(status)) {
-      return res.status(400).json({ message: '׳³ֲ³ײ²ֲ¡׳³ֲ³ײ»ֲ׳³ֲ³ײ»ֲ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ¡ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ³ג€”׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ' });
+      return res.status(400).json({ message: 'סטטוס לא תקין' });
     }
 
     const request = await ApprovalRequest.findById(req.params.id);
-    if (!request) return res.status(404).json({ message: '׳³ֲ³׳’ג‚¬ֻ׳³ֲ³ײ²ֲ§׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ' });
+    if (!request) return res.status(404).json({ message: 'בקשה לא נמצאה' });
 
     const community = await Community.findById(request.communityId).select('adminId policy.approvalResolverMode');
     if (!community) return res.status(404).json({ message: 'Community not found' });
@@ -586,17 +579,16 @@ router.post('/devices/:deviceId/verify-uninstall-pin', async (req, res) => {
       await device.save();
       return res.json({ success: true, allowUninstall: true });
     } else {
-      return res.status(401).json({ message: '׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג€ֲ¢' });
+      return res.status(401).json({ message: 'קוד שגוי' });
     }
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 });
 
-// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ Global overview ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ all devices across all communities, no filters ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 router.get('/admin/global/devices', requireTetherAuth, async (req, res) => {
   try {
-    if (!isSuperAdmin(req.admin)) return res.status(403).json({ message: '׳³ג€™׳³ג„¢׳³ֲ©׳³ג€ ׳³ֲ׳³ֲ¡׳³ג€¢׳³ֲ¨׳³ג€' });
+    if (!isSuperAdmin(req.admin)) return res.status(403).json({ message: 'גישה אסורה' });
     const devices = await TetherDevice.find({}).populate('communityId', 'name code').sort({ createdAt: -1 });
     const staleThreshold = new Date(Date.now() - 30 * 60 * 1000);
     res.json(devices.map(d => ({
@@ -605,7 +597,7 @@ router.get('/admin/global/devices', requireTetherAuth, async (req, res) => {
       deviceModel:     d.deviceModel,
       deviceNickname:  d.deviceNickname ?? null,
       communityId:     d.communityId?._id?.toString() ?? null,
-      communityName:   d.communityId?.name ?? '׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ',
+      communityName:   d.communityId?.name ?? 'לא משויך',
       communityCode:   d.communityId?.code ?? '',
       isDeviceOwner:   d.isDeviceOwner,
       allowUninstall:  d.allowUninstall ?? false,
@@ -621,7 +613,7 @@ router.get('/admin/global/devices', requireTetherAuth, async (req, res) => {
 // All communities across all admins, no filters
 router.get('/admin/global/communities', requireTetherAuth, async (req, res) => {
   try {
-    if (!isSuperAdmin(req.admin)) return res.status(403).json({ message: '׳³ג€™׳³ג„¢׳³ֲ©׳³ג€ ׳³ֲ׳³ֲ¡׳³ג€¢׳³ֲ¨׳³ג€' });
+    if (!isSuperAdmin(req.admin)) return res.status(403).json({ message: 'גישה אסורה' });
     const communities = await Community.find({}).populate('adminId', 'name email').sort({ createdAt: -1 });
     const counts = await TetherDevice.aggregate([
       { $group: { _id: '$communityId', total: { $sum: 1 }, active: { $sum: { $cond: ['$active', 1, 0] } } } }
@@ -632,7 +624,7 @@ router.get('/admin/global/communities', requireTetherAuth, async (req, res) => {
       name:              c.name,
       code:              c.code,
       active:            c.active,
-      adminName:         c.adminId?.name  ?? '׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ¢',
+      adminName:         c.adminId?.name  ?? 'לא ידוע',
       adminEmail:        c.adminId?.email ?? '',
       deviceCount:       countMap[c._id.toString()]?.total  ?? 0,
       activeDeviceCount: countMap[c._id.toString()]?.active ?? 0,
@@ -644,7 +636,7 @@ router.get('/admin/global/communities', requireTetherAuth, async (req, res) => {
 // Hard-delete device by MongoDB _id
 router.delete('/admin/global/devices/:id', requireTetherAuth, async (req, res) => {
   try {
-    if (!isSuperAdmin(req.admin)) return res.status(403).json({ message: '׳³ג€™׳³ג„¢׳³ֲ©׳³ג€ ׳³ֲ׳³ֲ¡׳³ג€¢׳³ֲ¨׳³ג€' });
+    if (!isSuperAdmin(req.admin)) return res.status(403).json({ message: 'גישה אסורה' });
     await TetherDevice.findByIdAndDelete(req.params.id);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ message: e.message }); }
@@ -653,7 +645,7 @@ router.delete('/admin/global/devices/:id', requireTetherAuth, async (req, res) =
 // Hard-delete community by MongoDB _id
 router.delete('/admin/global/communities/:id', requireTetherAuth, async (req, res) => {
   try {
-    if (!isSuperAdmin(req.admin)) return res.status(403).json({ message: '׳³ג€™׳³ג„¢׳³ֲ©׳³ג€ ׳³ֲ׳³ֲ¡׳³ג€¢׳³ֲ¨׳³ג€' });
+    if (!isSuperAdmin(req.admin)) return res.status(403).json({ message: 'גישה אסורה' });
     await Community.findByIdAndDelete(req.params.id);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ message: e.message }); }
@@ -662,19 +654,18 @@ router.delete('/admin/global/communities/:id', requireTetherAuth, async (req, re
 // Rename community
 router.put('/admin/global/communities/:id/rename', requireTetherAuth, async (req, res) => {
   try {
-    if (!isSuperAdmin(req.admin)) return res.status(403).json({ message: '׳³ג€™׳³ג„¢׳³ֲ©׳³ג€ ׳³ֲ׳³ֲ¡׳³ג€¢׳³ֲ¨׳³ג€' });
+    if (!isSuperAdmin(req.admin)) return res.status(403).json({ message: 'גישה אסורה' });
     const { name } = req.body;
-    if (!name?.trim()) return res.status(400).json({ message: '׳³ֲ³ײ²ֲ©׳³ֲ³ײ²ֲ ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³׳’ג‚¬ֲ' });
+    if (!name?.trim()) return res.status(400).json({ message: 'שם חובה' });
     const c = await Community.findByIdAndUpdate(req.params.id, { name: name.trim() }, { new: true });
-    if (!c) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ' });
+    if (!c) return res.status(404).json({ message: 'קהילה לא נמצאה' });
     res.json({ name: c.name });
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ One-time maintenance: revoke allowUninstall on ALL devices ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 router.post('/admin/maintenance/reset-allow-uninstall', requireTetherAuth, async (req, res) => {
   try {
-    if (!isSuperAdmin(req.admin)) return res.status(403).json({ message: '׳³ג€™׳³ג„¢׳³ֲ©׳³ג€ ׳³ֲ׳³ֲ¡׳³ג€¢׳³ֲ¨׳³ג€' });
+    if (!isSuperAdmin(req.admin)) return res.status(403).json({ message: 'גישה אסורה' });
     const result = await TetherDevice.updateMany({ allowUninstall: true }, { $set: { allowUninstall: false } });
     res.json({ revoked: result.modifiedCount });
   } catch (e) {
@@ -687,7 +678,7 @@ router.put('/admin/devices/:deviceId/allow-uninstall', requireTetherAuth, async 
   try {
     const { allowUninstall } = req.body;
     const device = await findOwnedDevice(req.admin, req.params.deviceId);
-    if (!device) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
+    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
     device.allowUninstall = !!allowUninstall;
     await device.save();
     res.json({ allowUninstall: device.allowUninstall });
@@ -700,7 +691,7 @@ router.put('/admin/devices/:deviceId/allow-uninstall', requireTetherAuth, async 
 router.delete('/admin/devices/:deviceId', requireTetherAuth, async (req, res) => {
   try {
     const device = await findOwnedDevice(req.admin, req.params.deviceId);
-    if (!device) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
+    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
     device.active = false;
     await device.save();
     res.json({ success: true });
@@ -713,7 +704,7 @@ router.delete('/admin/devices/:deviceId', requireTetherAuth, async (req, res) =>
 router.get('/admin/devices/:deviceId', requireTetherAuth, async (req, res) => {
   try {
     const device = await findOwnedDevice(req.admin, req.params.deviceId, { populateCommunity: true });
-    if (!device) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
+    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
     const communityDoc = device.communityId; // populated document
     res.json({
       id: device._id.toString(),
@@ -742,7 +733,7 @@ router.get('/admin/devices/:deviceId', requireTetherAuth, async (req, res) => {
 router.put('/admin/devices/:deviceId/device-policy', requireTetherAuth, async (req, res) => {
   try {
     const device = await findOwnedDevice(req.admin, req.params.deviceId, { populateCommunity: true });
-    if (!device) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
+    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
     device.devicePolicy = sanitizeDevicePolicyPayload(req.body);
     // Push FORCE_SYNC so device picks up changes on next poll
     device.pendingCommands.push({ type: 'FORCE_SYNC', payload: '' });
@@ -758,7 +749,7 @@ router.put('/admin/devices/:deviceId/nickname', requireTetherAuth, async (req, r
   try {
     const { nickname } = req.body;
     const device = await findOwnedDevice(req.admin, req.params.deviceId);
-    if (!device) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
+    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
     device.deviceNickname = nickname || null;
     await device.save();
     res.json({ deviceNickname: device.deviceNickname });
@@ -816,13 +807,13 @@ router.get('/admin/activity', requireTetherAuth, async (req, res) => {
     const activity = [
       ...recentDevices.map(d => ({
         type: 'device_joined',
-        description: `׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨ ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ׳³ֲ³ײ²ֲ© ׳³ֲ³׳’ג‚¬ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ»ֲ׳³ֲ³ײ²ֲ¨׳³ֲ³ײ²ֲ£: ${d.deviceModel}`,
+        description: `מכשיר חדש הצטרף: ${d.deviceModel}`,
         communityName: communityMap[d.communityId.toString()] || '',
         timestamp: d.createdAt
       })),
       ...recentApprovals.map(a => ({
         type: 'approval_request',
-        description: `׳³ֲ³׳’ג‚¬ֻ׳³ֲ³ײ²ֲ§׳³ֲ³ײ²ֲ©׳³ֲ³ײ³ג€” ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ¨: ${a.action}`,
+        description: `בקשת אישור: ${a.action}`,
         communityName: communityMap[a.communityId.toString()] || '',
         timestamp: a.createdAt
       }))
@@ -853,8 +844,8 @@ router.get('/admin/approvals/all', requireTetherAuth, async (req, res) => {
 router.get('/admin/communities/:id/logs', requireTetherAuth, async (req, res) => {
   try {
     const community = await Community.findOne({ _id: req.params.id, adminId: req.admin._id });
-    if (!community) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ' });
-    if (!community.policy.logsEnabled) return res.status(403).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג€ֳ—׳³ֲ³ײ²ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢' });
+    if (!community) return res.status(404).json({ message: 'קהילה לא נמצאה' });
+    if (!community.policy.logsEnabled) return res.status(403).json({ message: 'לוגים לא מופעלים לקהילה זו' });
 
     const logs = await ApprovalRequest.find({ communityId: community._id })
       .sort({ createdAt: -1 }).limit(100);
@@ -886,11 +877,10 @@ router.delete('/admin/communities/:id', requireTetherAuth, async (req, res) => {
   }
 });
 
-// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ Manage admins (superadmin only) ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 
 router.get('/admin/members', requireTetherAuth, async (req, res) => {
   try {
-    if (req.admin.role !== 'superadmin') return res.status(403).json({ message: '׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¡׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ¨׳³ֲ³׳’ג‚¬ֲ' });
+    if (req.admin.role !== 'superadmin') return res.status(403).json({ message: 'גישה אסורה' });
     const admins = await TetherAdmin.find({}, 'name email role active createdAt');
     res.json(admins.map(formatAdmin));
   } catch (e) {
@@ -900,9 +890,9 @@ router.get('/admin/members', requireTetherAuth, async (req, res) => {
 
 router.post('/admin/members/invite', requireTetherAuth, async (req, res) => {
   try {
-    if (req.admin.role !== 'superadmin') return res.status(403).json({ message: '׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¡׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ¨׳³ֲ³׳’ג‚¬ֲ' });
+    if (req.admin.role !== 'superadmin') return res.status(403).json({ message: 'גישה אסורה' });
     const { name, email, password } = req.body;
-    if (!name || !email || !password) return res.status(400).json({ message: '׳³ֲ³ײ²ֲ©׳³ֲ³ײ²ֲ, ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ ׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ¡׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¡׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³׳’ג‚¬ֲ' });
+    if (!name || !email || !password) return res.status(400).json({ message: 'שם, אימייל וסיסמה חובה' });
     const passwordHash = await bcrypt.hash(password, 12);
     const admin = await TetherAdmin.create({ name, email, passwordHash, role: 'admin' });
     res.status(201).json(formatAdmin(admin));
@@ -913,7 +903,7 @@ router.post('/admin/members/invite', requireTetherAuth, async (req, res) => {
 
 router.delete('/admin/members/:id', requireTetherAuth, async (req, res) => {
   try {
-    if (req.admin.role !== 'superadmin') return res.status(403).json({ message: '׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¡׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ¨׳³ֲ³׳’ג‚¬ֲ' });
+    if (req.admin.role !== 'superadmin') return res.status(403).json({ message: 'גישה אסורה' });
     await TetherAdmin.findByIdAndUpdate(req.params.id, { active: false });
     res.json({ success: true });
   } catch (e) {
@@ -1003,31 +993,28 @@ router.delete('/admin/apps/approved/:id', requireTetherAuth, async (req, res) =>
   }
 });
 
-// Serve APK for provisioning (public ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ Android downloads it during device setup)
 router.get('/app/download', (req, res) => {
   const apkPath = path.join(__dirname, '../../uploads/tether-latest.apk');
   res.download(apkPath, 'tether-latest.apk', (err) => {
-    if (err) res.status(404).json({ message: 'APK ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ ׳³ֲ³׳’ג‚¬ֲ׳³ֲ³ײ²ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ³ג€” ׳³ֲ³׳’ג‚¬ֲ׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³ײ²ֲ¥ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ©׳³ֲ³ײ²ֲ¨׳³ֲ³ײ³ג€”' });
+    if (err) res.status(404).json({ message: 'APK לא נמצא — העלה את הקובץ לשרת' });
   });
 });
 
-// Current APK version ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ devices poll this to decide whether to self-update
 router.get('/app/version', (req, res) => {
   try {
     const versionPath = path.join(__dirname, '../../uploads/tether-version.json');
     const data = JSON.parse(fs.readFileSync(versionPath, 'utf8'));
     res.json(data);
   } catch {
-    res.status(404).json({ message: '׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³ײ²ֲ¥ ׳³ֲ³׳’ג‚¬ג„¢׳³ֲ³ײ²ֲ¨׳³ֲ³ײ²ֲ¡׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
+    res.status(404).json({ message: 'קובץ גרסה לא נמצא' });
   }
 });
 
-// Update APK version metadata (admin only ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ call after uploading a new APK)
 router.post('/admin/app/version', requireTetherAuth, (req, res) => {
   try {
     const { versionCode, versionName } = req.body;
     if (!versionCode || !versionName) {
-      return res.status(400).json({ message: 'versionCode ׳³ֲ³׳’ג‚¬ֲ¢-versionName ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³׳’ג‚¬ֲ' });
+      return res.status(400).json({ message: 'versionCode ׳•-versionName ׳—׳•׳‘׳”' });
     }
     const versionPath = path.join(__dirname, '../../uploads/tether-version.json');
     fs.writeFileSync(versionPath, JSON.stringify({ versionCode, versionName }, null, 2));
@@ -1037,7 +1024,7 @@ router.post('/admin/app/version', requireTetherAuth, (req, res) => {
   }
 });
 
-// ׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ג€ ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֳ—׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ§׳³ֲ³ײ²ֲ¦׳³ֲ³׳’ג€ֲ¢׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ³ג€” ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨
+// דיווח אפליקציות מהמכשיר
 router.post('/devices/:deviceId/apps', async (req, res) => {
   try {
     const { deviceId } = req.params;
@@ -1052,7 +1039,7 @@ router.post('/devices/:deviceId/apps', async (req, res) => {
   }
 });
 
-// ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ¢׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³ײ³ג€” ׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֳ—׳³ֲ³׳’ג€ֲ¢ ׳³ֲ³׳’ג‚¬ג€׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ
+// נעילת קהילה לפי זמן
 router.post('/community/:id/lock', requireTetherAuth, async (req, res) => {
   try {
     const { lockedUntilTs } = req.body;
@@ -1062,7 +1049,7 @@ router.post('/community/:id/lock', requireTetherAuth, async (req, res) => {
     const community = await Community.findOneAndUpdate(communityFilter, {
       'policy.lockedUntilTs': lockedUntilTs
     });
-    if (!community) return res.status(404).json({ message: '׳³ֲ§׳³ג€׳³ג„¢׳³ֲ׳³ג€ ׳³ֲ׳³ֲ ׳³ֲ ׳³ֲ׳³ֲ¦׳³ֲ׳³ג€' });
+    if (!community) return res.status(404).json({ message: 'קהילה לא נמצאה' });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1091,7 +1078,6 @@ router.get('/admin/devices', requireTetherAuth, async (req, res) => {
   }
 });
 
-// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ Heartbeat ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ device reports its protection-layer status every 5 min ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 router.post('/devices/:deviceId/heartbeat', async (req, res) => {
   try {
     const { accessibilityEnabled, isDeviceAdmin, isDeviceOwner, vpnActive } = req.body;
@@ -1112,7 +1098,6 @@ router.post('/devices/:deviceId/heartbeat', async (req, res) => {
   }
 });
 
-// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ Security events ׳³ג€™׳’ג€ֲ¬׳’ג‚¬ֲ device reports each intercepted threat ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 router.post('/devices/:deviceId/events', async (req, res) => {
   try {
     const { type, packageName } = req.body;
@@ -1121,7 +1106,7 @@ router.post('/devices/:deviceId/events', async (req, res) => {
       'BLOCKED_APP_OPENED', 'TIME_LOCK_BLOCKED', 'NEW_APP_INSTALLED'
     ];
     if (!validTypes.includes(type)) {
-      return res.status(400).json({ message: '׳³ֲ³ײ²ֲ¡׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ג„¢ ׳³ֲ³ײ²ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ¢ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג€ֲ¢' });
+      return res.status(400).json({ message: 'סוג אירוע לא חוקי' });
     }
 
     const event = { type, packageName: packageName || null, timestamp: new Date() };
@@ -1145,11 +1130,10 @@ router.post('/devices/:deviceId/events', async (req, res) => {
   }
 });
 
-// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ Admin: view security events for a device ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 router.get('/admin/devices/:deviceId/events', requireTetherAuth, async (req, res) => {
   try {
     const device = await findOwnedDevice(req.admin, req.params.deviceId);
-    if (!device) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
+    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
     res.json({
       protectionStatus: device.protectionStatus,
       events: device.securityEvents.slice().reverse() // newest first
@@ -1159,15 +1143,14 @@ router.get('/admin/devices/:deviceId/events', requireTetherAuth, async (req, res
   }
 });
 
-// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ Admin: push a command to a specific device ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 // The command is delivered on the device's next policy poll (at most 15 min later).
 router.post('/admin/devices/:deviceId/commands', requireTetherAuth, async (req, res) => {
   try {
     const { type, payload } = req.body;
-    if (!type) return res.status(400).json({ message: 'type ׳³ֲ³׳’ג‚¬ג€׳³ֲ³׳’ג‚¬ֲ¢׳³ֲ³׳’ג‚¬ֻ׳³ֲ³׳’ג‚¬ֲ' });
+    if (!type) return res.status(400).json({ message: 'type ׳—׳•׳‘׳”' });
 
     const device = await findOwnedDevice(req.admin, req.params.deviceId);
-    if (!device) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֳ·׳³ֲ³ײ²ֲ©׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ¨ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ' });
+    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
     device.pendingCommands.push({ type, payload: payload || '' });
     await device.save();
     res.json({ success: true, pendingCount: device.pendingCommands.length });
@@ -1176,11 +1159,10 @@ router.post('/admin/devices/:deviceId/commands', requireTetherAuth, async (req, 
   }
 });
 
-// ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬ Admin: protection health summary for all devices in a community ׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬׳³ג€™׳’ג‚¬ֲ׳’ג€ֲ¬
 router.get('/admin/communities/:id/devices/status', requireTetherAuth, async (req, res) => {
   try {
     const community = await Community.findOne({ _id: req.params.id, adminId: req.admin._id });
-    if (!community) return res.status(404).json({ message: '׳³ֲ³ײ²ֲ§׳³ֲ³׳’ג‚¬ֲ׳³ֲ³׳’ג€ֲ¢׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ ׳³ֲ³ײ²ֲ׳³ֲ³ײ²ֲ¦׳³ֲ³ײ²ֲ׳³ֲ³׳’ג‚¬ֲ' });
+    if (!community) return res.status(404).json({ message: 'קהילה לא נמצאה' });
 
     const devices = await TetherDevice.find(
       { communityId: community._id, active: true },

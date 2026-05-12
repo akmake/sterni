@@ -7,7 +7,9 @@ const router = express.Router();
 router.use(protect); 
 
 router.get('/accounts', settingsController.getAccounts);
+router.get('/accounts/:id/password', settingsController.getAccountPassword);
 router.post('/account', settingsController.saveEmailAccount);
+router.delete('/account/:id', settingsController.deleteAccount);
 router.post('/test-connection', settingsController.testConnection);
 
 router.get('/config', settingsController.getConfig);

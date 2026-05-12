@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -166,18 +167,24 @@ fun StudyDetailScreen(
         if (state.sections.isNotEmpty() && !scrollRestored) {
             val idx = prefs.getInt("${scrollKey}_idx", 0)
             val off = prefs.getInt("${scrollKey}_off", 0)
-            if (idx > 0) listState.scrollToItem(idx, off)
+            if (idx > 0 || off > 0) {
+                listState.scrollToItem(idx, off)
+            }
             scrollRestored = true
         }
     }
 
-    DisposableEffect(scrollKey) {
-        onDispose {
-            prefs.edit()
-                .putInt("${scrollKey}_idx", listState.firstVisibleItemIndex)
-                .putInt("${scrollKey}_off", listState.firstVisibleItemScrollOffset)
-                .apply()
-        }
+    // Save scroll position whenever it changes (debounced by the nature of snapshotFlow)
+    LaunchedEffect(listState) {
+        snapshotFlow { Pair(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) }
+            .collect { (idx, off) ->
+                if (scrollRestored) {
+                    prefs.edit()
+                        .putInt("${scrollKey}_idx", idx)
+                        .putInt("${scrollKey}_off", off)
+                        .apply()
+                }
+            }
     }
 
     LaunchedEffect(autoScrolling) {

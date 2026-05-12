@@ -5,6 +5,16 @@ export const getAccounts = async () => {
   return data;
 };
 
+export const getAccountPassword = async (id) => {
+  const { data } = await api.get(`/settings/accounts/${id}/password`);
+  return data.password;
+};
+
+export const deleteAccount = async (id) => {
+  const { data } = await api.delete(`/settings/account/${id}`);
+  return data;
+};
+
 export const saveAccount = async (accountData) => {
   const { data } = await api.post('/settings/account', accountData);
   return data;

@@ -57,7 +57,29 @@ export const getAccounts = async (req, res) => {
   }
 };
 
-// 4. עדכון הגדרות ניתוב (איזה מייל הולך לאן)
+// 4. שליפת סיסמה מפוענחת לחשבון ספציפי (admin only)
+export const getAccountPassword = async (req, res) => {
+  try {
+    const account = await EmailAccount.findById(req.params.id);
+    if (!account) return res.status(404).json({ message: 'חשבון לא נמצא' });
+    const password = decrypt({ iv: account.iv, content: account.encryptedPassword });
+    res.json({ password });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// 5. מחיקת חשבון מייל
+export const deleteAccount = async (req, res) => {
+  try {
+    await EmailAccount.findByIdAndDelete(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// 6. עדכון הגדרות ניתוב (איזה מייל הולך לאן)
 // 4. עדכון הגדרות ניתוב (איזה מייל הולך לאן)
 export const updateRouting = async (req, res) => {
   try {

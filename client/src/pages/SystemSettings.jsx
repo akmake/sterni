@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, Server, Mail, MessageSquare, DollarSign } from 'lucide-react';
+import { Save, Plus, Server, Mail, MessageSquare, DollarSign, Pencil, Trash2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import * as settingsService from '../services/settingsService';
 
@@ -15,6 +15,8 @@ const SystemSettings = () => {
 
   // טופס חשבון
   const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({
     friendlyName: '', host: 'smtp.gmail.com', port: 587, user: '', password: ''
   });
@@ -40,13 +42,46 @@ const SystemSettings = () => {
   const handleSaveAccount = async (e) => {
     e.preventDefault();
     try {
-      await settingsService.saveAccount(form);
-      toast.success('חשבון נשמר');
+      await settingsService.saveAccount({ ...form, id: editingId || undefined });
+      toast.success(editingId ? 'חשבון עודכן' : 'חשבון נשמר');
       setIsEditing(false);
+      setEditingId(null);
+      setForm({ friendlyName: '', host: 'smtp.gmail.com', port: 587, user: '', password: '' });
       fetchData();
     } catch (error) {
       toast.error('שגיאה בשמירה');
     }
+  };
+
+  const handleEditAccount = async (acc) => {
+    setEditingId(acc._id);
+    setShowPassword(false);
+    setForm({ friendlyName: acc.friendlyName, host: acc.host, port: acc.port, user: acc.user, password: '' });
+    try {
+      const pwd = await settingsService.getAccountPassword(acc._id);
+      setForm(prev => ({ ...prev, password: pwd }));
+    } catch {
+      toast.error('שגיאה בטעינת סיסמה');
+    }
+    setIsEditing(true);
+  };
+
+  const handleDeleteAccount = async (id) => {
+    if (!window.confirm('למחוק חשבון זה?')) return;
+    try {
+      await settingsService.deleteAccount(id);
+      toast.success('חשבון נמחק');
+      fetchData();
+    } catch {
+      toast.error('שגיאה במחיקה');
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditingId(null);
+    setShowPassword(false);
+    setForm({ friendlyName: '', host: 'smtp.gmail.com', port: 587, user: '', password: '' });
   };
 
   const handleSaveConfig = async () => {
@@ -103,25 +138,36 @@ const SystemSettings = () => {
                       <div className="text-gray-500 text-sm">{acc.user}</div>
                       <div className="text-xs text-gray-400 mt-1">{acc.host}</div>
                     </div>
-                    <div className="h-3 w-3 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
+                    <div className="flex items-center gap-2">
+                      <div className="h-3 w-3 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
+                      <button onClick={() => handleEditAccount(acc)} className="p-2 rounded hover:bg-blue-100 text-blue-600" title="ערוך"><Pencil size={16}/></button>
+                      <button onClick={() => handleDeleteAccount(acc._id)} className="p-2 rounded hover:bg-red-100 text-red-500" title="מחק"><Trash2 size={16}/></button>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
           ) : (
             <form onSubmit={handleSaveAccount} className="bg-gray-50 p-6 rounded-xl border border-gray-200">
-               {/* אותו טופס כמו מקודם... */}
-               <h3 className="font-bold text-lg mb-4">הוספת חשבון חדש</h3>
+               <h3 className="font-bold text-lg mb-4">{editingId ? 'עריכת חשבון' : 'הוספת חשבון חדש'}</h3>
                <div className="grid grid-cols-2 gap-4 mb-6">
                  <div><label className="text-sm font-bold">שם מזהה</label><input required className="w-full p-2 border rounded" value={form.friendlyName} onChange={e=>setForm({...form, friendlyName:e.target.value})} placeholder="למשל: מייל כספים"/></div>
                  <div><label className="text-sm font-bold">כתובת מייל</label><input required className="w-full p-2 border rounded" value={form.user} onChange={e=>setForm({...form, user:e.target.value})}/></div>
                  <div><label className="text-sm font-bold">שרת (Host)</label><input required className="w-full p-2 border rounded" value={form.host} onChange={e=>setForm({...form, host:e.target.value})}/></div>
-                 <div><label className="text-sm font-bold">סיסמת אפליקציה</label><input required type="password" className="w-full p-2 border rounded" value={form.password} onChange={e=>setForm({...form, password:e.target.value})}/></div>
+                 <div>
+                   <label className="text-sm font-bold">סיסמת אפליקציה</label>
+                   <div className="relative">
+                     <input required type={showPassword ? 'text' : 'password'} className="w-full p-2 border rounded pr-10" value={form.password} onChange={e=>setForm({...form, password:e.target.value})}/>
+                     <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
+                       {showPassword ? <EyeOff size={16}/> : <Eye size={16}/>}
+                     </button>
+                   </div>
+                 </div>
                </div>
                <div className="flex gap-3 justify-end">
                  <button type="button" onClick={handleTestConnection} className="bg-amber-500 text-white px-4 py-2 rounded">בדוק חיבור</button>
                  <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded">שמור</button>
-                 <button type="button" onClick={() => setIsEditing(false)} className="text-gray-500 px-4 py-2">ביטול</button>
+                 <button type="button" onClick={handleCancelEdit} className="text-gray-500 px-4 py-2">ביטול</button>
                </div>
             </form>
           )}

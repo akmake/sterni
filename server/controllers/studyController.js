@@ -14,10 +14,9 @@ const STUDY_CONFIG = {
     detailMode: 'rashi',
     rules: [
       'הלימוד הוא לפי עליית היום בפרשת השבוע.',
-      'שישי כולל עלייה ו׳+ז׳ לפי מנהג חב"ד.',
       'בשבת מקובל לעשות חזרה כללית על הפרשה.',
     ],
-    schedule: { sunday: "א'", monday: "ב'", tuesday: "ג'", wednesday: "ד'", thursday: "ה'", friday: "ו' + ז'", shabbat: 'חזרה' },
+    schedule: { sunday: "א'", monday: "ב'", tuesday: "ג'", wednesday: "ד'", thursday: "ה'", friday: "ו'", shabbat: 'חזרה' },
   },
   rambam: {
     key: 'rambam',
@@ -645,8 +644,7 @@ async function resolveStudy(calendarItems, config, dateString) {
   // חומש – עלייה לפי יום השבוע
   if (config.kind === 'aliyah' && item.extraDetails && Array.isArray(item.extraDetails.aliyot)) {
     const dayOfWeek = new Date(dateString + 'T00:00:00Z').getUTCDay();
-    if (dayOfWeek === 5) refsToFetch = [item.extraDetails.aliyot[5], item.extraDetails.aliyot[6]].filter(Boolean);
-    else refsToFetch = [item.extraDetails.aliyot[dayOfWeek === 6 ? 6 : dayOfWeek]].filter(Boolean);
+    refsToFetch = [item.extraDetails.aliyot[dayOfWeek === 6 ? 6 : dayOfWeek]].filter(Boolean);
   }
 
   let allSections = [];

@@ -1,7 +1,7 @@
 # Sync Map — Coupled Files Registry
 
 > When you change a file in the LEFT column, you MUST also check/update the files in the RIGHT column.
-> Last updated: 2026-03-12
+> Last updated: 2026-06-09
 
 ---
 
@@ -23,6 +23,8 @@
 | `server/routes/auth.js` | `client/src/stores/authStore.js`, `client/src/pages/LoginPage.jsx`, `docs/auth-flow.md` |
 | `client/src/stores/authStore.js` | `client/src/components/ProtectedRoute.jsx`, `client/src/components/AdminOnlyRoute.jsx`, `client/src/App.jsx` |
 | `client/src/utils/api.js` | Every page that calls the API (CSRF token logic lives here) |
+| `client/src/utils/sanitizeHtml.js` | Every `dangerouslySetInnerHTML` consumer: `PriceQuoteGenerator.jsx`, `PriceQuoteGeneratorPdf.jsx`, `PaymentRequestGenerator.jsx`, `QuoteManager.jsx`, `HotelNewOrderPage.jsx`, `HotelEditOrderPage.jsx` (changing the tag/attr allowlist affects rendered formatting in all of them) |
+| `client/nginx.conf` (CSP / security headers) | Production reverse-proxy CSP (Cloudflare / outer nginx — not in repo), `docs/architecture.md` |
 
 ---
 

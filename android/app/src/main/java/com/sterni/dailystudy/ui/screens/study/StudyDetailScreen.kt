@@ -49,6 +49,8 @@ private val HE_NUMS = arrayOf(
 
 private fun toHebNum(n: Int) = if (n in 1 until HE_NUMS.size) HE_NUMS[n] else n.toString()
 
+private fun studyFontKey(studyKey: String) = "font_$studyKey"
+
 @Composable
 fun StudyDetailScreen(
     studyKey: String,
@@ -70,10 +72,11 @@ fun StudyDetailScreen(
     val isChumash = studyKey == "chumash"
     val chumashPrefs = remember { context.getSharedPreferences("ChumashPrefs", Context.MODE_PRIVATE) }
 
+    val fontKey = remember(studyKey) { studyFontKey(studyKey) }
     val fontSize = remember {
         mutableIntStateOf(
             if (isChumash) chumashPrefs.getInt("chumash_text_size", 20)
-            else prefs.getInt("text_size_sp", 20)
+            else prefs.getInt(fontKey, 20)
         )
     }
     val rashiFontSize = remember { mutableIntStateOf(chumashPrefs.getInt("rashi_text_size", 17)) }
@@ -131,7 +134,7 @@ fun StudyDetailScreen(
                     fontSize.intValue = size
                     scrollSpeed.intValue = speed
                     prefs.edit()
-                        .putInt("text_size_sp", size)
+                        .putInt(fontKey, size)
                         .putInt("scroll_speed", speed)
                         .apply()
                     if (chapters != null) {
@@ -149,7 +152,7 @@ fun StudyDetailScreen(
                     fontSize.intValue = size
                     scrollSpeed.intValue = speed
                     prefs.edit()
-                        .putInt("text_size_sp", size)
+                        .putInt(fontKey, size)
                         .putInt("scroll_speed", speed)
                         .apply()
                     showSettingsDialog = false

@@ -5,6 +5,7 @@ import api from '@/utils/api.js';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { useAuthStore } from '@/stores/authStore.js';
+import { sanitizeHtml } from '@/utils/sanitizeHtml';
 
 import { AddRoomForm } from '@/components/orders/AddRoomForm';
 import { OrderSummaryTable } from '@/components/orders/OrderSummaryTable';
@@ -225,7 +226,7 @@ export default function HotelEditOrderPage() {
                 <StickyNote className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <div className="pl-8 w-full overflow-hidden text-ellipsis whitespace-nowrap text-slate-600" dir="auto">
                   {orderDetails.notes
-                    ? <span dangerouslySetInnerHTML={{ __html: orderDetails.notes.replace(/<[^>]+>/g, ' ').substring(0, 100) }}></span>
+                    ? <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(orderDetails.notes.replace(/<[^>]+>/g, ' ').substring(0, 100)) }}></span>
                     : <span className="text-muted-foreground">הערות כלליות... (לחץ לעריכה)</span>
                   }
                 </div>

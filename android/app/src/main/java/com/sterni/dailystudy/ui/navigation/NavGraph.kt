@@ -22,6 +22,7 @@ import com.sterni.dailystudy.ui.screens.tools.PermissionsScreen
 import com.sterni.dailystudy.ui.screens.tools.JerusalemDirectionScreen
 import com.sterni.dailystudy.ui.screens.pdflibrary.PdfStudyScreen
 import com.sterni.dailystudy.ui.screens.mamaarim.ArticleUploadScreen
+import com.sterni.dailystudy.ui.screens.appblocker.AppBlockerScreen
 import java.net.URLDecoder
 import java.net.URLEncoder
 
@@ -47,6 +48,7 @@ sealed class Screen(val route: String) {
     object JerusalemDir   : Screen("jerusalemDirection")
     object PdfLibrary     : Screen("pdfLibrary")
     object ArticleUpload  : Screen("articleUpload")
+    object AppBlocker     : Screen("appBlocker")
 }
 
 @Composable
@@ -134,13 +136,18 @@ fun NavGraph(navController: NavHostController) {
 
         composable(Screen.Tools.route) {
             ToolsScreen(
-                onBack            = { navController.popBackStack() },
-                onTefilaClick     = { navController.navigate(Screen.Tefila.route) },
-                onSilentZoneClick = { navController.navigate(Screen.LocationZones.route) },
-                onMamaarimClick   = { navController.navigate(Screen.Mamaarim.route) },
-                onPermissionsClick     = { navController.navigate(Screen.Permissions.route) },
-                onJerusalemDirClick    = { navController.navigate(Screen.JerusalemDir.route) }
+                onBack              = { navController.popBackStack() },
+                onTefilaClick       = { navController.navigate(Screen.Tefila.route) },
+                onSilentZoneClick   = { navController.navigate(Screen.LocationZones.route) },
+                onMamaarimClick     = { navController.navigate(Screen.Mamaarim.route) },
+                onPermissionsClick  = { navController.navigate(Screen.Permissions.route) },
+                onJerusalemDirClick = { navController.navigate(Screen.JerusalemDir.route) },
+                onAppBlockerClick   = { navController.navigate(Screen.AppBlocker.route) }
             )
+        }
+
+        composable(Screen.AppBlocker.route) {
+            AppBlockerScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Screen.News.route) {

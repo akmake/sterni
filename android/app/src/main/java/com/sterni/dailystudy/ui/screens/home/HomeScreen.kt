@@ -137,7 +137,7 @@ fun HomeScreen(
                     modifier = Modifier.align(Alignment.Center)
                 )
                 else -> {
-                    val orderedKeys    = listOf("chumash", "rambam", "rambamOne", "tanya", "shnayimMikra", "tehillim")
+                    val orderedKeys    = listOf("chumash", "tehillim", "tanya", "rambam", "rambamOne", "shnayimMikra")
                     val orderedStudies = orderedKeys.mapNotNull { key -> uiState.studies[key]?.let { key to it } }
 
                     LazyColumn(

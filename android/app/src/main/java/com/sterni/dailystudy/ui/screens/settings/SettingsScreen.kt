@@ -29,15 +29,24 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
+private val STUDY_LABELS = listOf(
+    "chumash"      to "חומש",
+    "tehillim"     to "תהילים",
+    "tanya"        to "תניא",
+    "rambam"       to "רמבם ג׳ פרקים",
+    "rambamOne"    to "רמבם פרק א׳",
+    "shnayimMikra" to "שניים מקרא"
+)
+
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
     val context      = LocalContext.current
-    val rambamPrefs  = remember { context.getSharedPreferences("RambamPrefs", Context.MODE_PRIVATE) }
+    val studyPrefs   = remember { context.getSharedPreferences("StudyPrefs", Context.MODE_PRIVATE) }
+    val chumashPrefs = remember { context.getSharedPreferences("ChumashPrefs", Context.MODE_PRIVATE) }
     val shnayimPrefs = remember { context.getSharedPreferences("ShnayimPrefs", Context.MODE_PRIVATE) }
     val scope        = rememberCoroutineScope()
 
-    var fontSize         by remember { mutableIntStateOf(rambamPrefs.getInt("text_size_sp", 20)) }
-    var scrollSpeed      by remember { mutableIntStateOf(rambamPrefs.getInt("scroll_speed", 40)) }
+    var scrollSpeed      by remember { mutableIntStateOf(studyPrefs.getInt("scroll_speed", 40)) }
     var shnayimConnected by remember { mutableStateOf(shnayimPrefs.getBoolean("shnayim_mikra_connected", true)) }
     var cacheInfo        by remember { mutableStateOf("שמורים ${StudyCache.cachedCount(context)} ימים") }
     var downloadProgress by remember { mutableStateOf("") }
@@ -45,6 +54,16 @@ fun SettingsScreen(onBack: () -> Unit) {
     var userId           by remember { mutableStateOf(UserManager.getUserId(context) ?: "טוען...") }
     var loginCode        by remember { mutableStateOf("") }
     var loginStatus      by remember { mutableStateOf("") }
+
+    // Per-study font sizes
+    val fontSizes = remember {
+        STUDY_LABELS.associate { (key, _) ->
+            key to mutableIntStateOf(
+                if (key == "chumash") chumashPrefs.getInt("chumash_text_size", 20)
+                else studyPrefs.getInt("font_$key", 20)
+            )
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -82,30 +101,40 @@ fun SettingsScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             SettingsCard {
-                SettingLabel("גודל טקסט", "${fontSize}sp")
-                Slider(
-                    value = ((fontSize - 14) / 2f),
-                    onValueChange = {
-                        fontSize = 14 + (it.toInt() * 2)
-                        rambamPrefs.edit().putInt("text_size_sp", fontSize).apply()
-                    },
-                    valueRange = 0f..7f,
-                    steps = 6,
-                    colors = SliderDefaults.colors(thumbColor = Primary, activeTrackColor = Primary)
-                )
+                Text("גודל טקסט לפי לימוד", fontWeight = FontWeight.SemiBold, color = Ink, fontSize = 15.sp)
+                Spacer(Modifier.height(12.dp))
+                STUDY_LABELS.forEach { (key, label) ->
+                    val state = fontSizes[key] ?: return@forEach
+                    var size by state
+                    SettingLabel(label, "${size}sp")
+                    Slider(
+                        value         = size.toFloat(),
+                        onValueChange = {
+                            size = it.toInt()
+                            if (key == "chumash")
+                                chumashPrefs.edit().putInt("chumash_text_size", size).apply()
+                            else
+                                studyPrefs.edit().putInt("font_$key", size).apply()
+                        },
+                        valueRange = 14f..32f,
+                        steps      = 17,
+                        colors     = SliderDefaults.colors(thumbColor = Primary, activeTrackColor = Primary)
+                    )
+                    Spacer(Modifier.height(4.dp))
+                }
             }
 
             SettingsCard {
                 SettingLabel("מהירות גלילה", "${scrollSpeed} px/s")
                 Slider(
-                    value = ((scrollSpeed - 10) / 5f),
+                    value = scrollSpeed.toFloat(),
                     onValueChange = {
-                        scrollSpeed = 10 + (it.toInt() * 5)
-                        rambamPrefs.edit().putInt("scroll_speed", scrollSpeed).apply()
+                        scrollSpeed = it.toInt()
+                        studyPrefs.edit().putInt("scroll_speed", scrollSpeed).apply()
                     },
-                    valueRange = 0f..22f,
-                    steps = 21,
-                    colors = SliderDefaults.colors(thumbColor = Primary, activeTrackColor = Primary)
+                    valueRange = 10f..100f,
+                    steps      = 8,
+                    colors     = SliderDefaults.colors(thumbColor = Primary, activeTrackColor = Primary)
                 )
             }
 
@@ -144,21 +173,36 @@ fun SettingsScreen(onBack: () -> Unit) {
                     Text(downloadProgress, fontSize = 13.sp, color = Muted, modifier = Modifier.padding(top = 8.dp))
                 }
                 Spacer(Modifier.height(10.dp))
-                Button(
-                    onClick = {
-                        if (!downloading) {
-                            downloading = true
-                            scope.launch {
-                                downloadDays(context, 30) { progress -> downloadProgress = progress }
-                                cacheInfo = "שמורים ${StudyCache.cachedCount(context)} ימים"
-                                downloading = false
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            if (!downloading) {
+                                downloading = true
+                                scope.launch {
+                                    downloadDays(context, 30) { progress -> downloadProgress = progress }
+                                    cacheInfo = "שמורים ${StudyCache.cachedCount(context)} ימים"
+                                    downloading = false
+                                }
                             }
-                        }
-                    },
-                    enabled = !downloading,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Primary)
-                ) { Text("הורד 30 ימים") }
+                        },
+                        enabled  = !downloading,
+                        modifier = Modifier.weight(1f),
+                        colors   = ButtonDefaults.buttonColors(containerColor = Primary)
+                    ) { Text("הורד 30 ימים") }
+
+                    Button(
+                        onClick = {
+                            val deleted = StudyCache.clearAll(context)
+                            cacheInfo = "נמחקו $deleted ימים"
+                            downloadProgress = ""
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors   = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
+                    ) { Text("מחק קאש") }
+                }
                 if (cacheInfo.isNotEmpty()) {
                     Text(cacheInfo, fontSize = 12.sp, color = Muted, modifier = Modifier.padding(top = 4.dp))
                 }

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import api from '@/utils/api';
 import { Save, FolderOpen, Trash2, X, CalendarPlus, CheckCircle, Eye } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { sanitizeHtml } from '@/utils/sanitizeHtml';
 
 /**
  * QuoteManager v2
@@ -340,7 +341,7 @@ const QuoteManager = ({ currentData, onLoadData, containerRef, getLatestBlocks }
                 </button>
                 <div
                   className="border rounded-lg overflow-auto max-h-[60vh] bg-white p-4"
-                  dangerouslySetInnerHTML={{ __html: previewHtml }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewHtml) }}
                 />
               </div>
             )}

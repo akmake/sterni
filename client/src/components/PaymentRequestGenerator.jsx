@@ -6,6 +6,7 @@ import { toast } from 'react-hot-toast';
 import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
 import api from '@/utils/api';
+import { sanitizeHtml } from '@/utils/sanitizeHtml';
 
 // --- הגדרות A4 ---
 const A4_HEIGHT_PX = 1123;
@@ -759,7 +760,7 @@ const PaymentRequestGenerator = ({ groupId = null, onSave = null, paymentRequest
                                     <div
                                         contentEditable
                                         onContextMenu={(e) => handleContextMenu(e, 'text', block.id)}
-                                        dangerouslySetInnerHTML={{ __html: block.content }}
+                                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(block.content) }}
                                         onBlur={(e) => updateBlock(block.id, { content: e.target.innerHTML })}
                                         className="w-full min-h-[1.5em] outline-none border border-transparent hover:border-blue-200 focus:border-blue-400 p-2 rounded transition-colors text-sm leading-relaxed whitespace-pre-wrap relative z-20"
                                     />
@@ -781,7 +782,7 @@ const PaymentRequestGenerator = ({ groupId = null, onSave = null, paymentRequest
                                                 <tr className="bg-white text-slate-700 border-b border-t border-slate-300" style={{ borderTopColor: GOLD, borderTopWidth: '2px' }}>
                                                     {block.headers.map((h, idx) => (
                                                         <th key={idx} className="border-l border-slate-200 p-2 align-bottom relative group/th bg-gray-50" style={{ width: `${h.width}%` }} onContextMenu={(e) => handleContextMenu(e, 'table', block.id, -1, idx)}>
-                                                            <div contentEditable suppressContentEditableWarning onBlur={(e) => tableActions.updateHeaderTitle(block.id, idx, e.target.innerText)} className="w-full bg-transparent text-center font-bold text-sm outline-none whitespace-normal break-words min-h-[1.5em] relative z-50" dangerouslySetInnerHTML={{ __html: h.title }} />
+                                                            <div contentEditable suppressContentEditableWarning onBlur={(e) => tableActions.updateHeaderTitle(block.id, idx, e.target.innerText)} className="w-full bg-transparent text-center font-bold text-sm outline-none whitespace-normal break-words min-h-[1.5em] relative z-50" dangerouslySetInnerHTML={{ __html: sanitizeHtml(h.title) }} />
                                                             <div className="flex items-center justify-center gap-1 no-print opacity-0 group-hover/th:opacity-100 transition-opacity bg-white absolute bottom-full left-0 w-full z-[60] shadow border p-1 rounded mb-1">
                                                                 <input type="number" value={h.width} onChange={(e) => tableActions.updateHeaderWidth(block.id, idx, e.target.value)} className="w-8 text-[10px] text-center border rounded bg-gray-50"/>
                                                                 <span className="text-[10px]">%</span>
@@ -795,7 +796,7 @@ const PaymentRequestGenerator = ({ groupId = null, onSave = null, paymentRequest
                                                     <tr key={rIdx} className="border-b border-slate-200 hover:bg-slate-50">
                                                         {row.map((cell, cIdx) => (
                                                             <td key={cIdx} className="border-l border-slate-200 p-2 align-top relative" onContextMenu={(e) => handleContextMenu(e, 'table', block.id, rIdx, cIdx)}>
-                                                                <div contentEditable suppressContentEditableWarning onBlur={(e) => tableActions.updateCell(block.id, rIdx, cIdx, e.target.innerText)} className="w-full min-h-[1.5em] outline-none whitespace-pre-wrap text-sm relative z-50 cursor-text" dangerouslySetInnerHTML={{ __html: cell }} />
+                                                                <div contentEditable suppressContentEditableWarning onBlur={(e) => tableActions.updateCell(block.id, rIdx, cIdx, e.target.innerText)} className="w-full min-h-[1.5em] outline-none whitespace-pre-wrap text-sm relative z-50 cursor-text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(cell) }} />
                                                             </td>
                                                         ))}
                                                     </tr>

@@ -28,7 +28,8 @@ fun ToolsScreen(
     onSilentZoneClick: () -> Unit,
     onMamaarimClick: () -> Unit,
     onPermissionsClick: () -> Unit,
-    onJerusalemDirClick: () -> Unit
+    onJerusalemDirClick: () -> Unit,
+    onAppBlockerClick: () -> Unit = {}
 ) {
     Scaffold(
         topBar = {
@@ -94,6 +95,15 @@ fun ToolsScreen(
                     icon = Icons.Default.LocationOn,
                     accentColor = Color(0xFF059669),
                     onClick = onSilentZoneClick
+                )
+            }
+            item {
+                ToolCard(
+                    title = "חוסם אפליקציות",
+                    subtitle = "חסימת אפליקציות בשעות מוגדרות",
+                    icon = Icons.Default.Block,
+                    accentColor = Color(0xFFDC2626),
+                    onClick = onAppBlockerClick
                 )
             }
             item {

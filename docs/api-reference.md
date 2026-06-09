@@ -14,6 +14,26 @@
 | GET | `/csrf-token` | Get CSRF token |
 | `*` | `/chat/*` | Chat (Socket.IO HTTP) |
 | GET | `/logs` | System logs (admin UI) |
+| POST | `/logs/device-ping` | Client device-info cache (once on app load) |
+| POST | `/logs/behavior` | On-page behavior beacon (scroll/clicks/active-time) — `navigator.sendBeacon` |
+
+---
+
+## Visitor Intelligence (admin only — `requireAuth` + `requireAdmin`)
+Prefix `/api/logs/admin`. UI: `AdminLogsPage.jsx` (+ `pages/logs/` components).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/admin/all` | Raw request logs (filters: device, ipAddress, dates) |
+| GET | `/admin/summary` | Stats + analytics (topBrowsers/OS/devices/pages/IPs/**countries**) |
+| GET | `/admin/visitors` | Requests grouped into unique visitors (by fingerprint→IP); source classification, returning/new, suspicious. Params: `limit`, `days`, `suspicious` |
+| GET | `/admin/journey?key=` | One visitor's chronological page-by-page timeline |
+| GET | `/admin/live?minutes=5` | Visitors active in the last N minutes ("online now") |
+| GET | `/admin/user-activity` | Per registered-user activity summary |
+| POST | `/admin/toggle` | Enable/disable logging |
+| GET | `/admin/status` | Logging on/off status |
+| DELETE | `/admin/cleanup` | Delete logs older than `days` |
+| DELETE | `/admin/delete-all` | Delete all logs |
 
 ---
 

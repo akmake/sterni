@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import cookie from 'cookie';
 import Family from '../models/Family.js';
+import User from '../models/userModel.js';
 
 export function setupSocketIO(io) {
   // Authentication middleware for Socket.IO - read JWT from cookies
@@ -22,6 +23,17 @@ export function setupSocketIO(io) {
 
   io.on('connection', async (socket) => {
     console.log(`🔌 Socket connected: ${socket.userId}`);
+
+    // ★ Admins join the 'admins' room — receive visitor-intelligence alerts
+    try {
+      const u = await User.findById(socket.userId).select('role').lean();
+      if (u?.role === 'admin') {
+        socket.join('admins');
+        socket.isAdmin = true;
+      }
+    } catch (err) {
+      console.error('Error joining admins room:', err.message);
+    }
 
     // Auto-join user to their family room
     try {

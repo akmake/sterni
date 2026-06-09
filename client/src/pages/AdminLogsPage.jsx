@@ -7,9 +7,12 @@ import {
   Wifi, Cpu, ChevronDown, ChevronUp, Users, Zap, Search, X, Power, Cookie, MapPin,
   BatteryCharging, Shield, Fingerprint, MousePointer, Sun, Moon, Bot, Video, Mic,
   FileText, Layers, Bell, BellOff, Gauge, HardDrive,
-  BarChart3, TrendingUp, Hash, Plug, ScreenShare
+  BarChart3, TrendingUp, Hash, Plug, ScreenShare, Radio, ArrowDownUp
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import useSocket from '@/hooks/useSocket';
+import VisitorsView from './logs/VisitorsView.jsx';
+import LiveView from './logs/LiveView.jsx';
 
 // ════════════════════════════════════════════════════════════
 //  HELPERS
@@ -163,6 +166,8 @@ const LogRow = ({ log, isExpanded, onToggle }) => {
         <div className="flex items-center gap-4 shrink-0">
           {/* Quick mini badges */}
           <div className="hidden lg:flex items-center gap-1.5">
+            {log.location?.proxy && <span title="VPN / Proxy" className="w-5 h-5 rounded bg-rose-500/25 flex items-center justify-center"><Shield size={10} className="text-rose-300" /></span>}
+            {log.location?.hosting && <span title="Datacenter / שרת — חשוד כבוט" className="w-5 h-5 rounded bg-orange-500/25 flex items-center justify-center"><Bot size={10} className="text-orange-300" /></span>}
             {log.webdriver && <span title="בוט / אוטומציה" className="w-5 h-5 rounded bg-orange-500/20 flex items-center justify-center"><Bot size={10} className="text-orange-300" /></span>}
             {log.adBlocker && <span title="Ad Blocker" className="w-5 h-5 rounded bg-red-500/20 flex items-center justify-center"><Shield size={10} className="text-red-300" /></span>}
             {log.isTouchDevice && <span title="Touch" className="w-5 h-5 rounded bg-purple-500/20 flex items-center justify-center"><MousePointer size={10} className="text-purple-300" /></span>}
@@ -183,6 +188,9 @@ const LogRow = ({ log, isExpanded, onToggle }) => {
 
           {/* ★ BADGES */}
           <div className="flex flex-wrap gap-1.5 mb-4">
+            {log.location?.proxy && <Badge icon={<Shield size={10} />} text="VPN / Proxy" color="bg-rose-500/20 text-rose-300 border border-rose-500/40" />}
+            {log.location?.hosting && <Badge icon={<Bot size={10} />} text="Datacenter / שרת" color="bg-orange-500/20 text-orange-300 border border-orange-500/40" />}
+            {log.location?.mobileCarrier && <Badge icon={<Smartphone size={10} />} text="רשת סלולרית" color="bg-cyan-500/15 text-cyan-300 border border-cyan-500/25" />}
             {log.userId && <Badge icon={<Users size={10} />} text={log.userId?.name || 'משתמש רשום'} color="bg-blue-500/15 text-blue-300 border border-blue-500/25" />}
             {log.session?.isNewSession && <Badge icon="✨" text="סשן חדש" color="bg-emerald-500/15 text-emerald-300 border border-emerald-500/25" />}
             {log.isTouchDevice && <Badge icon={<MousePointer size={10} />} text="מסך מגע" color="bg-purple-500/15 text-purple-300 border border-purple-500/25" />}
@@ -215,6 +223,10 @@ const LogRow = ({ log, isExpanded, onToggle }) => {
                   {log.location?.country && (
                     <Detail icon={<MapPin size={12} />} label="מיקום" value={`${log.location.city || ''} ${log.location.region ? `· ${log.location.region}` : ''} ${log.location.country ? `(${log.location.country})` : ''}`.trim()} />
                   )}
+                  {log.location?.zip && <Detail icon={<MapPin size={12} />} label="מיקוד" value={log.location.zip} mono />}
+                  {log.location?.isp && <Detail icon={<Wifi size={12} />} label="ספק (ISP)" value={log.location.isp} />}
+                  {log.location?.org && log.location.org !== log.location.isp && <Detail icon={<Globe size={12} />} label="ארגון" value={log.location.org} small />}
+                  {log.location?.asn && <Detail icon={<Hash size={12} />} label="ASN" value={`${log.location.asn}${log.location.asName ? ` · ${log.location.asName}` : ''}`} mono small />}
                   {log.location?.latitude != null && log.location?.longitude != null && (
                     <Detail icon={<MapPin size={12} />} label="קואורדינטות" value={`${log.location.latitude?.toFixed(4)}, ${log.location.longitude?.toFixed(4)}`} mono small />
                   )}
@@ -297,6 +309,19 @@ const LogRow = ({ log, isExpanded, onToggle }) => {
                   {log.session?.isNewSession != null && <Detail label="סשן חדש" value={yn(log.session.isNewSession)} />}
                 </div>
               </div>
+
+              {/* 🖱️ On-page behavior */}
+              {log.behavior && (log.behavior.activeSeconds != null || log.behavior.maxScrollDepth != null || log.behavior.clicks != null) && (
+                <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/30">
+                  <SectionHeader icon={<MousePointer size={14} />} title="התנהגות בדף" color="text-pink-400" />
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                    {log.behavior.activeSeconds != null && <Detail icon={<Clock size={12} />} label="זמן פעיל" value={formatDuration(log.behavior.activeSeconds)} />}
+                    {log.behavior.maxScrollDepth != null && <Detail icon={<ArrowDownUp size={12} />} label="עומק גלילה" value={`${log.behavior.maxScrollDepth}%`} />}
+                    {log.behavior.clicks != null && <Detail icon={<MousePointer size={12} />} label="קליקים" value={log.behavior.clicks} />}
+                    {log.behavior.rageClicks > 0 && <Detail icon={<Zap size={12} />} label="Rage clicks" value={log.behavior.rageClicks} className="text-rose-300" />}
+                  </div>
+                </div>
+              )}
 
               {/* 🎤 Media Devices */}
               {log.mediaDevices && (
@@ -408,6 +433,22 @@ const AdminLogsPage = () => {
   const [searchIP, setSearchIP] = useState('');
   const [sortBy, setSortBy] = useState('newest');
   const [expandedLog, setExpandedLog] = useState(null);
+  const [view, setView] = useState('requests'); // 'requests' | 'visitors' | 'live'
+  const socket = useSocket();
+
+  // ★ Real-time alerts for suspicious visitors (VPN/datacenter/bot)
+  useEffect(() => {
+    if (!socket) return;
+    const onAlert = (a) => {
+      const reasonLabel = a.reason === 'vpn' ? 'VPN/Proxy' : a.reason === 'datacenter' ? 'Datacenter' : 'בוט';
+      toast(
+        `🚨 מבקר חשוד (${reasonLabel})\n${a.ip}${a.city ? ` · ${a.city}` : ''}${a.country ? `, ${a.country}` : ''}`,
+        { icon: '🛡️', duration: 6000, style: { background: '#1e293b', color: '#fda4af', border: '1px solid #be123c' } }
+      );
+    };
+    socket.on('visitor:alert', onAlert);
+    return () => socket.off('visitor:alert', onAlert);
+  }, [socket]);
 
   // ★ Computed stats from loaded logs
   const computedStats = useMemo(() => {
@@ -416,6 +457,7 @@ const AdminLogsPage = () => {
     const canvasFPs = new Set();
     let bots = 0, adBlock = 0, touch = 0, dark = 0, dnt = 0;
     let withGPU = 0, withBattery = 0, withSession = 0;
+    let vpn = 0, datacenter = 0;
 
     logs.forEach(l => {
       if (l.fingerprint) fps.add(l.fingerprint);
@@ -428,12 +470,15 @@ const AdminLogsPage = () => {
       if (l.gpu?.renderer) withGPU++;
       if (l.battery?.level != null) withBattery++;
       if (l.session?.pageViews) withSession++;
+      if (l.location?.proxy) vpn++;
+      if (l.location?.hosting) datacenter++;
     });
 
     return {
       uniqueFingerprints: fps.size,
       uniqueCanvasFingerprints: canvasFPs.size,
       bots, adBlock, touch, dark, dnt, withGPU, withBattery, withSession,
+      vpn, datacenter,
       dataQuality: Math.round((withSession / logs.length) * 100),
     };
   }, [logs]);
@@ -514,7 +559,8 @@ const AdminLogsPage = () => {
     if (!logs.length) return toast.error('אין לוגים');
 
     const headers = [
-      'Time', 'IP', 'Country', 'City', 'Region', 'Lat', 'Lon',
+      'Time', 'IP', 'Country', 'City', 'Region', 'Zip', 'Lat', 'Lon',
+      'ISP', 'Org', 'ASN', 'VPN/Proxy', 'Datacenter', 'Mobile Carrier',
       'Browser', 'Browser Version', 'OS', 'OS Version', 'Device', 'Platform', 'Architecture',
       'Screen W', 'Screen H', 'Avail W', 'Avail H', 'Color Depth', 'Pixel Ratio', 'Retina', 'Refresh Rate', 'Orientation',
       'CPU Cores', 'RAM (GB)', 'GPU Vendor', 'GPU Renderer', 'Touch Points',
@@ -540,8 +586,10 @@ const AdminLogsPage = () => {
       const row = [
         new Date(l.timestamp).toLocaleString('he-IL'),
         l.ipAddress,
-        l.location?.country || '', l.location?.city || '', l.location?.region || '',
+        l.location?.country || '', l.location?.city || '', l.location?.region || '', l.location?.zip || '',
         l.location?.latitude || '', l.location?.longitude || '',
+        l.location?.isp || '', l.location?.org || '', l.location?.asn || '',
+        ynCSV(l.location?.proxy), ynCSV(l.location?.hosting), ynCSV(l.location?.mobileCarrier),
         l.browser?.name || '', l.browser?.version || '',
         l.os?.name || '', l.os?.version || '', l.device || '', l.platform || '', l.os?.architecture || '',
         l.screen?.width || '', l.screen?.height || '', l.screen?.availWidth || '', l.screen?.availHeight || '',
@@ -680,6 +728,31 @@ const AdminLogsPage = () => {
         {/* ═══ ON STATE ═══ */}
         {loggingEnabled && (
           <>
+            {/* ═══ VIEW TABS ═══ */}
+            <div className="flex bg-slate-800/60 border border-slate-700/50 rounded-2xl p-1.5 mb-6 w-fit">
+              {[
+                { id: 'requests', label: 'בקשות', icon: <Activity size={15} /> },
+                { id: 'visitors', label: 'מבקרים', icon: <Users size={15} /> },
+                { id: 'live', label: 'Live', icon: <Radio size={15} /> },
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setView(t.id)}
+                  className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition-all ${
+                    view === t.id ? 'bg-blue-500/20 text-blue-300 shadow' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {t.id === 'live' && view !== 'live' && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />}
+                  {t.icon} {t.label}
+                </button>
+              ))}
+            </div>
+
+            {view === 'visitors' && <VisitorsView />}
+            {view === 'live' && <LiveView />}
+
+            {view === 'requests' && (
+            <>
             {/* ★ STAT CARDS — 8 columns */}
             {summary && (
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-8">
@@ -701,10 +774,12 @@ const AdminLogsPage = () => {
                   <BarChart3 size={16} className="text-amber-400" />
                   <span className="text-sm font-bold text-slate-300">סטטיסטיקות זיהוי — מתוך {logs.length} ביקורים</span>
                 </div>
-                <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-10 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-6 lg:grid-cols-12 gap-2">
                   {[
                     { label: 'טביעות', val: computedStats.uniqueFingerprints, icon: <Fingerprint size={12} />, clr: 'text-indigo-300' },
                     { label: 'Canvas FP', val: computedStats.uniqueCanvasFingerprints, icon: <Hash size={12} />, clr: 'text-purple-300' },
+                    { label: 'VPN/Proxy', val: computedStats.vpn, icon: <Shield size={12} />, clr: 'text-rose-300' },
+                    { label: 'Datacenter', val: computedStats.datacenter, icon: <Bot size={12} />, clr: 'text-orange-300' },
                     { label: 'בוטים', val: computedStats.bots, icon: <Bot size={12} />, clr: 'text-orange-300' },
                     { label: 'AdBlock', val: computedStats.adBlock, icon: <Shield size={12} />, clr: 'text-red-300' },
                     { label: 'מסך מגע', val: computedStats.touch, icon: <MousePointer size={12} />, clr: 'text-purple-300' },
@@ -743,6 +818,12 @@ const AdminLogsPage = () => {
                   <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-5">
                     <h3 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2"><FileText size={16} className="text-amber-400" /> דפים פופולריים</h3>
                     <MiniBar items={summary.analytics.topPages} color="amber" />
+                  </div>
+                )}
+                {summary.analytics.topCountries?.length > 0 && (
+                  <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-5">
+                    <h3 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2"><MapPin size={16} className="text-rose-400" /> מדינות</h3>
+                    <MiniBar items={summary.analytics.topCountries} color="rose" />
                   </div>
                 )}
               </div>
@@ -834,6 +915,8 @@ const AdminLogsPage = () => {
                 </div>
               )}
             </div>
+            </>
+            )}
           </>
         )}
       </div>

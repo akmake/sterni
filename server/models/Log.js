@@ -83,10 +83,22 @@ const logSchema = new mongoose.Schema(
     // Location (from IP geolocation)
     location: {
       country: String,
+      countryCode: String,
       city: String,
       region: String,
+      zip: String,
       latitude: Number,
       longitude: Number,
+      timezone: String,        // geo timezone (from IP, e.g. "Asia/Jerusalem")
+      // ★ Network / ISP intelligence
+      isp: String,             // e.g. "Bezeq", "Cellcom"
+      org: String,             // organization owning the IP
+      asn: String,             // autonomous system, e.g. "AS8551"
+      asName: String,          // AS owner name
+      // ★ Threat / connection flags (from IP intelligence)
+      proxy: Boolean,          // VPN / Tor / anonymizing proxy
+      hosting: Boolean,        // datacenter / hosting / cloud IP (likely bot/server)
+      mobileCarrier: Boolean,  // connected via mobile carrier network
     },
 
     // Connection Info
@@ -125,6 +137,14 @@ const logSchema = new mongoose.Schema(
       pageViews: Number,
       durationSeconds: Number,
       isNewSession: Boolean,
+    },
+
+    // ★ On-page behavior (filled later by POST /api/logs/behavior beacon)
+    behavior: {
+      maxScrollDepth: Number,   // 0-100 (% of page scrolled)
+      clicks: Number,           // total clicks on the page
+      rageClicks: Number,       // rapid repeated clicks in same spot (frustration signal)
+      activeSeconds: Number,    // real engaged time (focused + not idle)
     },
 
     // ★ Media Devices
@@ -168,6 +188,8 @@ logSchema.index({ userId: 1, timestamp: -1 });
 logSchema.index({ ipAddress: 1 });
 logSchema.index({ 'browser.name': 1 });
 logSchema.index({ device: 1 });
+logSchema.index({ 'location.country': 1 });
+logSchema.index({ fingerprint: 1, timestamp: -1 });
 // TTL: מחיקה אוטומטית של לוגים אחרי 90 יום
 logSchema.index({ createdAt: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });
 

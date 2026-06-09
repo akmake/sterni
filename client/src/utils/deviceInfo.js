@@ -58,14 +58,21 @@ const getWebGLFingerprint = () => {
   } catch { return null; }
 };
 
-/** Generate a comprehensive visitor fingerprint */
-const generateFingerprint = () => {
+/**
+ * Generate a comprehensive visitor fingerprint.
+ * Combines hardware/locale signals WITH canvas + WebGL hashes (real GPU-driver
+ * entropy) — far more unique than UA+screen alone (two identical iPhones now differ).
+ */
+const generateFingerprint = (canvasFP, webglFP) => {
   const components = [
     navigator.userAgent,
     navigator.language,
+    (navigator.languages || []).join(','),
     screen.colorDepth,
     `${screen.width}x${screen.height}`,
+    window.devicePixelRatio || 1,
     new Date().getTimezoneOffset(),
+    Intl.DateTimeFormat().resolvedOptions().timeZone || '',
     navigator.hardwareConcurrency || '',
     navigator.deviceMemory || '',
     navigator.platform || '',
@@ -74,6 +81,8 @@ const generateFingerprint = () => {
     !!window.sessionStorage,
     !!window.localStorage,
     navigator.plugins?.length || 0,
+    canvasFP || '',
+    webglFP || '',
   ].join('|');
   return hashCode(components);
 };
@@ -83,6 +92,10 @@ const generateFingerprint = () => {
 // ═══════════════════════════════════════════════════
 
 const collectSync = () => {
+  // Compute fingerprint hashes once, up front (reused in main fingerprint below)
+  const canvasFP = getCanvasFingerprint();
+  const webglFP = getWebGLFingerprint();
+
   // GPU info
   let gpu = null;
   try {
@@ -171,9 +184,9 @@ const collectSync = () => {
     notificationPermission: window.Notification?.permission || null,
 
     // ── Fingerprints ──
-    fingerprint: generateFingerprint(),
-    canvasFingerprint: getCanvasFingerprint(),
-    webglFingerprint: getWebGLFingerprint(),
+    fingerprint: generateFingerprint(canvasFP, webglFP),
+    canvasFingerprint: canvasFP,
+    webglFingerprint: webglFP,
 
     // ── Ad blocker detection ──
     adBlocker: (() => {

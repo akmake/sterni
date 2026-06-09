@@ -158,6 +158,13 @@ export const getLogsSummary = catchAsync(async (req, res) => {
     { $limit: 10 },
   ]);
 
+  const topCountries = await Log.aggregate([
+    { $match: { 'location.country': { $nin: [null, 'Unknown', 'Local'] } } },
+    { $group: { _id: '$location.country', count: { $sum: 1 }, code: { $first: '$location.countryCode' } } },
+    { $sort: { count: -1 } },
+    { $limit: 12 },
+  ]);
+
   res.status(200).json({
     status: 'success',
     summary: {
@@ -175,6 +182,7 @@ export const getLogsSummary = catchAsync(async (req, res) => {
       topOS,
       topPages,
       topIPs,
+      topCountries,
     },
   });
 });
@@ -304,4 +312,233 @@ export const getUserActivitySummary = catchAsync(async (req, res) => {
   });
 });
 
-export default { receiveDevicePing, toggleLogging, getLoggingStatus, getAllLogs, getLogsSummary, getMyLogs, deleteOldLogs, deleteAllLogs, getUserActivitySummary };
+// ════════════════════════════════════════════════════════════
+//  PHASE 2 — VISITOR JOURNEY
+// ════════════════════════════════════════════════════════════
+
+// Classify traffic source from the referer of a visitor's first hit
+const classifySource = (referer) => {
+  if (!referer) return 'direct';
+  let h = '';
+  try { h = new URL(referer).hostname.replace(/^www\./, ''); } catch { return 'direct'; }
+  if (/dahanswebsite\.com|localhost/.test(h)) return 'internal';
+  if (/google\./.test(h)) return 'google';
+  if (/bing\.|duckduckgo|yahoo|yandex/.test(h)) return 'search';
+  if (/whatsapp|wa\.me|t\.me|telegram/.test(h)) return 'whatsapp';
+  if (/facebook|fb\.|instagram|twitter|x\.com|linkedin|tiktok|youtube|t\.co/.test(h)) return 'social';
+  return 'referral';
+};
+
+// The key that identifies a unique visitor across requests (fingerprint, else IP)
+const VISITOR_KEY = { $ifNull: ['$fingerprint', '$ipAddress'] };
+
+// ★ Get visitors — raw request logs grouped into real people
+export const getVisitors = catchAsync(async (req, res) => {
+  const { limit = 100, days = 30, suspicious } = req.query;
+  const since = new Date(Date.now() - parseInt(days) * 24 * 60 * 60 * 1000);
+
+  const match = { timestamp: { $gte: since } };
+
+  const grouped = await Log.aggregate([
+    { $match: match },
+    { $sort: { timestamp: 1 } },
+    {
+      $group: {
+        _id: VISITOR_KEY,
+        visits: { $sum: 1 },
+        firstSeen: { $first: '$timestamp' },
+        lastSeen: { $last: '$timestamp' },
+        entryPage: { $first: '$page' },
+        lastPage: { $last: '$page' },
+        firstReferer: { $first: '$referer' },
+        pages: { $addToSet: '$page' },
+        days: { $addToSet: { $dateToString: { format: '%Y-%m-%d', date: '$timestamp' } } },
+        ips: { $addToSet: '$ipAddress' },
+        fingerprint: { $last: '$fingerprint' },
+        device: { $last: '$device' },
+        browser: { $last: '$browser.name' },
+        os: { $last: '$os.name' },
+        country: { $last: '$location.country' },
+        countryCode: { $last: '$location.countryCode' },
+        city: { $last: '$location.city' },
+        isp: { $last: '$location.isp' },
+        lat: { $last: '$location.latitude' },
+        lon: { $last: '$location.longitude' },
+        proxy: { $max: { $cond: ['$location.proxy', 1, 0] } },
+        hosting: { $max: { $cond: ['$location.hosting', 1, 0] } },
+        bot: { $max: { $cond: ['$webdriver', 1, 0] } },
+        userId: { $last: '$userId' },
+      },
+    },
+    ...(suspicious === 'true' ? [{ $match: { $or: [{ proxy: 1 }, { hosting: 1 }, { bot: 1 }] } }] : []),
+    { $sort: { lastSeen: -1 } },
+    { $limit: parseInt(limit) },
+  ]);
+
+  // Populate registered-user names
+  const User = (await import('mongoose')).default.model('User');
+  const userIds = grouped.map(g => g.userId).filter(Boolean);
+  const users = await User.find({ _id: { $in: userIds } }).select('name email role').lean();
+  const userMap = {};
+  users.forEach(u => { userMap[u._id.toString()] = u; });
+
+  const visitors = grouped.map(g => {
+    const user = g.userId ? userMap[g.userId.toString()] : null;
+    return {
+      key: g._id,
+      fingerprint: g.fingerprint || null,
+      visits: g.visits,
+      firstSeen: g.firstSeen,
+      lastSeen: g.lastSeen,
+      daysActive: g.days.length,
+      uniquePages: g.pages.length,
+      entryPage: g.entryPage,
+      lastPage: g.lastPage,
+      source: classifySource(g.firstReferer),
+      ips: g.ips.filter(Boolean),
+      device: g.device,
+      browser: g.browser,
+      os: g.os,
+      country: g.country,
+      countryCode: g.countryCode,
+      city: g.city,
+      isp: g.isp,
+      lat: g.lat,
+      lon: g.lon,
+      proxy: !!g.proxy,
+      hosting: !!g.hosting,
+      bot: !!g.bot,
+      isReturning: g.days.length > 1,
+      userId: g.userId || null,
+      name: user?.name || null,
+      role: user?.role || null,
+    };
+  });
+
+  // Source breakdown for the whole window
+  const sourceBreakdown = {};
+  visitors.forEach(v => { sourceBreakdown[v.source] = (sourceBreakdown[v.source] || 0) + 1; });
+
+  res.status(200).json({
+    status: 'success',
+    count: visitors.length,
+    summary: {
+      total: visitors.length,
+      returning: visitors.filter(v => v.isReturning).length,
+      newVisitors: visitors.filter(v => !v.isReturning).length,
+      suspicious: visitors.filter(v => v.proxy || v.hosting || v.bot).length,
+    },
+    sourceBreakdown,
+    data: visitors,
+  });
+});
+
+// ★ Get one visitor's full chronological journey (page-by-page timeline)
+export const getVisitorJourney = catchAsync(async (req, res) => {
+  const { key } = req.query;
+  if (!key) return res.status(400).json({ status: 'fail', message: 'key required' });
+
+  const events = await Log.find({ $or: [{ fingerprint: key }, { ipAddress: key }] })
+    .select('page method statusCode responseTime referer timestamp behavior location.city device')
+    .sort({ timestamp: 1 })
+    .limit(500)
+    .lean();
+
+  res.status(200).json({ status: 'success', count: events.length, data: events });
+});
+
+// ════════════════════════════════════════════════════════════
+//  PHASE 3 — LIVE VISITORS
+// ════════════════════════════════════════════════════════════
+
+// ★ Who is online right now (activity in the last N minutes)
+export const getLiveVisitors = catchAsync(async (req, res) => {
+  const minutes = parseInt(req.query.minutes) || 5;
+  const since = new Date(Date.now() - minutes * 60 * 1000);
+
+  const grouped = await Log.aggregate([
+    { $match: { timestamp: { $gte: since } } },
+    { $sort: { timestamp: 1 } },
+    {
+      $group: {
+        _id: VISITOR_KEY,
+        lastSeen: { $last: '$timestamp' },
+        currentPage: { $last: '$page' },
+        hits: { $sum: 1 },
+        device: { $last: '$device' },
+        browser: { $last: '$browser.name' },
+        country: { $last: '$location.country' },
+        city: { $last: '$location.city' },
+        lat: { $last: '$location.latitude' },
+        lon: { $last: '$location.longitude' },
+        ip: { $last: '$ipAddress' },
+        proxy: { $max: { $cond: ['$location.proxy', 1, 0] } },
+        hosting: { $max: { $cond: ['$location.hosting', 1, 0] } },
+        userId: { $last: '$userId' },
+      },
+    },
+    { $sort: { lastSeen: -1 } },
+  ]);
+
+  const User = (await import('mongoose')).default.model('User');
+  const userIds = grouped.map(g => g.userId).filter(Boolean);
+  const users = await User.find({ _id: { $in: userIds } }).select('name').lean();
+  const userMap = {};
+  users.forEach(u => { userMap[u._id.toString()] = u; });
+
+  const visitors = grouped.map(g => ({
+    key: g._id,
+    lastSeen: g.lastSeen,
+    currentPage: g.currentPage,
+    hits: g.hits,
+    device: g.device,
+    browser: g.browser,
+    country: g.country,
+    city: g.city,
+    lat: g.lat,
+    lon: g.lon,
+    ip: g.ip,
+    proxy: !!g.proxy,
+    hosting: !!g.hosting,
+    name: g.userId ? (userMap[g.userId.toString()]?.name || null) : null,
+  }));
+
+  res.status(200).json({ status: 'success', activeCount: visitors.length, windowMinutes: minutes, data: visitors });
+});
+
+// ════════════════════════════════════════════════════════════
+//  PHASE 4 — ON-PAGE BEHAVIOR
+// ════════════════════════════════════════════════════════════
+
+// ★ Receive behavior beacon (sent via navigator.sendBeacon on page leave) — public, no auth
+export const receiveBehavior = async (req, res) => {
+  try {
+    const { fingerprint, page, scrollDepth, clicks, rageClicks, activeSeconds } = req.body || {};
+    if (!fingerprint || !page) return res.status(204).end();
+
+    // Attach behavior to the most recent matching page-view log
+    await Log.findOneAndUpdate(
+      { fingerprint, page },
+      {
+        $set: {
+          behavior: {
+            maxScrollDepth: Math.min(100, Math.max(0, Math.round(scrollDepth || 0))),
+            clicks: Math.max(0, parseInt(clicks) || 0),
+            rageClicks: Math.max(0, parseInt(rageClicks) || 0),
+            activeSeconds: Math.max(0, parseInt(activeSeconds) || 0),
+          },
+        },
+      },
+      { sort: { timestamp: -1 } }
+    );
+    res.status(204).end();
+  } catch (e) {
+    res.status(204).end();
+  }
+};
+
+export default {
+  receiveDevicePing, toggleLogging, getLoggingStatus, getAllLogs, getLogsSummary,
+  getMyLogs, deleteOldLogs, deleteAllLogs, getUserActivitySummary,
+  getVisitors, getVisitorJourney, getLiveVisitors, receiveBehavior,
+};

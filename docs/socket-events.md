@@ -4,17 +4,21 @@
 > Setup: `server/services/socketService.js`
 > IO instance: `app.set('io', io)` → accessed via `req.app.get('io').emit(...)`
 
+## Rooms
+- `family:<familyId>` — auto-joined on connect (household real-time)
+- `admins` — auto-joined on connect when `user.role === 'admin'` (visitor-intelligence alerts)
+
 ## Server → Client Events
 
 | Event | Payload | Triggered by |
 |-------|---------|-------------|
-| *(document as you add events)* | | |
+| `visitor:alert` | `{ ip, page, country, city, isp, reason: 'vpn'\|'datacenter'\|'bot', timestamp }` | `loggingMiddleware.js` when a suspicious visitor is logged (throttled ≤1/IP per 10 min). Emitted to the `admins` room. Listened in `AdminLogsPage.jsx` → toast. |
 
 ## Client → Server Events
 
 | Event | Payload | Handled in |
 |-------|---------|-----------|
-| *(document as you add events)* | | |
+| `family:join` | — | `socketService.js` — (re)join the caller's family room |
 
 ---
 

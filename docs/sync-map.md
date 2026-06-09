@@ -103,4 +103,7 @@
 | `client/src/App.jsx` | `docs/api-reference.md` (new frontend routes) |
 | Any `.env` variable added/removed | `docs/architecture.md` |
 | `server/services/socketService.js` | `docs/socket-events.md`, any controller using `req.app.get('io')` |
-| `server/middlewares/loggingMiddleware.js` | `server/models/Log.js`, `AdminLogsPage.jsx` |
+| `server/middlewares/loggingMiddleware.js` | `server/models/Log.js`, `client/src/utils/deviceInfo.js`, `AdminLogsPage.jsx`, emits socket `visitor:alert` (`docs/socket-events.md`) |
+| `client/src/utils/deviceInfo.js` | `server/models/Log.js` (any new collected field needs a schema field + middleware mapping + `AdminLogsPage.jsx` display) |
+| `server/controllers/logsController.js` | `server/routes/logsRoutes.js`, `client/src/pages/logs/*` (VisitorsView/LiveView/VisitorJourneyModal/WorldMap), `docs/api-reference.md` |
+| `client/src/utils/behaviorTracker.js` | `server/controllers/logsController.js` (`receiveBehavior`), `server/models/Log.js` (`behavior` field) — init in `client/src/main.jsx` |

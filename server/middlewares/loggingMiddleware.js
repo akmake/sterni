@@ -20,6 +20,10 @@ export const makeDeviceKey = (ip, ua) => {
 const geoCache = new Map();
 const GEO_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
+// Throttle suspicious-visitor alerts — at most one alert per IP per 10 min
+const alertThrottle = new Map();
+const ALERT_THROTTLE_TTL = 10 * 60 * 1000;
+
 // נתיבים שלא נרשום לעולם
 const SKIP_PREFIXES = ['/api/logs', '/api/csrf-token', '/uploads', '/favicon', '/opo.png'];
 
@@ -74,18 +78,33 @@ const getGeolocation = async (ipAddress) => {
   }
 
   try {
-    // Using ip-api.com free endpoint (no key required)
-    const response = await axios.get(`http://ip-api.com/json/${ipAddress}?fields=status,country,city,region,lat,lon`, {
+    // Using ip-api.com free endpoint (no key required).
+    // Expanded fields: ISP/org/ASN + threat flags (proxy/hosting/mobile) — all free.
+    const fields = 'status,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,asname,mobile,proxy,hosting,query';
+    const response = await axios.get(`http://ip-api.com/json/${ipAddress}?fields=${fields}`, {
       timeout: 2000,
     });
 
     if (response.data.status === 'success') {
+      const d = response.data;
       const location = {
-        country: response.data.country || 'Unknown',
-        city: response.data.city || 'Unknown',
-        region: response.data.region || 'Unknown',
-        latitude: response.data.lat || null,
-        longitude: response.data.lon || null,
+        country: d.country || 'Unknown',
+        countryCode: d.countryCode || null,
+        city: d.city || 'Unknown',
+        region: d.regionName || d.region || 'Unknown',
+        zip: d.zip || null,
+        latitude: d.lat ?? null,
+        longitude: d.lon ?? null,
+        timezone: d.timezone || null,
+        // ★ Network intelligence
+        isp: d.isp || null,
+        org: d.org || null,
+        asn: d.as ? d.as.split(' ')[0] : null,   // "AS8551 Bezeq" → "AS8551"
+        asName: d.asname || (d.as ? d.as.split(' ').slice(1).join(' ') : null) || null,
+        // ★ Threat flags
+        proxy: d.proxy === true,
+        hosting: d.hosting === true,
+        mobileCarrier: d.mobile === true,
       };
 
       // Cache the result
@@ -281,6 +300,32 @@ export const loggingMiddleware = async (req, res, next) => {
             });
 
             await logEntry.save();
+
+            // ★ Real-time alert for suspicious visitors (VPN/Proxy, datacenter, bot)
+            const isSuspicious = location?.proxy || location?.hosting || clientData.webdriver;
+            if (isSuspicious) {
+              const now = Date.now();
+              const last = alertThrottle.get(finalIP) || 0;
+              if (now - last > ALERT_THROTTLE_TTL) {
+                alertThrottle.set(finalIP, now);
+                // Opportunistic cleanup
+                if (alertThrottle.size > 500) {
+                  for (const [k, t] of alertThrottle) if (now - t > ALERT_THROTTLE_TTL) alertThrottle.delete(k);
+                }
+                try {
+                  const io = req.app.get('io');
+                  io?.to('admins').emit('visitor:alert', {
+                    ip: finalIP,
+                    page: req.originalUrl,
+                    country: location?.country || null,
+                    city: location?.city || null,
+                    isp: location?.isp || null,
+                    reason: location?.proxy ? 'vpn' : location?.hosting ? 'datacenter' : 'bot',
+                    timestamp: new Date(),
+                  });
+                } catch { /* io not available — ignore */ }
+              }
+            }
           } catch (err) {
             if (!err.message?.includes('buffering timed out')) {
               console.error('Error saving log:', err.message);

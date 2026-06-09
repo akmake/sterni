@@ -47,7 +47,7 @@
 | Message | `Message.js` | chat system |
 | Email | `Email.js` | email module |
 | EmailAccount | `EmailAccount.js` | email accounts config |
-| Log | `Log.js` | system logging |
+| Log | `Log.js` | visitor tracking / intelligence (AdminLogsPage) |
 | SystemConfig | `SystemConfig.js` | system settings |
 | WorkOrder | `WorkOrder.js` | work orders |
 | BillingProfile | `Billingprofile.js` | billing profiles |
@@ -72,3 +72,7 @@
 - All controllers use `req.user._id` (ObjectId) for user-scoped queries — not `req.user.id` (string)
 - `HotelCounter` is used for auto-incrementing order reference numbers
 - `MerchantMap` + `FinanceCategoryRule` are used together for automatic transaction categorization during import
+- `Log` records every visitor request when `SystemConfig.loggingEnabled` is true (TTL: auto-deleted after 90 days). Written by `loggingMiddleware.js`, displayed in `AdminLogsPage.jsx`.
+  - `location.*` is enriched from IP via ip-api.com: country/city/region/zip/lat/lon/timezone **plus** ISP, org, ASN (`location.asn`/`asName`), and threat flags `location.proxy` (VPN), `location.hosting` (datacenter/bot), `location.mobileCarrier`.
+  - `fingerprint` combines hardware/locale + canvas + WebGL hashes (client `deviceInfo.js`) for cross-session visitor identification.
+  - `behavior.{maxScrollDepth,clicks,rageClicks,activeSeconds}` is filled later by the `POST /api/logs/behavior` beacon (client `behaviorTracker.js`), matched to the page-view log by `fingerprint` + `page`.

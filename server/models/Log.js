@@ -145,6 +145,44 @@ const logSchema = new mongoose.Schema(
       clicks: Number,           // total clicks on the page
       rageClicks: Number,       // rapid repeated clicks in same spot (frustration signal)
       activeSeconds: Number,    // real engaged time (focused + not idle)
+      // ★ Behavioral biometrics (consent-gated) — identifies a person across devices
+      biometrics: {
+        mouseSamples: Number,        // # of mouse-move samples observed
+        avgMouseSpeed: Number,       // px/sec
+        avgClickInterval: Number,    // ms between clicks
+        typingCadenceMs: Number,     // avg ms between keystrokes
+        signature: String,           // hashed behavioral signature
+      },
+    },
+
+    // ★ Advanced intelligence signals (collected client-side; consent disclosed)
+    signals: {
+      // Enriched fingerprint entropy
+      audioFingerprint: String,   // AudioContext render hash
+      fontFingerprint: String,    // hash of installed-font set
+      fontCount: Number,
+      mathFingerprint: String,    // FP-math precision hash
+      voices: Number,             // # speechSynthesis voices
+      // Privacy / environment
+      incognito: Boolean,         // private-browsing mode detected
+      persistentId: String,       // survives cookie-clearing (localStorage+IndexedDB)
+      // WebRTC — can reveal the real IP even behind a VPN
+      webrtc: {
+        localIPs: [String],
+        publicIPs: [String],
+        mismatch: Boolean,        // WebRTC public IP ≠ server-detected IP
+      },
+      // VPN / fraud scoring (computed server-side)
+      vpnScore: Number,           // 0-100 confidence the visitor is masking
+      vpnSignals: [String],       // which signals fired: 'proxy','hosting','tz','lang','webrtc'
+      tzMismatch: Boolean,        // browser timezone ≠ IP timezone
+      langMismatch: Boolean,      // browser language ≠ IP country language
+      // Consent record (disclosed via banner)
+      consent: {
+        given: Boolean,
+        version: String,
+        at: Date,
+      },
     },
 
     // ★ Media Devices
@@ -190,6 +228,8 @@ logSchema.index({ 'browser.name': 1 });
 logSchema.index({ device: 1 });
 logSchema.index({ 'location.country': 1 });
 logSchema.index({ fingerprint: 1, timestamp: -1 });
+logSchema.index({ 'signals.persistentId': 1 });
+logSchema.index({ 'signals.vpnScore': -1 });
 // TTL: מחיקה אוטומטית של לוגים אחרי 90 יום
 logSchema.index({ createdAt: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });
 

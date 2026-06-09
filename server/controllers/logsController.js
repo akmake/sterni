@@ -513,32 +513,61 @@ export const getLiveVisitors = catchAsync(async (req, res) => {
 // ★ Receive behavior beacon (sent via navigator.sendBeacon on page leave) — public, no auth
 export const receiveBehavior = async (req, res) => {
   try {
-    const { fingerprint, page, scrollDepth, clicks, rageClicks, activeSeconds } = req.body || {};
+    const { fingerprint, page, scrollDepth, clicks, rageClicks, activeSeconds, biometrics } = req.body || {};
     if (!fingerprint || !page) return res.status(204).end();
 
+    const behavior = {
+      maxScrollDepth: Math.min(100, Math.max(0, Math.round(scrollDepth || 0))),
+      clicks: Math.max(0, parseInt(clicks) || 0),
+      rageClicks: Math.max(0, parseInt(rageClicks) || 0),
+      activeSeconds: Math.max(0, parseInt(activeSeconds) || 0),
+    };
+    if (biometrics && typeof biometrics === 'object') {
+      behavior.biometrics = {
+        mouseSamples: parseInt(biometrics.mouseSamples) || 0,
+        avgMouseSpeed: parseInt(biometrics.avgMouseSpeed) || 0,
+        avgClickInterval: parseInt(biometrics.avgClickInterval) || 0,
+        typingCadenceMs: parseInt(biometrics.typingCadenceMs) || 0,
+        signature: typeof biometrics.signature === 'string' ? biometrics.signature.slice(0, 64) : null,
+      };
+    }
+
     // Attach behavior to the most recent matching page-view log
-    await Log.findOneAndUpdate(
-      { fingerprint, page },
-      {
-        $set: {
-          behavior: {
-            maxScrollDepth: Math.min(100, Math.max(0, Math.round(scrollDepth || 0))),
-            clicks: Math.max(0, parseInt(clicks) || 0),
-            rageClicks: Math.max(0, parseInt(rageClicks) || 0),
-            activeSeconds: Math.max(0, parseInt(activeSeconds) || 0),
-          },
-        },
-      },
-      { sort: { timestamp: -1 } }
-    );
+    await Log.findOneAndUpdate({ fingerprint, page }, { $set: { behavior } }, { sort: { timestamp: -1 } });
     res.status(204).end();
   } catch (e) {
     res.status(204).end();
   }
 };
 
+// ★ Record explicit data-collection consent (from the disclosure banner) — public
+export const recordConsent = async (req, res) => {
+  try {
+    const { fingerprint, persistentId, version, items } = req.body || {};
+    const rawIP = req.headers['cf-connecting-ip']
+               || req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+               || req.headers['x-real-ip'] || req.ip || 'unknown';
+    let ip = rawIP;
+    if (typeof ip === 'string' && ip.startsWith('::ffff:')) ip = ip.slice(7);
+
+    const ConsentRecord = (await import('../models/ConsentRecord.js')).default;
+    await ConsentRecord.create({
+      fingerprint: fingerprint || null,
+      persistentId: persistentId || null,
+      userId: req.user?._id || null,
+      ip,
+      userAgent: req.get('user-agent') || '',
+      version: version || '1',
+      items: Array.isArray(items) ? items.slice(0, 100) : [],
+    });
+    res.status(201).json({ ok: true });
+  } catch (e) {
+    res.status(200).json({ ok: false });
+  }
+};
+
 export default {
   receiveDevicePing, toggleLogging, getLoggingStatus, getAllLogs, getLogsSummary,
   getMyLogs, deleteOldLogs, deleteAllLogs, getUserActivitySummary,
-  getVisitors, getVisitorJourney, getLiveVisitors, receiveBehavior,
+  getVisitors, getVisitorJourney, getLiveVisitors, receiveBehavior, recordConsent,
 };

@@ -48,6 +48,7 @@
 | Email | `Email.js` | email module |
 | EmailAccount | `EmailAccount.js` | email accounts config |
 | Log | `Log.js` | visitor tracking / intelligence (AdminLogsPage) |
+| ConsentRecord | `ConsentRecord.js` | data-collection consent audit (consent banner) |
 | SystemConfig | `SystemConfig.js` | system settings |
 | WorkOrder | `WorkOrder.js` | work orders |
 | BillingProfile | `Billingprofile.js` | billing profiles |
@@ -75,4 +76,6 @@
 - `Log` records every visitor request when `SystemConfig.loggingEnabled` is true (TTL: auto-deleted after 90 days). Written by `loggingMiddleware.js`, displayed in `AdminLogsPage.jsx`.
   - `location.*` is enriched from IP via ip-api.com: country/city/region/zip/lat/lon/timezone **plus** ISP, org, ASN (`location.asn`/`asName`), and threat flags `location.proxy` (VPN), `location.hosting` (datacenter/bot), `location.mobileCarrier`.
   - `fingerprint` combines hardware/locale + canvas + WebGL hashes (client `deviceInfo.js`) for cross-session visitor identification.
-  - `behavior.{maxScrollDepth,clicks,rageClicks,activeSeconds}` is filled later by the `POST /api/logs/behavior` beacon (client `behaviorTracker.js`), matched to the page-view log by `fingerprint` + `page`.
+  - `behavior.{maxScrollDepth,clicks,rageClicks,activeSeconds,biometrics}` is filled later by the `POST /api/logs/behavior` beacon (client `behaviorTracker.js`), matched to the page-view log by `fingerprint` + `page`. `behavior.biometrics` = mouse/typing cadence signature.
+  - `signals.*` = advanced intelligence (client `advancedSignals.js`): enriched fingerprints (audio/font/math), `voices`, `incognito`, `persistentId` (localStorage+IndexedDB), `webrtc.{localIPs,publicIPs,mismatch}`, and server-computed `vpnScore`/`vpnSignals`/`tzMismatch`/`langMismatch` (in `loggingMiddleware.computeVpnSignals`). `signals.consent` mirrors the banner acknowledgement.
+- `ConsentRecord` is an auditable log of the data-collection consent banner being accepted (`POST /api/logs/consent`). Keyed by `fingerprint`/`persistentId`/`userId`.

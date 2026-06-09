@@ -21,6 +21,12 @@ let state = null;
 let tickTimer = null;
 let started = false;
 
+const hash = (str) => {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) { h = ((h << 5) - h) + str.charCodeAt(i); h |= 0; }
+  return Math.abs(h).toString(36);
+};
+
 const newState = (page) => ({
   page,
   start: Date.now(),
@@ -30,6 +36,16 @@ const newState = (page) => ({
   clicks: 0,
   rageClicks: 0,
   lastClick: null,
+  // ★ Behavioral biometrics
+  mouseDist: 0,
+  mouseSamples: 0,
+  lastMove: null,
+  clickIntSum: 0,
+  clickIntCount: 0,
+  lastClickT: null,
+  keyIntSum: 0,
+  keyIntCount: 0,
+  lastKeyT: null,
 });
 
 const getScrollDepth = () => {
@@ -58,7 +74,31 @@ const onClick = (e) => {
       Math.abs(e.clientY - lc.y) < RAGE_DISTANCE) {
     state.rageClicks++;
   }
+  // Click-interval biometrics
+  if (state.lastClickT) { state.clickIntSum += now - state.lastClickT; state.clickIntCount++; }
+  state.lastClickT = now;
   state.lastClick = { t: now, x: e.clientX, y: e.clientY };
+  markActivity();
+};
+
+// ★ Mouse-movement biometrics — accumulate travel distance + sample count
+const onMouseMove = (e) => {
+  if (!state) return;
+  const m = state.lastMove;
+  if (m) {
+    state.mouseDist += Math.hypot(e.clientX - m.x, e.clientY - m.y);
+    state.mouseSamples++;
+  }
+  state.lastMove = { x: e.clientX, y: e.clientY, t: Date.now() };
+  markActivity();
+};
+
+// ★ Typing-cadence biometrics — avg inter-keystroke time
+const onKeyDown = () => {
+  if (!state) return;
+  const now = Date.now();
+  if (state.lastKeyT && now - state.lastKeyT < 3000) { state.keyIntSum += now - state.lastKeyT; state.keyIntCount++; }
+  state.lastKeyT = now;
   markActivity();
 };
 
@@ -80,6 +120,18 @@ const flush = () => {
   try { fingerprint = collectDeviceInfo()?.fingerprint || null; } catch { /* ignore */ }
   if (!fingerprint) return;
 
+  // Behavioral biometrics summary
+  const avgMouseSpeed = activeSeconds > 0 ? Math.round(state.mouseDist / activeSeconds) : 0;
+  const avgClickInterval = state.clickIntCount ? Math.round(state.clickIntSum / state.clickIntCount) : 0;
+  const typingCadenceMs = state.keyIntCount ? Math.round(state.keyIntSum / state.keyIntCount) : 0;
+  const biometrics = {
+    mouseSamples: state.mouseSamples,
+    avgMouseSpeed,
+    avgClickInterval,
+    typingCadenceMs,
+    signature: hash(`${avgMouseSpeed}|${avgClickInterval}|${typingCadenceMs}|${state.rageClicks}`),
+  };
+
   const payload = JSON.stringify({
     fingerprint,
     page: state.page,
@@ -87,6 +139,7 @@ const flush = () => {
     clicks: state.clicks,
     rageClicks: state.rageClicks,
     activeSeconds,
+    biometrics,
   });
 
   try {
@@ -116,8 +169,9 @@ export const initBehaviorTracker = () => {
 
   window.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('click', onClick, true);
-  ['mousemove', 'keydown', 'touchstart'].forEach(ev =>
-    window.addEventListener(ev, markActivity, { passive: true }));
+  window.addEventListener('mousemove', onMouseMove, { passive: true });
+  window.addEventListener('keydown', onKeyDown, { passive: true });
+  window.addEventListener('touchstart', markActivity, { passive: true });
 
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
   window.addEventListener('pagehide', flush);

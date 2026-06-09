@@ -119,6 +119,40 @@ const getGeolocation = async (ipAddress) => {
   return { country: 'Unknown', city: 'Unknown' };
 };
 
+// ★ Compute a VPN/masking confidence score by combining multiple signals
+const computeVpnSignals = (clientData, location, finalIP) => {
+  const sig = [];
+  let score = 0;
+
+  if (location?.proxy) { sig.push('proxy'); score += 40; }
+  if (location?.hosting) { sig.push('hosting'); score += 40; }
+
+  // Browser timezone vs IP timezone (both from independent sources)
+  let tzMismatch = false;
+  if (clientData?.timezone && location?.timezone && clientData.timezone !== location.timezone) {
+    tzMismatch = true; sig.push('tz'); score += 25;
+  }
+
+  // WebRTC public IP that differs from the server-seen IP → real IP leaking past a VPN
+  let webrtcMismatch = false;
+  const pubIPs = clientData?.signals?.webrtc?.publicIPs;
+  if (Array.isArray(pubIPs) && pubIPs.some(ip => ip && ip !== finalIP)) {
+    webrtcMismatch = true; sig.push('webrtc'); score += 30;
+  }
+
+  // Light language/country heuristic (Israel-focused, low weight)
+  let langMismatch = false;
+  if (location?.countryCode === 'IL') {
+    const langs = (clientData?.languages || []).join(',').toLowerCase();
+    const primary = (clientData?.userLanguage || '').toLowerCase();
+    if ((langs || primary) && !langs.includes('he') && !primary.includes('he')) {
+      langMismatch = true; sig.push('lang'); score += 10;
+    }
+  }
+
+  return { vpnScore: Math.min(100, score), vpnSignals: sig, tzMismatch, langMismatch, webrtcMismatch };
+};
+
 export const loggingMiddleware = async (req, res, next) => {
   const skip =
     req.method === 'OPTIONS' ||
@@ -233,6 +267,10 @@ export const loggingMiddleware = async (req, res, next) => {
             // Get geolocation from IP
             const location = await getGeolocation(finalIP);
 
+            // ★ Compute VPN/masking confidence from combined signals
+            const vpn = computeVpnSignals(clientData, location, finalIP);
+            const clientSignals = clientData.signals || {};
+
             const logEntry = new Log({
               userId: resolvedUserId,
               ipAddress: finalIP,
@@ -297,12 +335,32 @@ export const loggingMiddleware = async (req, res, next) => {
               webGLSupported: clientData.webGLSupported ?? null,
               serviceWorkerSupported: clientData.serviceWorkerSupported ?? null,
               notificationPermission: clientData.notificationPermission || null,
+              // ★ Advanced signals (client-collected + server-computed VPN scoring)
+              signals: {
+                audioFingerprint: clientSignals.audioFingerprint || null,
+                fontFingerprint: clientSignals.fontFingerprint || null,
+                fontCount: clientSignals.fontCount ?? null,
+                mathFingerprint: clientSignals.mathFingerprint || null,
+                voices: clientSignals.voices ?? null,
+                incognito: clientSignals.incognito ?? null,
+                persistentId: clientSignals.persistentId || null,
+                webrtc: {
+                  localIPs: clientSignals.webrtc?.localIPs || [],
+                  publicIPs: clientSignals.webrtc?.publicIPs || [],
+                  mismatch: vpn.webrtcMismatch,
+                },
+                vpnScore: vpn.vpnScore,
+                vpnSignals: vpn.vpnSignals,
+                tzMismatch: vpn.tzMismatch,
+                langMismatch: vpn.langMismatch,
+                consent: clientSignals.consent || { given: false, version: null, at: null },
+              },
             });
 
             await logEntry.save();
 
-            // ★ Real-time alert for suspicious visitors (VPN/Proxy, datacenter, bot)
-            const isSuspicious = location?.proxy || location?.hosting || clientData.webdriver;
+            // ★ Real-time alert for suspicious visitors (VPN/Proxy, datacenter, bot, high VPN score)
+            const isSuspicious = location?.proxy || location?.hosting || clientData.webdriver || vpn.vpnScore >= 50;
             if (isSuspicious) {
               const now = Date.now();
               const last = alertThrottle.get(finalIP) || 0;
@@ -320,7 +378,8 @@ export const loggingMiddleware = async (req, res, next) => {
                     country: location?.country || null,
                     city: location?.city || null,
                     isp: location?.isp || null,
-                    reason: location?.proxy ? 'vpn' : location?.hosting ? 'datacenter' : 'bot',
+                    reason: location?.proxy ? 'vpn' : location?.hosting ? 'datacenter' : clientData.webdriver ? 'bot' : 'vpn',
+                    vpnScore: vpn.vpnScore,
                     timestamp: new Date(),
                   });
                 } catch { /* io not available — ignore */ }

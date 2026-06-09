@@ -107,3 +107,5 @@
 | `client/src/utils/deviceInfo.js` | `server/models/Log.js` (any new collected field needs a schema field + middleware mapping + `AdminLogsPage.jsx` display) |
 | `server/controllers/logsController.js` | `server/routes/logsRoutes.js`, `client/src/pages/logs/*` (VisitorsView/LiveView/VisitorJourneyModal/WorldMap), `docs/api-reference.md` |
 | `client/src/utils/behaviorTracker.js` | `server/controllers/logsController.js` (`receiveBehavior`), `server/models/Log.js` (`behavior` field) — init in `client/src/main.jsx` |
+| `client/src/utils/advancedSignals.js` | `client/src/utils/deviceInfo.js` (merges into payload), `server/models/Log.js` (`signals.*`), `server/middlewares/loggingMiddleware.js` (`computeVpnSignals`), `AdminLogsPage.jsx` display |
+| `client/src/components/ConsentBanner.jsx` | `client/src/utils/deviceInfo.js` (`CONSENT_KEY`/`CONSENT_VERSION`), `server/models/ConsentRecord.js`, `POST /api/logs/consent` — mounted globally in `client/src/App.jsx` |

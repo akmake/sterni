@@ -166,6 +166,7 @@ const LogRow = ({ log, isExpanded, onToggle }) => {
         <div className="flex items-center gap-4 shrink-0">
           {/* Quick mini badges */}
           <div className="hidden lg:flex items-center gap-1.5">
+            {log.signals?.vpnScore >= 25 && <span title={`ציון VPN ${log.signals.vpnScore}`} className={`px-1.5 h-5 rounded flex items-center text-[10px] font-bold ${log.signals.vpnScore >= 50 ? 'bg-rose-500/25 text-rose-300' : 'bg-amber-500/25 text-amber-300'}`}>VPN {log.signals.vpnScore}</span>}
             {log.location?.proxy && <span title="VPN / Proxy" className="w-5 h-5 rounded bg-rose-500/25 flex items-center justify-center"><Shield size={10} className="text-rose-300" /></span>}
             {log.location?.hosting && <span title="Datacenter / שרת — חשוד כבוט" className="w-5 h-5 rounded bg-orange-500/25 flex items-center justify-center"><Bot size={10} className="text-orange-300" /></span>}
             {log.webdriver && <span title="בוט / אוטומציה" className="w-5 h-5 rounded bg-orange-500/20 flex items-center justify-center"><Bot size={10} className="text-orange-300" /></span>}
@@ -397,6 +398,63 @@ const LogRow = ({ log, isExpanded, onToggle }) => {
               </div>
             )}
           </div>
+
+          {/* ★ Advanced signals — VPN scoring, WebRTC, persistent ID, incognito */}
+          {log.signals && (
+            <div className="mt-4 bg-gradient-to-r from-rose-500/5 to-indigo-500/5 rounded-xl p-4 border border-rose-500/20">
+              <SectionHeader icon={<Shield size={14} />} title="אותות מתקדמים ומודיעין" color="text-rose-400" />
+
+              {/* VPN score bar */}
+              {log.signals.vpnScore != null && (
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-slate-400">ציון VPN / הסוואה</span>
+                    <span className={`text-sm font-black ${log.signals.vpnScore >= 50 ? 'text-rose-300' : log.signals.vpnScore >= 25 ? 'text-amber-300' : 'text-emerald-300'}`}>{log.signals.vpnScore}/100</span>
+                  </div>
+                  <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full transition-all ${log.signals.vpnScore >= 50 ? 'bg-rose-500' : log.signals.vpnScore >= 25 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${log.signals.vpnScore}%` }} />
+                  </div>
+                  {log.signals.vpnSignals?.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {log.signals.vpnSignals.map((s) => (
+                        <span key={s} className="text-[10px] bg-rose-500/15 text-rose-300 px-1.5 py-0.5 rounded-full font-bold">
+                          {{ proxy: 'Proxy', hosting: 'Datacenter', tz: 'אזור זמן', webrtc: 'WebRTC', lang: 'שפה' }[s] || s}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2.5">
+                {log.signals.webrtc?.publicIPs?.length > 0 && (
+                  <Detail icon={<Globe size={12} />} label="IP אמיתי (WebRTC)" value={log.signals.webrtc.publicIPs.join(', ')} mono small className={log.signals.webrtc.mismatch ? 'text-rose-300' : ''} />
+                )}
+                {log.signals.webrtc?.localIPs?.length > 0 && (
+                  <Detail icon={<Wifi size={12} />} label="IP מקומי" value={log.signals.webrtc.localIPs.join(', ')} mono small />
+                )}
+                {log.signals.incognito != null && <Detail icon={<EyeOff size={12} />} label="גלישה פרטית" value={yn(log.signals.incognito)} />}
+                {log.signals.persistentId && <Detail icon={<Fingerprint size={12} />} label="מזהה מתמשך" value={log.signals.persistentId} mono small />}
+                {log.signals.audioFingerprint && <Detail icon={<Mic size={12} />} label="Audio FP" value={log.signals.audioFingerprint} mono />}
+                {log.signals.fontFingerprint && <Detail icon={<FileText size={12} />} label="גופנים" value={`${log.signals.fontFingerprint} (${log.signals.fontCount})`} mono small />}
+                {log.signals.mathFingerprint && <Detail icon={<Hash size={12} />} label="Math FP" value={log.signals.mathFingerprint} mono />}
+                {log.signals.voices != null && <Detail icon={<Mic size={12} />} label="קולות מערכת" value={log.signals.voices} />}
+                {log.signals.consent?.given != null && <Detail icon={<Shield size={12} />} label="הסכמה" value={log.signals.consent.given ? `✓ v${log.signals.consent.version || '?'}` : '—'} />}
+              </div>
+
+              {log.behavior?.biometrics && (
+                <div className="mt-3 pt-3 border-t border-slate-700/40">
+                  <div className="text-[11px] text-slate-500 mb-2 font-bold">ביומטריה התנהגותית</div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2.5">
+                    {log.behavior.biometrics.avgMouseSpeed != null && <Detail icon={<MousePointer size={12} />} label="מהירות עכבר" value={`${log.behavior.biometrics.avgMouseSpeed} px/s`} />}
+                    {log.behavior.biometrics.avgClickInterval != null && <Detail icon={<Clock size={12} />} label="מרווח קליקים" value={`${log.behavior.biometrics.avgClickInterval}ms`} />}
+                    {log.behavior.biometrics.typingCadenceMs > 0 && <Detail icon={<Clock size={12} />} label="קצב הקלדה" value={`${log.behavior.biometrics.typingCadenceMs}ms`} />}
+                    {log.behavior.biometrics.signature && <Detail icon={<Fingerprint size={12} />} label="חתימה" value={log.behavior.biometrics.signature} mono />}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ★ Request Info */}
           <div className="mt-4 bg-slate-800/50 rounded-xl p-4 border border-slate-700/30">

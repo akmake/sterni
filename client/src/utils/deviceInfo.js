@@ -6,9 +6,23 @@
  *   2. X-Device-Info header (on every request — backup)
  */
 
+import { collectAdvancedSignals } from './advancedSignals.js';
+
+export const CONSENT_KEY = 'sterni_data_consent';
+export const CONSENT_VERSION = '1';
+
 let _cache = null;
 let _initPromise = null;
 let _pingDone = false;
+
+const readConsent = () => {
+  try {
+    const raw = localStorage.getItem(CONSENT_KEY);
+    if (!raw) return { given: false, version: null, at: null };
+    const c = JSON.parse(raw);
+    return { given: !!c.given, version: c.version || null, at: c.at || null };
+  } catch { return { given: false, version: null, at: null }; }
+};
 
 // ═══════════════════════════════════════════════════
 // FINGERPRINTING HELPERS
@@ -250,7 +264,17 @@ const resolveAsync = async (info) => {
     );
   }
 
+  // ★ Advanced signals (audio/font/math fingerprint, WebRTC, persistent ID, incognito)
+  tasks.push(
+    collectAdvancedSignals()
+      .then(sig => { info.signals = { ...(info.signals || {}), ...sig }; })
+      .catch(() => {})
+  );
+
   if (tasks.length) await Promise.allSettled(tasks);
+
+  // ★ Consent state (disclosed via banner) — attached to every payload
+  info.signals = { ...(info.signals || {}), consent: readConsent() };
 };
 
 // ── Session tracking ──────────────────────────────

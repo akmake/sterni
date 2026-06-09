@@ -14,6 +14,7 @@ import {
   getVisitorJourney,
   getLiveVisitors,
   receiveBehavior,
+  recordConsent,
 } from '../controllers/logsController.js';
 
 const router = express.Router();
@@ -23,6 +24,9 @@ router.post('/device-ping', receiveDevicePing);
 
 // ★ Behavior beacon — sent via navigator.sendBeacon on page leave (public, no auth)
 router.post('/behavior', receiveBehavior);
+
+// ★ Consent record — disclosure banner acknowledged (public, no auth)
+router.post('/consent', recordConsent);
 
 // ★ Toggle + Status — שליטה על הלוגים
 router.post('/admin/toggle', requireAuth, requireAdmin, toggleLogging);

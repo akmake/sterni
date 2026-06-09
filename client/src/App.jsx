@@ -3,6 +3,7 @@ import React, { Suspense } from "react";
 import { useAuthStore } from "@/stores/authStore";
 
 import Layout from "@/components/Layout";
+import ConsentBanner from "@/components/ConsentBanner";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AdminOnlyRoute from "@/components/AdminOnlyRoute";
 import TzitzitRoute from "@/components/TzitzitRoute";
@@ -92,6 +93,7 @@ function DefaultRedirect() {
 
 export default function App() {
   return (
+    <>
     <Routes>
       {/* ג”€ג”€ג”€ Main app area (with Layout) ג”€ג”€ג”€ */}
       <Route path="/" element={<Layout />}>
@@ -185,6 +187,8 @@ export default function App() {
       <Route path="/print/group-schedule" element={<GroupSchedulePrintPage />} />
 
     </Routes>
+    <ConsentBanner />
+    </>
   );
 }
 

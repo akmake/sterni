@@ -15,7 +15,8 @@
 | `*` | `/chat/*` | Chat (Socket.IO HTTP) |
 | GET | `/logs` | System logs (admin UI) |
 | POST | `/logs/device-ping` | Client device-info cache (once on app load) |
-| POST | `/logs/behavior` | On-page behavior beacon (scroll/clicks/active-time) — `navigator.sendBeacon` |
+| POST | `/logs/behavior` | On-page behavior beacon (scroll/clicks/active-time/biometrics) — `navigator.sendBeacon` |
+| POST | `/logs/consent` | Record data-collection consent (banner acknowledged) → `ConsentRecord` |
 
 ---
 

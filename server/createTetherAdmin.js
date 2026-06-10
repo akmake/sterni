@@ -6,7 +6,15 @@ import User from './models/userModel.js';
 
 await mongoose.connect(process.env.MONGO_URI);
 
-const email = 'yosefdaean@gmail.com';
+const email = process.env.ADMIN_EMAIL;
+const password = process.env.ADMIN_PASSWORD;
+
+if (!email || !password) {
+  console.error('❌ הגדר ADMIN_EMAIL ו-ADMIN_PASSWORD ב-.env לפני הרצת הסקריפט');
+  await mongoose.disconnect();
+  process.exit(1);
+}
+
 const existing = await User.findOne({ email });
 
 if (existing) {
@@ -17,7 +25,7 @@ if (existing) {
     console.log('🔄 Role updated to admin');
   }
 } else {
-  const passwordHash = await bcrypt.hash('2904', 12);
+  const passwordHash = await bcrypt.hash(password, 12);
   const user = await User.create({
     name: 'Yosef Dahan',
     email,

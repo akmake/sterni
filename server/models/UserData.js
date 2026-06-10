@@ -32,9 +32,25 @@ const userDataSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    /** SHA-256 hash of the opaque sync token issued at register/login. select:false → never returned. */
+    syncTokenHash: {
+      type: String,
+      default: null,
+      select: false,
+    },
   },
   { timestamps: true }
 );
+
+/** Hash an opaque sync token for storage/comparison. */
+userDataSchema.statics.hashToken = function (token) {
+  return crypto.createHash('sha256').update(String(token)).digest('hex');
+};
+
+/** Generate a fresh opaque sync token (plaintext — return to client once). */
+userDataSchema.statics.generateToken = function () {
+  return crypto.randomBytes(32).toString('hex');
+};
 
 /** Generate a unique 4-digit numeric code. */
 userDataSchema.statics.generateUserId = async function () {

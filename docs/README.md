@@ -15,6 +15,7 @@
 | `state-management.md` | All Zustand stores |
 | `socket-events.md` | Socket.IO events |
 | `sync-map.md` | **Which files change together** — check before editing |
+| `security-audit-2026-06.md` | Security audit findings, fixes applied, `.env` state, and device-auth rollout plan |
 
 ## Modules
 

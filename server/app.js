@@ -62,8 +62,9 @@ import newsRoutes from './routes/newsRoutes.js';
 // --- Tether imports (device management) ---
 import tetherRoutes from './routes/tetherRoutes.js';
 
-import rateLimiter from './middlewares/rateLimiter.js';
+import rateLimiter, { authLimiter } from './middlewares/rateLimiter.js';
 import { requireAuth } from './middlewares/authMiddleware.js';
+import { errorHandler } from './middlewares/errorHandler.js';
 import { startEmailListener } from './services/emailListener.js';
 import { loggingMiddleware } from './middlewares/loggingMiddleware.js';
 
@@ -197,13 +198,7 @@ app.use('*', (req, res) => {
   res.status(404).json({ message: 'API endpoint not found' });
 });
 
-app.use((err, req, res, next) => {
-  if (err.code === 'EBADCSRFTOKEN') {
-    return res.status(403).json({ message: 'Form has been tampered with (CSRF Invalid)' });
-  }
-  console.error(err);
-  res.status(err.statusCode || 500).json({ message: err.message || 'Internal Server Error' });
-});
+app.use(errorHandler);
 
 startEmailListener();
 connectToWhatsApp();

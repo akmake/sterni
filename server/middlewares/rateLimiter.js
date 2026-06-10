@@ -22,5 +22,18 @@ export const productsLimiter = isDev
       legacyHeaders: false,
     });
 
+/* Limiter קשיח לנתיבי אימות (login) — נגד brute-force.
+   נספרות רק בקשות שנכשלו, כך שמשתמש לגיטימי לא נחסם. */
+export const authLimiter = isDev
+  ? (_req, _res, next) => next()
+  : rateLimit({
+      windowMs: 15 * 60 * 1000,
+      max: 10,
+      skipSuccessfulRequests: true,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { message: 'יותר מדי ניסיונות התחברות. נסה שוב בעוד מספר דקות.' },
+    });
+
 /* ברירת-מחדל */
 export default publicLimiter;

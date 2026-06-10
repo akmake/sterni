@@ -1,19 +1,20 @@
 import express from 'express';
 import * as settingsController from '../controllers/settingsController.js';
-import { requireAuth as protect } from '../middlewares/authMiddleware.js'; 
+import { requireAuth as protect, requireAdmin } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
-router.use(protect); 
+router.use(protect);
 
-router.get('/accounts', settingsController.getAccounts);
-router.get('/accounts/:id/password', settingsController.getAccountPassword);
-router.post('/account', settingsController.saveEmailAccount);
-router.delete('/account/:id', settingsController.deleteAccount);
-router.post('/test-connection', settingsController.testConnection);
+// --- חשבונות מייל / סיסמאות / ניתוב = מנהל בלבד (חושף סודות מערכת) ---
+router.get('/accounts', requireAdmin, settingsController.getAccounts);
+router.get('/accounts/:id/password', requireAdmin, settingsController.getAccountPassword);
+router.post('/account', requireAdmin, settingsController.saveEmailAccount);
+router.delete('/account/:id', requireAdmin, settingsController.deleteAccount);
+router.post('/test-connection', requireAdmin, settingsController.testConnection);
 
-router.get('/config', settingsController.getConfig);
-router.post('/routing', settingsController.updateRouting);
+router.get('/config', requireAdmin, settingsController.getConfig);
+router.post('/routing', requireAdmin, settingsController.updateRouting);
 router.get('/quote-template', settingsController.getQuoteTemplate);
 router.post('/quote-template', settingsController.updateQuoteTemplate);
 router.get('/quote-templates', settingsController.getQuoteTemplates);

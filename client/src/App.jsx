@@ -106,7 +106,6 @@ export default function App() {
           {/* ג˜… FIX: Consistent paths ג€” all relative (no leading slash) */}
           <Route path="profile"               element={<ProfilePage />} />
           <Route path="software-library"      element={<SoftwareLibraryPage />} />
-          <Route path="settings"              element={<SystemSettings />} />
           <Route path="price-quote"           element={<PriceQuoteGenerator />} />
           <Route path="price-quote-v2"        element={<PriceQuoteGeneratorPdf />} />
           <Route path="price-quote-template"  element={<QuoteTemplateEditorPage />} />
@@ -165,6 +164,7 @@ export default function App() {
         </Route>
 
         <Route element={<AdminOnlyRoute />}>
+          <Route path="settings"   element={<SystemSettings />} />
           <Route path="admin/users" element={<AdminUsersPage />} />
           <Route path="admin/meals" element={<AdminMealsPage />} />
           <Route path="admin/logs" element={<AdminLogsPage />} />

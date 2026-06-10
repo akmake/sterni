@@ -95,6 +95,19 @@
 
 ---
 
+## Device Auth (cross-repo — server ↔ Android apps)
+
+> ⚠️ These couplings span **separate repositories**. A change on one side needs a coordinated change + redeploy on the other. See `docs/architecture.md` → "Tether / Shieor device auth".
+
+| File changed | Must also check |
+|---|---|
+| `server/routes/tetherRoutes.js` (`/devices/join` token issuance, `requireDeviceAuth`, `TETHER_ENFORCE_DEVICE_AUTH`) | `server/models/TetherDevice.js` (`deviceSecretHash`), **ManagerApk** repo: `data/model/TetherModels.kt` (`JoinCommunityResponse.deviceToken`), `admin/TetherPolicyManager.kt` (token store), `data/api/RetrofitClient.kt` (interceptor), `ui/screens/join/JoinCommunityViewModel.kt`, `DailyStudyApp.kt` |
+| `server/controllers/shieorUserController.js` + `server/routes/shieorUserRoutes.js` (`syncToken`, `requireSyncAuth`, `SHIEOR_ENFORCE_AUTH`) | `server/models/UserData.js` (`syncTokenHash`), **AppHome** repo: `network/UserService.kt` (`syncToken` fields + `@Header`), `sync/UserManager.kt` (token store + bearer) |
+
+**Rollout order (do NOT enforce before apps ship):** (1) deploy server token issuance — non-breaking; (2) rebuild + roll out ManagerApk & AppHome so devices send the token; (3) once telemetry shows devices sending tokens, set `TETHER_ENFORCE_DEVICE_AUTH=true` / `SHIEOR_ENFORCE_AUTH=true`.
+
+---
+
 ## System-wide
 
 | File changed | Must also check |

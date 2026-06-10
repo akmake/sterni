@@ -34,7 +34,7 @@ const policySchema = new mongoose.Schema({
   supportWhatsApp: { type: String, default: null },
   supportEmail: { type: String, default: null },
   supportName: { type: String, default: 'Community Manager' },
-  uninstallPin: { type: String, default: '0000' },
+  uninstallPin: { type: String, default: null }, // null = אין PIN מוגדר → ביטול נעילה נדחה (fail-secure)
   webFilterMode: {
     type: String,
     enum: ['NONE', 'BLACKLIST', 'WHITELIST'],

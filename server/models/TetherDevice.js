@@ -77,6 +77,10 @@ const tetherDeviceSchema = new mongoose.Schema({
     required: true
   },
 
+  // SHA-256 hash of the device's secret token (issued at /devices/join).
+  // select:false → never returned in normal queries.
+  deviceSecretHash: { type: String, default: null, select: false },
+
   isDeviceOwner:  { type: Boolean, default: false },
   allowUninstall: { type: Boolean, default: false },
 

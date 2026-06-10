@@ -8,12 +8,18 @@ export const errorHandler = (err, req, res, next) => {
 
   err.statusCode = err.statusCode || 500;
   err.status = err.status || 'error';
-  err.message = err.message || 'Something went very wrong!';
+
+  const isProd = process.env.NODE_ENV === 'production';
+  // Never leak internal error details for 5xx in production — only operational
+  // (4xx) errors carry a client-safe message.
+  const safeMessage = (!isProd || err.statusCode < 500)
+    ? (err.message || 'Something went very wrong!')
+    : 'Internal Server Error';
 
   res.status(err.statusCode).json({
     status: err.status,
-    message: err.message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+    message: safeMessage,
+    ...(!isProd && { stack: err.stack }),
   });
 };
 

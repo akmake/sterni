@@ -3,12 +3,13 @@
 import express from 'express';
 import { registerUser, loginUser, logout, refresh, getProfile, updateProfile, updatePreferredView, changePassword } from '../controllers/authController.js';
 import { requireAuth } from '../middlewares/authMiddleware.js';
+import { authLimiter } from '../middlewares/rateLimiter.js';
 
 const router = express.Router();
 
 // Public routes
 // router.post('/register', registerUser); // הרשמה עצמית בוטלה – רק מנהל יוצר משתמשים
-router.post('/login', loginUser);
+router.post('/login', authLimiter, loginUser);
 router.post('/logout', logout);
 router.post('/refresh', refresh);
 

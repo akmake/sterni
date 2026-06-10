@@ -1,6 +1,6 @@
 # Auth Flow
 
-> Last updated: 2026-03-12
+> Last updated: 2026-06-09
 
 ## Overview
 
@@ -39,6 +39,14 @@ Both cookies are HTTP-only → cannot be accessed by JavaScript → XSS-safe.
 
 ---
 
+## Rate Limiting (`server/middlewares/rateLimiter.js`)
+
+- `authLimiter` — applied to `POST /api/auth/login` (`server/routes/auth.js`). Max 10 **failed** attempts per IP / 15 min (`skipSuccessfulRequests: true`), so legitimate users are never blocked. Brute-force protection.
+- `publicLimiter` (default export) — applied to `GET /api/csrf-token` (`server/app.js`).
+- In development (`NODE_ENV !== 'production'`) all limiters are pass-through no-ops.
+
+---
+
 ## CSRF Protection
 
 All protected routes require a CSRF token.
@@ -72,7 +80,7 @@ The axios instance handles fetching and attaching the CSRF token automatically.
 ### Actions
 - `login(credentials)` — calls POST /api/auth/login, sets user in store
 - `logout()` — calls POST /api/auth/logout, clears store
-- `checkAuth()` — called on app load, validates current session
+- ⚠️ **No `checkAuth()` exists** — there is no server-side session re-validation on app load. `isAuthenticated` is derived from the persisted `user` in localStorage; if the cookie/session expired, the UI still shows "logged in" until an API call returns 401 (handled by the `api.js` interceptor). Adding a `checkAuth` that calls `/api/auth/profile` on mount is an open improvement.
 
 ---
 

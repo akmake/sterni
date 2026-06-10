@@ -1,6 +1,7 @@
 ﻿import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -26,6 +27,38 @@ const requireTetherAuth = async (req, res, next) => {
   } catch {
     return res.status(401).json({ message: 'טוקן לא חוקי / פג תוקף' });
   }
+};
+
+// --- Per-device authentication (device secret token) ---
+// Each device receives an opaque secret at /devices/join; only its SHA-256 hash
+// is stored. The device sends it back in the `X-Device-Token` header on every
+// /devices/:deviceId/* call.
+export const hashDeviceToken = (token) =>
+  crypto.createHash('sha256').update(String(token)).digest('hex');
+
+export const generateDeviceToken = () => crypto.randomBytes(32).toString('hex');
+
+// Rollout-safe: when TETHER_ENFORCE_DEVICE_AUTH !== 'true', a *missing* token is
+// allowed (legacy apps in the field) but a *wrong* token is always rejected.
+// Flip the env flag to 'true' once all devices have updated to enforce fully.
+const requireDeviceAuth = async (req, res, next) => {
+  const token = req.headers['x-device-token'];
+  const enforce = process.env.TETHER_ENFORCE_DEVICE_AUTH === 'true';
+
+  const device = await TetherDevice.findOne({ deviceId: req.params.deviceId }).select('+deviceSecretHash');
+  if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
+
+  if (!token) {
+    if (enforce) return res.status(401).json({ message: 'device token required' });
+    req.device = device; // legacy device — allowed during rollout
+    return next();
+  }
+
+  if (!device.deviceSecretHash || hashDeviceToken(token) !== device.deviceSecretHash) {
+    return res.status(401).json({ message: 'invalid device token' });
+  }
+  req.device = device;
+  next();
 };
 
 
@@ -61,7 +94,8 @@ router.post('/auth/bootstrap', async (req, res) => {
     if (count > 0) return res.status(403).json({ message: 'כבר קיים מנהל' });
 
     const { name, email, password, secret } = req.body;
-    if (secret !== 'tether-init-2025') return res.status(403).json({ message: 'Forbidden' });
+    const bootstrapSecret = process.env.TETHER_BOOTSTRAP_SECRET;
+    if (!bootstrapSecret || secret !== bootstrapSecret) return res.status(403).json({ message: 'Forbidden' });
 
     const passwordHash = await bcrypt.hash(password, 12);
     const admin = await TetherAdmin.create({ name, email, passwordHash, role: 'superadmin' });
@@ -102,10 +136,18 @@ router.post('/devices/join', async (req, res) => {
       await TetherDevice.deleteMany({ hardwareId });
     }
     await TetherDevice.findOneAndDelete({ deviceId });
-    const device = await TetherDevice.create({ deviceId, deviceModel, hardwareId: hardwareId || null, communityId: community._id });
+
+    // Issue a per-device secret token; store only its hash, return the plaintext once.
+    const deviceToken = generateDeviceToken();
+    const device = await TetherDevice.create({
+      deviceId, deviceModel, hardwareId: hardwareId || null,
+      communityId: community._id,
+      deviceSecretHash: hashDeviceToken(deviceToken)
+    });
 
     res.json({
       success: true,
+      deviceToken, // ⚠️ returned only here — the app must persist it securely
       device: {
         id: device._id,
         deviceId: device.deviceId,
@@ -171,7 +213,7 @@ function mergePolicy(communityPolicy, devicePolicy = {}) {
 }
 
 // allowUninstall is delivered once then reset to false (app handles the 1-hour window locally).
-router.get('/devices/:deviceId/policy', async (req, res) => {
+router.get('/devices/:deviceId/policy', requireDeviceAuth, async (req, res) => {
   try {
     const device = await TetherDevice.findOneAndUpdate(
       { deviceId: req.params.deviceId },
@@ -193,7 +235,7 @@ router.get('/devices/:deviceId/policy', async (req, res) => {
 });
 
 // Request approval for blocked action
-router.post('/devices/:deviceId/approval', async (req, res) => {
+router.post('/devices/:deviceId/approval', requireDeviceAuth, async (req, res) => {
   try {
     const rlKey = `approval:${req.ip}:${req.params.deviceId}`;
     if (hitRateLimit({ key: rlKey, limit: 30, windowMs: 60 * 1000 })) {
@@ -554,7 +596,7 @@ router.put('/admin/approvals/:id', requireTetherAuth, async (req, res) => {
 });
 
 // Verify PIN from Android app locally to allow uninstall
-router.post('/devices/:deviceId/verify-uninstall-pin', async (req, res) => {
+router.post('/devices/:deviceId/verify-uninstall-pin', requireDeviceAuth, async (req, res) => {
   try {
     const { pin } = req.body;
     const rlKey = `uninstall-pin:${req.ip}:${req.params.deviceId}`;
@@ -568,13 +610,15 @@ router.post('/devices/:deviceId/verify-uninstall-pin', async (req, res) => {
     if (!device.communityId) return res.status(404).json({ message: 'Community not found' });
 
     const communityPolicy = device.communityId.policy || {};
+    // אין יותר PIN ברירת-מחדל '0000' — אם לא הוגדר PIN/קוד חירום, אין קוד תקף (fail-secure).
     const validPins = new Set([
-      communityPolicy.uninstallPin || '0000',
+      communityPolicy.uninstallPin || null,
       communityPolicy.adminEmergencyCode || null,
       device.devicePolicy?.adminEmergencyCode || null
     ].filter(Boolean));
 
-    if (validPins.has(String(pin || '').trim())) {
+    const submitted = String(pin || '').trim();
+    if (submitted && validPins.has(submitted)) {
       device.allowUninstall = true;
       await device.save();
       return res.json({ success: true, allowUninstall: true });
@@ -1025,7 +1069,7 @@ router.post('/admin/app/version', requireTetherAuth, (req, res) => {
 });
 
 // דיווח אפליקציות מהמכשיר
-router.post('/devices/:deviceId/apps', async (req, res) => {
+router.post('/devices/:deviceId/apps', requireDeviceAuth, async (req, res) => {
   try {
     const { deviceId } = req.params;
     const apps = req.body.installedApps || req.body.apps;
@@ -1078,7 +1122,7 @@ router.get('/admin/devices', requireTetherAuth, async (req, res) => {
   }
 });
 
-router.post('/devices/:deviceId/heartbeat', async (req, res) => {
+router.post('/devices/:deviceId/heartbeat', requireDeviceAuth, async (req, res) => {
   try {
     const { accessibilityEnabled, isDeviceAdmin, isDeviceOwner, vpnActive } = req.body;
     await TetherDevice.findOneAndUpdate(
@@ -1098,7 +1142,7 @@ router.post('/devices/:deviceId/heartbeat', async (req, res) => {
   }
 });
 
-router.post('/devices/:deviceId/events', async (req, res) => {
+router.post('/devices/:deviceId/events', requireDeviceAuth, async (req, res) => {
   try {
     const { type, packageName } = req.body;
     const validTypes = [

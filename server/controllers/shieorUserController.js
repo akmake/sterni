@@ -8,8 +8,10 @@ import UserData from '../models/UserData.js';
 export const registerUser = async (req, res, next) => {
   try {
     const userId = await UserData.generateUserId();
-    const user = await UserData.create({ userId });
-    res.status(201).json({ userId: user.userId });
+    const syncToken = UserData.generateToken();
+    const user = await UserData.create({ userId, syncTokenHash: UserData.hashToken(syncToken) });
+    // syncToken returned only here — the app persists it and sends it as Bearer on get/sync.
+    res.status(201).json({ userId: user.userId, syncToken });
   } catch (err) {
     next(err);
   }
@@ -99,8 +101,16 @@ export const loginUser = async (req, res, next) => {
     if (!userId) return res.status(400).json({ message: 'חסר מספר משתמש' });
     const user = await UserData.findOne({ userId });
     if (!user) return res.status(404).json({ message: 'מספר משתמש לא נמצא' });
+
+    // Issue a fresh sync token on login so a new device can authenticate get/sync.
+    // Login itself is rate-limited (authLimiter) to blunt brute-force of the short userId.
+    const syncToken = UserData.generateToken();
+    user.syncTokenHash = UserData.hashToken(syncToken);
+    await user.save();
+
     res.json({
       userId:           user.userId,
+      syncToken,
       readingPositions: Object.fromEntries(user.readingPositions),
       preferences:      Object.fromEntries(user.preferences),
       savedArticleIds:  user.savedArticleIds,

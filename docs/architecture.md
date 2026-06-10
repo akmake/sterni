@@ -1,6 +1,6 @@
 # Architecture & Environment
 
-> Last updated: 2026-03-12
+> Last updated: 2026-06-09
 
 ## Environment Variables
 
@@ -23,7 +23,22 @@
 | Variable | Description |
 |----------|-------------|
 | `EMAIL_*` | Email listener credentials (see emailListener.js) |
+| `ENCRYPTION_KEY` | 32-char AES-256 key used by `server/utils/encryption.js` to encrypt stored email-account passwords. **Must be set** — there is no insecure fallback. ⚠️ If you change this key, previously-encrypted passwords can no longer be decrypted (re-enter them). |
 | WhatsApp credentials stored in `server/auth_info_baileys/` and `server/credentials/` |
+
+### Admin bootstrap scripts (manual, run-once)
+| Variable | Description |
+|----------|-------------|
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Required by `createAdmin.js` and `createTetherAdmin.js`. No hardcoded credentials — set these in `.env` before running the scripts. `ADMIN_NAME` optional. |
+
+### Tether / Shieor device auth (rollout flags)
+| Variable | Description |
+|----------|-------------|
+| `TETHER_BOOTSTRAP_SECRET` | Required for the one-time `POST /api/tether/auth/bootstrap` superadmin creation (replaces the old hardcoded `tether-init-2025`). If unset, bootstrap is disabled. |
+| `TETHER_ENFORCE_DEVICE_AUTH` | `'true'` → reject `/api/tether/devices/:id/*` calls that lack a valid `X-Device-Token`. Default (unset) is **rollout mode**: missing token allowed (legacy devices), wrong token always rejected. Flip to `'true'` only after all field devices send the token. |
+| `SHIEOR_ENFORCE_AUTH` | Same rollout pattern for `GET/PUT /api/user/:userId` — `'true'` requires a valid `Authorization: Bearer <syncToken>`. |
+
+> **Device token model:** `/api/tether/devices/join` returns a one-time `deviceToken`; `/api/user/register` and `/api/user/login` return a one-time `syncToken`. Only the SHA-256 hash is stored server-side (`TetherDevice.deviceSecretHash`, `UserData.syncTokenHash`, both `select:false`). The app persists the plaintext and sends it back on every device call. See "rollout flags" above for the 3-phase enable.
 
 ---
 
@@ -55,6 +70,9 @@ The static frontend is served by nginx (`client/nginx.conf`), which sets the CSP
 
 ### HTML rendering (XSS)
 All `dangerouslySetInnerHTML` usages go through `client/src/utils/sanitizeHtml.js` (DOMPurify, formatting allowlist). Never inject raw user HTML directly — always wrap with `sanitizeHtml()`. Affected: PriceQuoteGenerator(Pdf), PaymentRequestGenerator, QuoteManager, HotelNew/EditOrderPage.
+
+### Error handling
+All routes funnel errors to the central handler `server/middlewares/errorHandler.js` (registered last in `app.js`). It handles `EBADCSRFTOKEN` (403) and, in **production**, returns a generic `"Internal Server Error"` message for 5xx (no stack/internal message leakage). Stack traces are only included when `NODE_ENV !== 'production'`. Use `next(err)` (or the `catchAsync` wrapper) in controllers rather than ad-hoc `res.status(500)`.
 
 ### CSRF Flow
 1. Client calls `GET /api/csrf-token` to get token

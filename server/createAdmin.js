@@ -10,9 +10,15 @@ const createAdmin = async () => {
     await mongoose.connect(process.env.MONGO_URI);
     console.log('✅ מחובר ל־MongoDB');
 
-    const email = 'yosefdaean@gmail.com';
-    const password = '0546205955'; // שנה לסיסמה חזקה
-    const name = 'יוסף יצחק דהאן'; // שם
+    const email = process.env.ADMIN_EMAIL;
+    const password = process.env.ADMIN_PASSWORD;
+    const name = process.env.ADMIN_NAME || 'Admin';
+
+    if (!email || !password) {
+      console.error('❌ הגדר ADMIN_EMAIL ו-ADMIN_PASSWORD ב-.env לפני הרצת הסקריפט');
+      return process.exit(1);
+    }
+
     const existing = await User.findOne({ email });
 
     if (existing) {

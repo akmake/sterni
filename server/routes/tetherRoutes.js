@@ -215,12 +215,32 @@ function mergePolicy(communityPolicy, devicePolicy = {}) {
 // allowUninstall is delivered once then reset to false (app handles the 1-hour window locally).
 router.get('/devices/:deviceId/policy', requireDeviceAuth, async (req, res) => {
   try {
+    // Command delivery reliability:
+    //  - Apps that send `X-Cmd-Ack: 1` get at-least-once delivery — we do NOT clear
+    //    pendingCommands on read; the device acks executed ids via POST /commands/ack and we
+    //    $pull them then. This survives a dropped HTTP response (the command is redelivered).
+    //  - Legacy apps (no header) keep the original at-most-once clear-on-read, so they don't
+    //    replay the same command on every poll.
+    const supportsAck = req.headers['x-cmd-ack'] === '1';
+    const readUpdate = { lastSeen: new Date(), $set: { allowUninstall: false } };
+    if (!supportsAck) readUpdate.$set.pendingCommands = [];
+
     const device = await TetherDevice.findOneAndUpdate(
       { deviceId: req.params.deviceId },
-      { lastSeen: new Date(), $set: { pendingCommands: [], allowUninstall: false } }
+      readUpdate
     ).populate('communityId');
 
     if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
+
+    // ── Iron link: device enforcement strictly follows server state ──
+    // A device that was removed from its community (soft-delete → active=false), or whose
+    // community was deleted/deactivated, must STOP enforcing. We answer its policy poll with
+    // 404 — the exact signal the app already self-releases on (confirmed across a few polls,
+    // see onDeviceNotFound). This is declarative and idempotent: every poll re-asserts "you are
+    // no longer managed", so it self-heals across restarts and needs no app update to work.
+    if (!device.active || !device.communityId || device.communityId.active === false) {
+      return res.status(404).json({ message: 'מכשיר אינו מנוהל עוד — שחרור', released: true });
+    }
 
     const merged = mergePolicy(device.communityId.policy, device.devicePolicy);
 
@@ -229,6 +249,25 @@ router.get('/devices/:deviceId/policy', requireDeviceAuth, async (req, res) => {
       allowUninstall: device.allowUninstall ?? false,
       pendingCommands: device.pendingCommands ?? []
     });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// Device acknowledges the commands it executed → remove them so they are not redelivered.
+// Idempotent: unknown / already-removed ids are simply ignored. Pairs with the at-least-once
+// delivery above (X-Cmd-Ack apps).
+router.post('/devices/:deviceId/commands/ack', requireDeviceAuth, async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.ids)
+      ? req.body.ids.map((x) => String(x || '').trim()).filter(Boolean)
+      : [];
+    if (ids.length === 0) return res.json({ success: true, removed: 0 });
+    await TetherDevice.updateOne(
+      { deviceId: req.params.deviceId },
+      { $pull: { pendingCommands: { _id: { $in: ids } } } }
+    );
+    res.json({ success: true, removed: ids.length });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }

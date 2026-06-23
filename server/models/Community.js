@@ -10,6 +10,12 @@ const policySchema = new mongoose.Schema({
   blockFactoryReset:     { type: Boolean, default: true },
   blockUsbTransfer:      { type: Boolean, default: false },
   maxInstalledApps:      { type: Number,  default: null },
+  // BLACKLIST: allow every app except blockedApps; WHITELIST: only allowedApps run (kiosk).
+  appPolicyMode: {
+    type: String,
+    enum: ['BLACKLIST', 'WHITELIST'],
+    default: 'BLACKLIST'
+  },
   allowedApps:           { type: [String], default: [] },
   blockedApps:           { type: [String], default: [] },
   appTimeLocks: {

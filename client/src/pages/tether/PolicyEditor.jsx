@@ -5,6 +5,7 @@ import { tetherApi, authHeader } from './tetherApi';
 export default function PolicyEditor({ communityId, initialPolicy, onSaved }) {
   const [policy, setPolicy] = useState({
     webFilterMode: 'NONE',
+    appPolicyMode: 'BLACKLIST',
     allowedDomains: [],
     blockedDomains: [],
     ...initialPolicy,
@@ -65,6 +66,24 @@ export default function PolicyEditor({ communityId, initialPolicy, onSaved }) {
           <option value="SHOW_MESSAGE">הצג הודעה</option>
           <option value="REQUEST_APPROVAL">בקשת אישור</option>
         </select>
+      </div>
+
+      <div className="mt-4 pt-4 border-t border-gray-200">
+        <h5 className="text-xs font-semibold text-gray-500 uppercase mb-3">📱 אפליקציות</h5>
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">מצב אפליקציות</label>
+          <select value={policy.appPolicyMode || 'BLACKLIST'}
+            onChange={e => setPolicy(p => ({ ...p, appPolicyMode: e.target.value }))}
+            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm">
+            <option value="BLACKLIST">חסום אפליקציות ספציפיות (רשימה שחורה)</option>
+            <option value="WHITELIST">אפשר רק אפליקציות מאושרות (רשימה לבנה / קיוסק)</option>
+          </select>
+          <p className="text-xs text-gray-400 mt-1">
+            {policy.appPolicyMode === 'WHITELIST'
+              ? 'מצב קיוסק: רק האפליקציות ברשימת המותרות יפעלו, כל השאר ייחסם.'
+              : 'כל האפליקציות פועלות חוץ מהאפליקציות ברשימה החסומה.'}
+          </p>
+        </div>
       </div>
 
       <div className="mt-4 pt-4 border-t border-gray-200">

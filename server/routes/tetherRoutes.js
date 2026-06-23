@@ -190,6 +190,7 @@ function mergePolicy(communityPolicy, devicePolicy = {}) {
   });
 
   if (devicePolicy.maxInstalledApps != null) merged.maxInstalledApps = devicePolicy.maxInstalledApps;
+  if (devicePolicy.appPolicyMode != null) merged.appPolicyMode = devicePolicy.appPolicyMode;
   if (devicePolicy.blockedActionBehavior != null) merged.blockedActionBehavior = devicePolicy.blockedActionBehavior;
   if (devicePolicy.webFilterMode != null) merged.webFilterMode = devicePolicy.webFilterMode;
   if (devicePolicy.supportWhatsApp != null) merged.supportWhatsApp = devicePolicy.supportWhatsApp;
@@ -419,6 +420,10 @@ const sanitizeDevicePolicyPayload = (payload = {}) => {
     if (Number.isFinite(parsed) && parsed >= 0) out.maxInstalledApps = Math.floor(parsed);
   }
 
+  if (payload.appPolicyMode != null) {
+    const allowed = ['BLACKLIST', 'WHITELIST'];
+    if (allowed.includes(payload.appPolicyMode)) out.appPolicyMode = payload.appPolicyMode;
+  }
   if (payload.blockedActionBehavior != null) {
     const allowed = ['SILENT', 'SHOW_MESSAGE', 'REQUEST_APPROVAL'];
     if (allowed.includes(payload.blockedActionBehavior)) out.blockedActionBehavior = payload.blockedActionBehavior;

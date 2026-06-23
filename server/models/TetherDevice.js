@@ -48,6 +48,7 @@ const devicePolicySchema = new mongoose.Schema({
   allowedDomains:    { type: [String], default: undefined },
   blockedDomains:    { type: [String], default: undefined },
   adminEmergencyCode:{ type: String, default: null },
+  appPolicyMode:     { type: String, enum: ['BLACKLIST', 'WHITELIST'], default: null }, // null = inherit community
   blockedApps:       { type: [String], default: [] },  // extra per-device blocks
   allowedApps:       { type: [String], default: [] },  // per-device overrides (force-allow)
   appTimeLocks:      { type: [appTimeLockSchema], default: [] },

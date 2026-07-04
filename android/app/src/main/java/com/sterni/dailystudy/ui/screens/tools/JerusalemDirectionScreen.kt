@@ -37,6 +37,7 @@ import com.sterni.dailystudy.ui.theme.BaHaYetzira
 import com.sterni.dailystudy.ui.theme.Muted
 import com.sterni.dailystudy.ui.theme.Primary
 import com.sterni.dailystudy.ui.theme.SblHebrew
+import com.sterni.dailystudy.ui.components.AppScreenHeader
 import kotlin.math.*
 
 // Jerusalem coordinates
@@ -130,25 +131,7 @@ fun JerusalemDirectionScreen(onBack: () -> Unit) {
 
     Scaffold(
         containerColor = Color(0xFFFDFBF7),
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "כיוון ירושלים",
-                        fontFamily = BaHaYetzira,
-                        fontWeight = FontWeight.Bold,
-                        fontSize   = 20.sp,
-                        color      = Primary
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזור", tint = Primary)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFFDFBF7))
-            )
-        }
+        topBar = { AppScreenHeader("כיוון ירושלים", onBack, "מצפן לכיוון עיר הקודש") }
     ) { padding ->
         Column(
             modifier            = Modifier

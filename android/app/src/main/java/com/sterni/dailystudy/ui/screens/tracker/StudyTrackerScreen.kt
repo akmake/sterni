@@ -25,6 +25,7 @@ import com.sterni.dailystudy.notification.MidnightReminderReceiver
 import com.sterni.dailystudy.notification.ZmanBriefWorker
 import com.sterni.dailystudy.tracker.StudyTracker
 import com.sterni.dailystudy.ui.theme.*
+import com.sterni.dailystudy.ui.components.AppScreenHeader
 import com.sterni.dailystudy.widget.StudyWidgetProvider
 import java.text.SimpleDateFormat
 import java.util.*
@@ -47,28 +48,7 @@ fun StudyTrackerScreen(onBack: () -> Unit) {
             .fillMaxSize()
             .background(BgColor)
     ) {
-        Surface(shadowElevation = 0.dp, color = Color(0xFFFDFBF7)) {
-            Column {
-                Spacer(Modifier.statusBarsPadding())
-                Row(
-                    modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowForward, contentDescription = "חזור", tint = Primary)
-                    }
-                    Text(
-                        "מעקב לימודים",
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.Center,
-                        fontSize = 19.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Primary
-                    )
-                    Spacer(Modifier.width(48.dp))
-                }
-            }
-        }
+        AppScreenHeader("מעקב לימודים", onBack, "קצב, רצף והתמדה")
 
         TabRow(
             selectedTabIndex = selectedTab,

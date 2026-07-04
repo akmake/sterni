@@ -38,6 +38,7 @@ import coil.request.ImageRequest
 import com.sterni.dailystudy.data.model.ArticleContent
 import com.sterni.dailystudy.data.model.NewsItem
 import com.sterni.dailystudy.ui.theme.*
+import com.sterni.dailystudy.ui.components.AppScreenHeader
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -98,52 +99,11 @@ fun NewsScreen(
     Scaffold(
         containerColor      = PageBg,
         contentWindowInsets = WindowInsets(0.dp),
-        topBar = {
-            Column(Modifier.background(CardBg)) {
-                Spacer(Modifier.statusBarsPadding())
-                Row(
-                    modifier              = Modifier
-                        .fillMaxWidth()
-                        .height(54.dp)
-                        .padding(horizontal = 4.dp),
-                    verticalAlignment     = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזרה", tint = Ink, modifier = Modifier.size(20.dp))
-                    }
-                    Text(
-                        text       = "חדשות",
-                        modifier   = Modifier.weight(1f),
-                        fontSize   = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = SblHebrew,
-                        color      = Ink
-                    )
-                    if (state.lastUpdated != null) {
-                        val timeStr = remember(state.lastUpdated) {
-                            SimpleDateFormat("HH:mm", Locale.US).format(Date(state.lastUpdated!!))
-                        }
-                        Row(
-                            verticalAlignment     = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp),
-                            modifier              = Modifier.padding(end = 4.dp)
-                        ) {
-                            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFF22C55E)))
-                            Text(timeStr, fontSize = 12.sp, fontFamily = SblHebrew, color = Muted)
-                        }
-                    }
-                    IconButton(onClick = { vm.loadFeed() }, enabled = !state.loading) {
-                        Icon(
-                            Icons.Default.Refresh,
-                            contentDescription = "רענון",
-                            tint               = if (state.loading) Muted.copy(alpha = 0.3f) else Ink,
-                            modifier           = Modifier.size(20.dp)
-                        )
-                    }
-                }
-                HorizontalDivider(color = Divider, thickness = 0.5.dp)
-            }
-        }
+        topBar = { AppScreenHeader("חדשות", onBack, state.lastUpdated?.let {
+            "עודכן ${SimpleDateFormat("HH:mm", Locale.US).format(Date(it))}"
+        }) { IconButton(onClick = { vm.loadFeed() }, enabled = !state.loading) {
+            Icon(Icons.Default.Refresh, "רענן", tint = if (state.loading) Muted.copy(alpha = .3f) else Muted)
+        } } }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when {

@@ -2,12 +2,15 @@ package com.sterni.dailystudy.ui.screens.settings
 
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.rounded.CloudDownload
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,6 +25,7 @@ import com.sterni.dailystudy.cache.StudyCache
 import com.sterni.dailystudy.data.api.RetrofitClient
 import com.sterni.dailystudy.sync.UserManager
 import com.sterni.dailystudy.ui.theme.*
+import com.sterni.dailystudy.ui.components.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -65,48 +69,21 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BgColor)
-    ) {
-        Surface(shadowElevation = 0.dp, color = Color(0xFFFDFBF7)) {
-            Column {
-                Spacer(Modifier.statusBarsPadding())
-                Row(
-                    modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowForward, contentDescription = "חזור", tint = Primary)
-                    }
-                    Text(
-                        "הגדרות",
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.Center,
-                        fontSize = 19.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Primary
-                    )
-                    Spacer(Modifier.width(48.dp))
-                }
-            }
-        }
-
+    Column(Modifier.fillMaxSize().background(BgColor)) {
+        AppScreenHeader("הגדרות", onBack, "התאמה אישית")
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(start = 16.dp, end = 8.dp, top = 16.dp, bottom = 16.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            SettingsCard {
-                Text("גודל טקסט לפי לימוד", fontWeight = FontWeight.SemiBold, color = Ink, fontSize = 15.sp)
-                Spacer(Modifier.height(12.dp))
+            AppSectionTitle("קריאה", "התאם את הטקסט והגלילה לקצב שלך")
+            AppCard {
                 STUDY_LABELS.forEach { (key, label) ->
                     val state = fontSizes[key] ?: return@forEach
                     var size by state
-                    SettingLabel(label, "${size}sp")
+                    AppValueLabel(label, "$size")
                     Slider(
                         value         = size.toFloat(),
                         onValueChange = {
@@ -120,12 +97,11 @@ fun SettingsScreen(onBack: () -> Unit) {
                         steps      = 17,
                         colors     = SliderDefaults.colors(thumbColor = Primary, activeTrackColor = Primary)
                     )
-                    Spacer(Modifier.height(4.dp))
+                    if (key != STUDY_LABELS.last().first) HorizontalDivider(color = LineColor.copy(alpha = .45f))
                 }
             }
-
-            SettingsCard {
-                SettingLabel("מהירות גלילה", "${scrollSpeed} px/s")
+            AppCard {
+                AppValueLabel("מהירות גלילה אוטומטית", "$scrollSpeed")
                 Slider(
                     value = scrollSpeed.toFloat(),
                     onValueChange = {
@@ -137,38 +113,38 @@ fun SettingsScreen(onBack: () -> Unit) {
                     colors     = SliderDefaults.colors(thumbColor = Primary, activeTrackColor = Primary)
                 )
             }
-
-            SettingsCard {
-                Text("שניים מקרא ואחד תרגום", fontWeight = FontWeight.SemiBold, color = Ink, fontSize = 15.sp)
-                Spacer(Modifier.height(10.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
+            AppCard {
+                Text("שניים מקרא ואחד תרגום", fontWeight = FontWeight.SemiBold, color = Ink, fontSize = 14.sp)
+                Text("בחר כיצד יוצגו הפסוקים והתרגום", color = Muted, fontSize = 12.sp)
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth().background(Color(0xFFF5F7F6), RoundedCornerShape(11.dp)).padding(4.dp)) {
+                    TextButton(
                         onClick = {
                             shnayimConnected = true
                             shnayimPrefs.edit().putBoolean("shnayim_mikra_connected", true).apply()
                         },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (shnayimConnected) Primary else LineColor,
+                            containerColor = if (shnayimConnected) Color.White else Color.Transparent,
                             contentColor   = if (shnayimConnected) Color.White else Muted
-                        )
+                        ).let { if (shnayimConnected) ButtonDefaults.textButtonColors(containerColor = Primary, contentColor = Color.White) else ButtonDefaults.textButtonColors(contentColor = Muted) },
+                        shape = RoundedCornerShape(8.dp)
                     ) { Text("רצוף") }
-                    Button(
+                    TextButton(
                         onClick = {
                             shnayimConnected = false
                             shnayimPrefs.edit().putBoolean("shnayim_mikra_connected", false).apply()
                         },
                         modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (!shnayimConnected) Primary else LineColor,
-                            contentColor   = if (!shnayimConnected) Color.White else Muted
-                        )
+                        colors = if (!shnayimConnected) ButtonDefaults.textButtonColors(containerColor = Primary, contentColor = Color.White) else ButtonDefaults.textButtonColors(contentColor = Muted),
+                        shape = RoundedCornerShape(8.dp)
                     ) { Text("מופרד") }
                 }
             }
-
-            SettingsCard {
-                Text("הורדה אופליין (30 יום)", fontWeight = FontWeight.SemiBold, color = Ink, fontSize = 15.sp)
+            AppSectionTitle("נתונים וסנכרון", "שמירה לשימוש בלי חיבור ומעבר בין מכשירים")
+            AppCard {
+                Text("לימוד בלי חיבור", fontWeight = FontWeight.SemiBold, color = Ink, fontSize = 14.sp)
+                Text("הורד את 30 הימים הקרובים למכשיר", color = Muted, fontSize = 12.sp)
                 if (downloadProgress.isNotEmpty()) {
                     Text(downloadProgress, fontSize = 13.sp, color = Muted, modifier = Modifier.padding(top = 8.dp))
                 }
@@ -190,48 +166,47 @@ fun SettingsScreen(onBack: () -> Unit) {
                         },
                         enabled  = !downloading,
                         modifier = Modifier.weight(1f),
-                        colors   = ButtonDefaults.buttonColors(containerColor = Primary)
-                    ) { Text("הורד 30 ימים") }
-
-                    Button(
+                        colors   = ButtonDefaults.buttonColors(containerColor = Primary),
+                        shape = RoundedCornerShape(10.dp)
+                    ) { Icon(Icons.Rounded.CloudDownload, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("הורד") }
+                    OutlinedButton(
                         onClick = {
                             val deleted = StudyCache.clearAll(context)
                             cacheInfo = "נמחקו $deleted ימים"
                             downloadProgress = ""
                         },
                         modifier = Modifier.weight(1f),
-                        colors   = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
-                    ) { Text("מחק קאש") }
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFDC2626)),
+                        border = BorderStroke(1.dp, Color(0xFFDC2626).copy(alpha = .25f)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) { Icon(Icons.Rounded.DeleteOutline, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("מחק") }
                 }
                 if (cacheInfo.isNotEmpty()) {
                     Text(cacheInfo, fontSize = 12.sp, color = Muted, modifier = Modifier.padding(top = 4.dp))
                 }
             }
-
-            SettingsCard {
-                Text("מספר משתמש", fontWeight = FontWeight.SemiBold, color = Ink, fontSize = 15.sp)
+            AppCard {
+                Text("החשבון שלי", fontWeight = FontWeight.SemiBold, color = Ink, fontSize = 14.sp)
                 Spacer(Modifier.height(8.dp))
-                Text(
-                    "המספר שלך: $userId",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Primary,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Surface(color = Primary.copy(alpha = .07f), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    Row(Modifier.padding(14.dp), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                        Text("מספר משתמש", color = Muted, fontSize = 12.sp)
+                        Text(userId, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Primary)
+                    }
+                }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "שמור את המספר הזה — הוא מסנכרן את כל הנתונים שלך בין מכשירים.",
+                    "המספר הזה מאפשר לשחזר את הנתונים במכשיר אחר.",
                     fontSize = 12.sp,
                     color = Muted
                 )
                 HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = LineColor.copy(alpha = 0.5f))
-                Text("כניסה ממכשיר אחר", fontWeight = FontWeight.SemiBold, color = Ink, fontSize = 14.sp)
+                Text("שחזור ממכשיר אחר", fontWeight = FontWeight.SemiBold, color = Ink, fontSize = 14.sp)
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = loginCode,
                     onValueChange = { loginCode = it.filter { c -> c.isDigit() }.take(4) },
-                    label = { Text("הזן מספר משתמש (4 ספרות)") },
+                    label = { Text("מספר משתמש — 4 ספרות") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -263,9 +238,11 @@ fun SettingsScreen(onBack: () -> Unit) {
                     },
                     modifier = Modifier.fillMaxWidth(),
                     enabled  = loginCode.length == 4,
-                    colors   = ButtonDefaults.buttonColors(containerColor = Primary)
-                ) { Text("סנכרן מהמספר הזה") }
+                    colors   = ButtonDefaults.buttonColors(containerColor = Primary),
+                    shape = RoundedCornerShape(10.dp)
+                ) { Icon(Icons.Rounded.Sync, null, Modifier.size(18.dp)); Spacer(Modifier.width(7.dp)); Text("שחזר וסנכרן") }
             }
+            Spacer(Modifier.height(24.dp))
         }
     }
 
@@ -274,27 +251,6 @@ fun SettingsScreen(onBack: () -> Unit) {
             val id = withContext(Dispatchers.IO) { UserManager.ensureRegistered(context) }
             userId = id ?: "לא זמין (אין חיבור)"
         }
-    }
-}
-
-@Composable
-private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
-    Surface(
-        modifier        = Modifier.fillMaxWidth(),
-        shape           = RoundedCornerShape(14.dp),
-        shadowElevation = 1.dp,
-        color           = Color(0xFFFDFBF7),
-        border          = androidx.compose.foundation.BorderStroke(1.dp, LineColor.copy(alpha = 0.5f))
-    ) {
-        Column(modifier = Modifier.padding(16.dp), content = content)
-    }
-}
-
-@Composable
-private fun SettingLabel(label: String, value: String) {
-    Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-        Text(label, fontWeight = FontWeight.SemiBold, color = Ink, fontSize = 15.sp)
-        Text(value, fontSize = 14.sp, color = Primary, fontWeight = FontWeight.Bold)
     }
 }
 

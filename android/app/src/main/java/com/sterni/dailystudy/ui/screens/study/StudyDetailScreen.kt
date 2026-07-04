@@ -33,6 +33,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sterni.dailystudy.data.model.Section
 import com.sterni.dailystudy.ui.theme.*
+import com.sterni.dailystudy.ui.components.AppScreenHeader
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -200,37 +201,9 @@ fun StudyDetailScreen(
     }
 
     Scaffold(
-        topBar = {
-            Surface(shadowElevation = 0.dp, color = Color(0xFFFDFBF7)) {
-                Column {
-                    Spacer(Modifier.statusBarsPadding())
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .padding(horizontal = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.Default.ArrowForward, contentDescription = "Back", tint = Primary)
-                        }
-                        Text(
-                            text = title,
-                            modifier = Modifier.weight(1f),
-                            textAlign = TextAlign.Center,
-                            fontSize = 19.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Primary,
-                            maxLines = 1,
-                            fontFamily = SblHebrew
-                        )
-                        IconButton(onClick = { showSettingsDialog = true }) {
-                            Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Primary)
-                        }
-                    }
-                }
-            }
-        },
+        topBar = { AppScreenHeader(title, onBack, label.ifBlank { "לימוד היום" }) {
+            IconButton(onClick = { showSettingsDialog = true }) { Icon(Icons.Default.Settings, "הגדרות קריאה", tint = Muted) }
+        } },
         containerColor = Color(0xFFFDFBF7),
         floatingActionButton = {
             Button(

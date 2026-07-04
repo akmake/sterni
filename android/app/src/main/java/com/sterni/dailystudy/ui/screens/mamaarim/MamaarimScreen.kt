@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sterni.dailystudy.data.model.Mamaar
 import com.sterni.dailystudy.ui.theme.*
+import com.sterni.dailystudy.ui.components.AppScreenHeader
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -65,35 +66,9 @@ fun MamaarimScreen(
                 Icon(Icons.Default.Add, contentDescription = "העלה מאמר")
             }
         },
-        topBar = {
-            Surface(shadowElevation = 2.dp, color = Color.White) {
-                Column {
-                    Spacer(Modifier.statusBarsPadding())
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .padding(horizontal = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.Default.ArrowForward, contentDescription = "חזור", tint = Primary)
-                        }
-                        Text(
-                            text = "מאמרים",
-                            modifier = Modifier.weight(1f),
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = BaHaYetzira,
-                            color = Primary
-                        )
-                        IconButton(onClick = { vm.loadAll() }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "רענן", tint = Primary)
-                        }
-                    }
-                }
-            }
-        },
+        topBar = { AppScreenHeader("מאמרים", onBack, "הספרייה שלי") {
+            IconButton(onClick = { vm.loadAll() }) { Icon(Icons.Default.Refresh, "רענן", tint = Muted) }
+        } },
         containerColor = BgColor
     ) { padding ->
 

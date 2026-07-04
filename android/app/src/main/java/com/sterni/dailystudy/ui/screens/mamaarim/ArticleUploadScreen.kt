@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sterni.dailystudy.ui.theme.*
+import com.sterni.dailystudy.ui.components.AppScreenHeader
 
 @Composable
 fun ArticleUploadScreen(
@@ -45,34 +46,7 @@ fun ArticleUploadScreen(
     ) { uri -> uri?.let { vm.onPdfPicked(it) } }
 
     Scaffold(
-        topBar = {
-            Surface(shadowElevation = 2.dp, color = Color.White) {
-                Column {
-                    Spacer(Modifier.statusBarsPadding())
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .padding(horizontal = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = { vm.reset(); onBack() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "חזור", tint = Primary)
-                        }
-                        Text(
-                            text       = "העלאת מאמר",
-                            modifier   = Modifier.weight(1f),
-                            fontSize   = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = BaHaYetzira,
-                            color      = Primary,
-                            textAlign  = TextAlign.Center
-                        )
-                        Spacer(Modifier.width(48.dp))
-                    }
-                }
-            }
-        },
+        topBar = { AppScreenHeader("מאמר חדש", { vm.reset(); onBack() }, "הוספה מהמכשיר או מהענן") },
         containerColor = BgColor
     ) { padding ->
 

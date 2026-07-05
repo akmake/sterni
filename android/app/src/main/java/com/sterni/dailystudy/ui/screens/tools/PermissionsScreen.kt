@@ -32,7 +32,6 @@ import com.sterni.dailystudy.ui.theme.Ink
 import com.sterni.dailystudy.ui.theme.Muted
 import com.sterni.dailystudy.ui.theme.Primary
 import com.sterni.dailystudy.ui.theme.SblHebrew
-import com.sterni.dailystudy.ui.components.AppScreenHeader
 
 private data class PermissionInfo(
     val title:      String,
@@ -120,7 +119,25 @@ fun PermissionsScreen(onBack: () -> Unit) {
 
     Scaffold(
         containerColor = Color(0xFFFDFBF7),
-        topBar = { AppScreenHeader("הרשאות", onBack, "מצב הגישה למכשיר") }
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        "הרשאות האפליקציה",
+                        fontFamily = BaHaYetzira,
+                        fontWeight = FontWeight.Bold,
+                        fontSize   = 20.sp,
+                        color      = Primary
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזור", tint = Primary)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFFDFBF7))
+            )
+        }
     ) { padding ->
         LazyColumn(
             modifier       = Modifier.fillMaxSize().padding(padding),

@@ -32,7 +32,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sterni.dailystudy.data.model.Mamaar
 import com.sterni.dailystudy.data.model.MamaarSection
 import com.sterni.dailystudy.ui.theme.*
-import com.sterni.dailystudy.ui.components.AppScreenHeader
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -110,9 +109,36 @@ private fun ReaderContent(mamaar: Mamaar, onBack: () -> Unit) {
     }
 
     Scaffold(
-        topBar = { AppScreenHeader(mamaar.title, onBack, "קריאת מאמר") {
-            IconButton(onClick = { showSettings = true }) { Icon(Icons.Default.FormatSize, "הגדרות קריאה", tint = Muted) }
-        } },
+        topBar = {
+            Surface(shadowElevation = 0.dp, color = Color(0xFFFDFBF7)) {
+                Column {
+                    Spacer(Modifier.statusBarsPadding())
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.Default.ArrowForward, contentDescription = "חזור", tint = Primary)
+                        }
+                        Text(
+                            text = mamaar.title,
+                            modifier = Modifier.weight(1f),
+                            textAlign = TextAlign.Center,
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Primary,
+                            maxLines = 1
+                        )
+                        IconButton(onClick = { showSettings = true }) {
+                            Icon(Icons.Default.FormatSize, contentDescription = "גודל טקסט", tint = Primary)
+                        }
+                    }
+                }
+            }
+        },
         containerColor = Color(0xFFFDFBF7),
         floatingActionButton = {
             Button(

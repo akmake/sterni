@@ -33,7 +33,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sterni.dailystudy.alarm.AlarmConfig
 import com.sterni.dailystudy.ui.theme.*
-import com.sterni.dailystudy.ui.components.AppScreenHeader
 import com.sterni.dailystudy.util.HebrewDate
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -60,7 +59,31 @@ fun ZmanimScreen(
                 .background(BgColor)
                 .padding(paddingValues)
         ) {
-            AppScreenHeader("זמנים", onBack, "לפי המיקום והתאריך שבחרת")
+            Surface(shadowElevation = 0.dp, color = Color(0xFFFDFBF7)) {
+                Column {
+                    Spacer(Modifier.statusBarsPadding())
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "חזור", tint = Primary)
+                        }
+                        Text(
+                            "זמנים הלכתיים",
+                            modifier = Modifier.weight(1f),
+                            textAlign = TextAlign.Center,
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Primary
+                        )
+                        Spacer(Modifier.width(48.dp))
+                    }
+                }
+            }
 
             Row(
                 modifier = Modifier

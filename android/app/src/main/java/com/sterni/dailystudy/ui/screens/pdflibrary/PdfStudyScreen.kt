@@ -40,8 +40,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sterni.dailystudy.ui.theme.BaHaYetzira
 import com.sterni.dailystudy.ui.theme.Primary
-import com.sterni.dailystudy.ui.theme.Muted
-import com.sterni.dailystudy.ui.components.AppScreenHeader
 
 private fun getFileName(context: android.content.Context, uri: Uri): String {
     var result: String? = null
@@ -315,8 +313,29 @@ fun PdfStudyScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize().background(Color(0xFFFDFBF7))) {
-        AppScreenHeader("ארון הספרים", onBack, "ספרי PDF ללימוד אישי") {
-            IconButton(onClick = { launcher.launch(arrayOf("application/pdf")) }) { Icon(Icons.Default.Add, "הוסף ספר", tint = Muted) }
+        Surface(shadowElevation = 2.dp, color = Color.White) {
+            Column {
+                Spacer(Modifier.statusBarsPadding())
+                Row(
+                    modifier          = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowForward, "Back", tint = Primary)
+                    }
+                    Text(
+                        text       = "ארון הספרים שלי",
+                        modifier   = Modifier.weight(1f),
+                        fontSize   = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = BaHaYetzira,
+                        color      = Primary
+                    )
+                    IconButton(onClick = { launcher.launch(arrayOf("application/pdf")) }) {
+                        Icon(Icons.Default.Add, "Add Book", tint = Primary)
+                    }
+                }
+            }
         }
 
         if (state.books.isEmpty()) {

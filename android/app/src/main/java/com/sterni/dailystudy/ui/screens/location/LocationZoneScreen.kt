@@ -36,7 +36,6 @@ import com.sterni.dailystudy.ui.theme.*
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
-import com.sterni.dailystudy.ui.components.AppScreenHeader
 
 @Composable
 fun LocationZoneScreen(
@@ -98,7 +97,28 @@ fun LocationZoneScreen(
             .fillMaxSize()
             .background(BgColor)
     ) {
-        AppScreenHeader("אזורי שקט", onBack, "השתקה חכמה לפי מיקום")
+        Surface(shadowElevation = 0.dp, color = Color(0xFFFDFBF7)) {
+            Column {
+                Spacer(Modifier.statusBarsPadding())
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowForward, contentDescription = "חזור", tint = Primary)
+                    }
+                    Text(
+                        "אזורי שקט",
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center,
+                        fontSize = 19.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Primary
+                    )
+                    Spacer(Modifier.width(48.dp))
+                }
+            }
+        }
 
         if (!state.hasLocationPermission) {
             val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED

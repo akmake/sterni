@@ -24,7 +24,6 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sterni.dailystudy.ui.theme.*
-import com.sterni.dailystudy.ui.components.AppScreenHeader
 
 private val LightBg = Color(0xFFFDFBF7)
 
@@ -111,12 +110,46 @@ fun TefilaScreen(onBack: () -> Unit) {
 
     Scaffold(
         containerColor = LightBg,
-        topBar = { AppScreenHeader(
-            title = when (selectedSection) { TefilaSection.EIZEHU -> "איזהו מקומן"; TefilaSection.KSHEMA -> "ק\"ש תפילין ר\"ת"; null -> "תפילה" },
-            subtitle = if (selectedSection == null) "קטעי תפילה לקריאה נוחה" else "מצב קריאה",
-            onBack = { if (selectedSection == null) onBack() else selectedSection = null },
-            action = if (selectedSection != null) {{ IconButton(onClick = { showSettings = true }) { Icon(Icons.Default.Settings, "הגדרות", tint = Muted) } }} else null
-        ) }
+        topBar = {
+            Surface(shadowElevation = 0.dp, color = LightBg) {
+                Column {
+                    Spacer(Modifier.statusBarsPadding())
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = {
+                            if (selectedSection == null) onBack() else selectedSection = null
+                        }) {
+                            Icon(Icons.Default.ArrowForward, contentDescription = "חזור", tint = Primary)
+                        }
+                        Text(
+                            text = when (selectedSection) {
+                                TefilaSection.EIZEHU -> "איזהו מקומן"
+                                TefilaSection.KSHEMA -> "ק\"ש תפילין ר\"ת"
+                                null                 -> "תפילה"
+                            },
+                            modifier   = Modifier.weight(1f),
+                            textAlign  = TextAlign.Center,
+                            fontSize   = 19.sp,
+                            fontWeight = FontWeight.Bold,
+                            color      = Primary,
+                            fontFamily = BaHaYetzira
+                        )
+                        if (selectedSection != null) {
+                            IconButton(onClick = { showSettings = true }) {
+                                Icon(Icons.Default.Settings, contentDescription = "הגדרות", tint = Primary)
+                            }
+                        } else {
+                            Spacer(Modifier.width(48.dp))
+                        }
+                    }
+                }
+            }
+        }
     ) { padding ->
         when (selectedSection) {
             null -> TefilaMenu(

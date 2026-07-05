@@ -31,7 +31,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sterni.dailystudy.data.model.AppBlockSchedule
 import com.sterni.dailystudy.ui.theme.*
-import com.sterni.dailystudy.ui.components.AppScreenHeader
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,7 +54,23 @@ fun AppBlockerScreen(
     }
 
     Scaffold(
-        topBar = { AppScreenHeader("חוסם אפליקציות", onBack, "זמנים שקטים מהסחות דעת") },
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text("חוסם אפליקציות", fontFamily = BaHaYetzira, fontWeight = FontWeight.Bold)
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזור")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor        = Primary,
+                    titleContentColor     = Color.White,
+                    navigationIconContentColor = Color.White
+                )
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(
                 onClick          = { viewModel.startNewSchedule() },

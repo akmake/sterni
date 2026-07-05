@@ -1,31 +1,26 @@
 package com.sterni.dailystudy.ui.screens.tools
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.rounded.*
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.sterni.dailystudy.ui.components.*
-import com.sterni.dailystudy.ui.theme.BgColor
-import com.sterni.dailystudy.ui.theme.LineColor
-import com.sterni.dailystudy.ui.theme.Primary
+import androidx.compose.ui.unit.sp
+import com.sterni.dailystudy.ui.theme.BaHaYetzira
+import com.sterni.dailystudy.ui.theme.SblHebrew
 
-private data class ToolItem(
-    val title: String,
-    val subtitle: String,
-    val icon: ImageVector,
-    val accent: Color,
-    val onClick: () -> Unit
-)
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ToolsScreen(
     onBack: () -> Unit,
@@ -36,38 +31,155 @@ fun ToolsScreen(
     onJerusalemDirClick: () -> Unit,
     onAppBlockerClick: () -> Unit = {}
 ) {
-    val everyday = listOf(
-        ToolItem("תפילה", "קטעי תפילה וקריאת שמע", Icons.AutoMirrored.Filled.MenuBook, Primary, onTefilaClick),
-        ToolItem("כיוון ירושלים", "מצפן לכיוון ירושלים עיר הקודש", Icons.Rounded.Explore, Color(0xFFD97706), onJerusalemDirClick),
-        ToolItem("מאמרים", "מאגר המאמרים האישי שלך", Icons.Rounded.Article, Color(0xFF7C3AED), onMamaarimClick)
-    )
-    val device = listOf(
-        ToolItem("אזורי שקט", "השתקה אוטומטית במקומות שבחרת", Icons.Rounded.LocationOn, Color(0xFF059669), onSilentZoneClick),
-        ToolItem("חוסם אפליקציות", "זמנים שקטים מהסחות דעת", Icons.Rounded.Block, Color(0xFFDC2626), onAppBlockerClick),
-        ToolItem("הרשאות", "בדיקה וניהול הרשאות המכשיר", Icons.Rounded.Security, Color(0xFF64748B), onPermissionsClick)
-    )
-
-    Column(Modifier.fillMaxSize().background(BgColor)) {
-        AppScreenHeader("כלים", onBack, "הכל במקום אחד")
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        "כלים",
+                        fontFamily = BaHaYetzira,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזור")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            )
+        }
+    ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item { AppSectionTitle("ליום יום", "לימוד, תפילה והתמצאות") }
-            item { ToolGroup(everyday) }
-            item { AppSectionTitle("המכשיר שלי", "כלים שעובדים ברקע ושומרים על הזמן שלך") }
-            item { ToolGroup(device) }
-            item { Spacer(Modifier.height(20.dp)) }
+            item {
+                ToolCard(
+                    title = "תפילה",
+                    subtitle = "איזהו מקומן, רבינו תם, ברכות",
+                    icon = Icons.AutoMirrored.Filled.MenuBook,
+                    accentColor = Color(0xFF0284C7),
+                    onClick = onTefilaClick
+                )
+            }
+            item {
+                ToolCard(
+                    title = "הרשאות",
+                    subtitle = "ניהול כל הרשאות האפליקציה",
+                    icon = Icons.Default.Security,
+                    accentColor = Color(0xFF7C3AED),
+                    onClick = onPermissionsClick
+                )
+            }
+            item {
+                ToolCard(
+                    title = "כיוון ירושלים",
+                    subtitle = "מצפן לכיוון ירושלים עיר הקודש",
+                    icon = Icons.Default.Explore,
+                    accentColor = Color(0xFFEA580C),
+                    onClick = onJerusalemDirClick
+                )
+            }
+            item {
+                ToolCard(
+                    title = "אזורי שקט",
+                    subtitle = "השתקה אוטומטית לפי מיקום",
+                    icon = Icons.Default.LocationOn,
+                    accentColor = Color(0xFF059669),
+                    onClick = onSilentZoneClick
+                )
+            }
+            item {
+                ToolCard(
+                    title = "חוסם אפליקציות",
+                    subtitle = "חסימת אפליקציות בשעות מוגדרות",
+                    icon = Icons.Default.Block,
+                    accentColor = Color(0xFFDC2626),
+                    onClick = onAppBlockerClick
+                )
+            }
+            item {
+                ToolCard(
+                    title = "מאמרים",
+                    subtitle = "מאגר מאמרים וקבצי PDF",
+                    icon = Icons.Default.Article,
+                    accentColor = Color(0xFFD97706),
+                    onClick = onMamaarimClick
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun ToolGroup(items: List<ToolItem>) {
-    AppCard(modifier = Modifier.padding(top = 4.dp)) {
-        items.forEachIndexed { index, item ->
-            AppListRow(item.title, item.subtitle, item.icon, item.accent, item.onClick)
-            if (index != items.lastIndex) HorizontalDivider(color = LineColor.copy(alpha = .55f), modifier = Modifier.padding(start = 56.dp))
+private fun ToolCard(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    accentColor: Color,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = accentColor.copy(alpha = 0.12f),
+                modifier = Modifier.size(52.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
+
+            Spacer(Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SblHebrew,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    fontSize = 14.sp,
+                    fontFamily = SblHebrew,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            )
         }
     }
 }

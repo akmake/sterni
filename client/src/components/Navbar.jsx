@@ -1,6 +1,6 @@
 import { useState, Fragment } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { Menu, X, LogOut, Briefcase, Utensils, FileText, ChevronDown, ChevronUp, Settings, UserCircle, ListTodo, User, Users, CalendarDays, CreditCard, Shield, BarChart3, Scissors, FolderPlus, ClipboardList, Home, ArrowLeftRight, ShoppingCart, ClipboardCheck, Wallet, FolderKanban, Landmark, Hotel, Monitor, DollarSign, Tag, MapPin, MessageCircle, Newspaper, Smartphone } from "lucide-react";
+import { Menu, X, LogOut, Briefcase, Utensils, FileText, ChevronDown, ChevronUp, Settings, UserCircle, ListTodo, User, Users, CalendarDays, CreditCard, Shield, BarChart3, Scissors, FolderPlus, ClipboardList, Home, ArrowLeftRight, ShoppingCart, ClipboardCheck, Wallet, FolderKanban, Landmark, Hotel, Monitor, DollarSign, Tag, MapPin, MessageCircle, Newspaper, Smartphone, FileSpreadsheet } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/stores/authStore";
 import useLogout from "@/hooks/useLogout";
@@ -81,6 +81,7 @@ const getManagementNav = (isAuthenticated, isAdmin, hasTzitzitAccess) => {
         { to: '/admin/extras', label: 'ניהול תוספות', icon: Tag },
         { to: '/settings', label: 'הגדרות מערכת', icon: Settings },
         { to: '/admin/logs', label: 'דוח מבקרים', icon: BarChart3 },
+        { to: '/admin/commissions', label: 'דוח עמלות', icon: FileSpreadsheet },
         { to: '/admin/tether', label: 'Tether — ניהול מכשירים', icon: Smartphone },
       ]
     });

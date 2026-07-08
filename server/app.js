@@ -29,6 +29,8 @@ import quotePdfRoutes from './routes/quotePdfRoutes.js';
 import paymentRequestRoutes from './routes/paymentRequestRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import adminCommissionRoutes from './routes/adminCommissions.js';
+import adminCommissionOrdersStub from './routes/adminCommissionOrdersStub.js';
 import logsRoutes from './routes/logsRoutes.js';
 
 import tzitzitRoutes from './routes/tzitzitRoutes.js';
@@ -188,6 +190,8 @@ app.use('/api/finance/analytics', requireAuth, financeAnalyticsRoutes);
 app.use('/api/finance/dashboard', requireAuth, financeDashboardRoutes);
 app.use('/api/finance/import', requireAuth, financeImportRoutes);
 app.use('/api/software', requireAuth, softwareRoutes);
+app.use('/api/admin/commissions', adminCommissionRoutes);
+app.use('/api/admin/orders', adminCommissionOrdersStub);
 app.use('/api/admin', adminRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/hotel-orders', hotelOrderRoutes);

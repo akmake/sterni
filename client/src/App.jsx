@@ -80,6 +80,7 @@ import FinanceDepositsPage from './pages/FinanceDepositsPage';
 import FinanceImportPage from './pages/FinanceImportPage';
 import FinanceCategoriesPage from './pages/FinanceCategoriesPage';
 import FinanceAutomationPage from './pages/FinanceAutomationPage';
+import CommissionsPage from './pages/admin/CommissionsPage.jsx';
 
 // ׳“׳£ ׳‘׳™׳× ׳“׳™׳ ׳׳™ ׳׳₪׳™ ׳×׳¦׳•׳’׳” ׳׳•׳¢׳“׳₪׳×
 function DefaultRedirect() {
@@ -173,6 +174,7 @@ export default function App() {
           <Route path="admin/extras" element={<ManageExtrasPage />} />
           <Route path="admin/user-activity" element={<UserActivityPage />} />
           <Route path="admin/tether" element={<TetherAdminPage />} />
+          <Route path="admin/commissions" element={<CommissionsPage />} />
         </Route>
 
         <Route element={<TzitzitRoute />}>

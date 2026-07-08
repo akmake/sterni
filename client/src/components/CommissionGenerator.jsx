@@ -569,7 +569,7 @@ export default function CommissionGenerator({ onReportGenerated }) {
                                                 <td className="p-3 text-xs text-right">{row.finalInvNum}</td>
                                                 <td className="p-3 font-mono text-right">{row.masterId}</td>
                                                 <td className="p-3 text-right">{row.guestName}</td>
-                                                <td className="p-3 text-right text-xs">{row.customerPhone}</td> {/* חדש */}
+                                                <td className="p-3 text-right text-xs">{row.customerPhone}</td>
                                                 <td className="p-3 text-right text-xs">
                                                     {row.arrivalDate ? format(row.arrivalDate, 'dd/MM/yy') : '-'}
                                                 </td>

@@ -50,6 +50,8 @@ import financeAnalyticsRoutes from './routes/financeAnalyticsRoutes.js';
 import financeDashboardRoutes from './routes/financeDashboardRoutes.js';
 import financeImportRoutes from './routes/financeImportRoutes.js';
 import { setupSocketIO } from './services/socketService.js';
+import { setupGameSocketIO } from './services/gameSocketService.js';
+import gameRoutes from './routes/gameRoutes.js';
 import whatsappRoutes from './routes/whatsappRoutes.js';
 
 import softwareRoutes from './routes/softwareRoutes.js';
@@ -98,14 +100,30 @@ const app = express();
 const httpServer = createServer(app);
 
 // --- Socket.IO Setup ---
+const configuredOrigins = [
+  process.env.CLIENT_URL,
+  ...(process.env.CLIENT_URLS || '').split(','),
+  'https://dahanswebsite.com',
+  'http://localhost',
+  'https://localhost',
+  'capacitor://localhost',
+  'http://localhost:5173',
+].filter(Boolean).map(origin => origin.trim());
+
+const corsOrigin = (origin, callback) => {
+  if (!origin || configuredOrigins.includes(origin)) return callback(null, true);
+  return callback(new Error('Origin is not allowed by CORS'));
+};
+
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: corsOrigin,
     credentials: true,
   },
 });
 app.set('io', io);
 setupSocketIO(io);
+await setupGameSocketIO(io);
 
 // --- Trust Proxy (׳§׳¨׳™׳˜׳™ ׳׳–׳™׳”׳•׳™ IP ׳׳׳™׳×׳™ ׳׳׳—׳•׳¨׳™ Nginx/Cloudflare) ---
 app.set('trust proxy', 1);
@@ -116,9 +134,9 @@ app.use(helmet({
 }));
 
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: corsOrigin,
   credentials: true,
-  allowedHeaders: ['Content-Type', 'X-CSRF-Token', 'X-Device-Info'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Device-Info'],
 }));
 
 app.use(express.json({ limit: '10mb' }));
@@ -137,6 +155,7 @@ app.use(loggingMiddleware);
 // =================================================================
 app.use('/api/chat', chatRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/game', gameRoutes);
 app.use('/api/logs', logsRoutes);
 
 // --- Shieor routes (APK ׳׳™׳׳•׳“ ׳™׳•׳׳™ ג€” ׳׳׳ CSRF) ---

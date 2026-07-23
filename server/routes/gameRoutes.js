@@ -9,7 +9,6 @@ import {
 } from '../middlewares/gameAuth.js';
 import {
   gameState,
-  isGameUserOnline,
   publicGameUser,
 } from '../services/gameSocketService.js';
 import { authLimiter } from '../middlewares/rateLimiter.js';
@@ -129,6 +128,100 @@ router.get(
 );
 
 router.get(
+  '/opponents',
+  safe(async (req, res) => {
+    const matches = await GameMatch.find({
+      'players.user': req.gameUser._id,
+    })
+      .sort({ updatedAt: -1 })
+      .limit(100)
+      .select('players.user updatedAt')
+      .lean();
+    const recentByUser = new Map();
+    for (const match of matches) {
+      const opponentId = match.players
+        .map((player) => player.user.toString())
+        .find((userId) => userId !== req.gameUser._id.toString());
+      if (opponentId && !recentByUser.has(opponentId)) {
+        recentByUser.set(opponentId, match.updatedAt);
+      }
+      if (recentByUser.size >= 20) break;
+    }
+    const users = await GameUser.find({
+      _id: { $in: [...recentByUser.keys()] },
+    }).lean();
+    const userMap = new Map(users.map((user) => [user._id.toString(), user]));
+    return res.json({
+      opponents: [...recentByUser.entries()]
+        .map(([userId, lastPlayedAt]) => ({
+          user: userMap.has(userId) ? publicGameUser(userMap.get(userId)) : null,
+          lastPlayedAt: new Date(lastPlayedAt).getTime(),
+        }))
+        .filter((entry) => entry.user),
+    });
+  }),
+);
+
+router.get(
+  '/users/:userId/history',
+  safe(async (req, res) => {
+    const opponent = await GameUser.findById(req.params.userId).select(
+      'username displayName stats',
+    );
+    if (!opponent) {
+      return res.status(404).json({
+        error: { code: 'USER_NOT_FOUND', message: 'המשתמש לא נמצא' },
+      });
+    }
+    const myId = req.gameUser._id.toString();
+    const opponentId = opponent._id.toString();
+    const matches = await GameMatch.find({
+      $and: [
+        { 'players.user': req.gameUser._id },
+        { 'players.user': opponent._id },
+      ],
+      phase: 'finished',
+    })
+      .sort({ updatedAt: -1 })
+      .select('players round winnerId updatedAt')
+      .lean();
+
+    const completed = matches.map((match) => {
+      const mine = match.players.find(
+        (player) => player.user.toString() === myId,
+      );
+      const theirs = match.players.find(
+        (player) => player.user.toString() === opponentId,
+      );
+      return {
+        matchId: match._id.toString(),
+        rounds: match.round,
+        playedAt: match.updatedAt.getTime(),
+        myScore: mine?.score || 0,
+        opponentScore: theirs?.score || 0,
+        winnerId: match.winnerId?.toString() || null,
+        result: match.winnerId?.toString() === myId ? 'win' : 'loss',
+      };
+    });
+    const summary = completed.reduce(
+      (total, match) => {
+        if (match.winnerId === myId) total.myWins += 1;
+        else total.opponentWins += 1;
+        total.total += 1;
+        return total;
+      },
+      { myWins: 0, opponentWins: 0, total: 0 },
+    );
+
+    return res.json({
+      opponent: publicGameUser(opponent),
+      summary,
+      matches: completed.slice(0, 30),
+    });
+  }),
+);
+
+router.get(
   '/invites',
   safe(async (req, res) => {
     await GameInvite.updateMany(
@@ -193,4 +286,3 @@ router.post(
 );
 
 export default router;
-

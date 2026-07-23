@@ -8,6 +8,7 @@ import { sendGameInvitePush } from './gamePushService.js';
 const ROUND_MS = 6_000;
 const REVEAL_MS = 3_200;
 const INVITE_MS = 60_000;
+const TARGET_SCORE = 3;
 const MOVES = ['rock', 'paper', 'scissors'];
 const socketsByUser = new Map();
 const matchTimers = new Map();
@@ -75,7 +76,9 @@ export async function gameState(matchOrId) {
       user: publicGameUser(player.user, ['countdown', 'revealing'].includes(match.phase)),
       locked: Boolean(player.move),
       rematchReady: player.rematchReady,
+      score: player.score || 0,
     })),
+    targetScore: TARGET_SCORE,
     deadline: match.deadline?.getTime?.() ?? null,
     revealAt: match.revealAt?.getTime?.() ?? null,
     choices,
@@ -116,13 +119,71 @@ async function emitMatch(namespace, matchId) {
 }
 
 async function finishReveal(namespace, matchId) {
-  const match = await GameMatch.findOneAndUpdate(
+  const match = await GameMatch.findOne({ _id: matchId, phase: 'revealing' });
+  if (!match) return;
+  const matchWinner = match.players.find(
+    (player) => (player.score || 0) >= TARGET_SCORE,
+  );
+  if (matchWinner) {
+    await GameMatch.updateOne(
+      { _id: matchId, phase: 'revealing' },
+      {
+        $set: {
+          phase: 'finished',
+          winnerId: matchWinner.user,
+          revealAt: null,
+        },
+      },
+    );
+    await emitMatch(namespace, matchId);
+    const winner = asId(matchWinner.user);
+    const loser = match.players
+      .map((player) => asId(player.user))
+      .find((playerId) => playerId !== winner);
+    await Promise.all([
+      GameUser.updateOne({ _id: winner }, { $inc: { 'stats.wins': 1 } }),
+      GameUser.updateOne({ _id: loser }, { $inc: { 'stats.losses': 1 } }),
+    ]);
+    matchTimers.delete(String(matchId));
+    return;
+  }
+
+  const nextDeadline = new Date(Date.now() + ROUND_MS);
+  const historyEntry = {
+    number: match.round,
+    moves: match.players
+      .filter((player) => player.move)
+      .map((player) => ({ user: player.user, move: player.move })),
+    winnerId: match.winnerId,
+    reason: match.finishReason,
+    startedAt: new Date(match.deadline.getTime() - ROUND_MS),
+    finishedAt: new Date(),
+  };
+  const continued = await GameMatch.findOneAndUpdate(
     { _id: matchId, phase: 'revealing' },
-    { $set: { phase: 'finished' } },
+    {
+      $inc: { round: 1 },
+      $set: {
+        phase: 'countdown',
+        deadline: nextDeadline,
+        revealAt: null,
+        winnerId: null,
+        finishReason: null,
+        'players.$[].move': null,
+        'players.$[].lockedAt': null,
+        processedActionIds: [],
+      },
+      $push: { history: historyEntry },
+    },
     { new: true },
   );
-  if (match) await emitMatch(namespace, matchId);
-  matchTimers.delete(String(matchId));
+  if (!continued) return;
+  await emitMatch(namespace, matchId);
+  scheduleMatch(namespace, matchId, nextDeadline, () =>
+    finalizeSelection(namespace, matchId).catch((error) =>
+      console.error('[GAME] next round failed:', error),
+    ),
+  );
 }
 
 async function finalizeSelection(namespace, matchId) {
@@ -140,35 +201,29 @@ async function finalizeSelection(namespace, matchId) {
     if (second.move) winnerId = second.user;
   }
   const revealAt = new Date(Date.now() + REVEAL_MS);
+  const update = {
+    $set: {
+      phase: 'revealing',
+      revealAt,
+      winnerId,
+      finishReason,
+    },
+  };
+  if (winnerId) {
+    update.$inc = { 'players.$[winner].score': 1 };
+  }
   const updated = await GameMatch.findOneAndUpdate(
     { _id: matchId, phase: 'countdown' },
+    update,
     {
-      $set: {
-        phase: 'revealing',
-        revealAt,
-        winnerId,
-        finishReason,
-      },
+      new: true,
+      ...(winnerId
+        ? { arrayFilters: [{ 'winner.user': winnerId }] }
+        : {}),
     },
-    { new: true },
   );
   if (!updated) return;
 
-  const firstId = asId(first.user);
-  const secondId = asId(second.user);
-  if (!winnerId) {
-    await GameUser.updateMany(
-      { _id: { $in: [firstId, secondId] } },
-      { $inc: { 'stats.draws': 1 } },
-    );
-  } else {
-    const winner = asId(winnerId);
-    const loser = winner === firstId ? secondId : firstId;
-    await Promise.all([
-      GameUser.updateOne({ _id: winner }, { $inc: { 'stats.wins': 1 } }),
-      GameUser.updateOne({ _id: loser }, { $inc: { 'stats.losses': 1 } }),
-    ]);
-  }
   await emitMatch(namespace, matchId);
   scheduleMatch(namespace, matchId, revealAt, () =>
     finishReveal(namespace, matchId).catch((error) =>
@@ -334,46 +389,19 @@ async function handleRematch(namespace, user, gameId, ready) {
   );
   if (!match) return actionFailure('GAME_NOT_FINISHED', 'המשחק עדיין לא הסתיים');
   if (match.players.every((player) => player.rematchReady)) {
-    const deadline = new Date(Date.now() + ROUND_MS);
-    const historyEntry = {
-      number: match.round,
-      moves: match.players
-        .filter((player) => player.move)
-        .map((player) => ({ user: player.user, move: player.move })),
-      winnerId: match.winnerId,
-      reason: match.finishReason,
-      startedAt: new Date(match.deadline.getTime() - ROUND_MS),
-      finishedAt: new Date(),
-    };
-    const restarted = await GameMatch.findOneAndUpdate(
-      {
-        _id: gameId,
-        phase: 'finished',
-        players: { $not: { $elemMatch: { rematchReady: false } } },
-      },
-      {
-        $inc: { round: 1 },
-        $set: {
-          phase: 'countdown',
-          deadline,
-          revealAt: null,
-          winnerId: null,
-          finishReason: null,
-          'players.$[].move': null,
-          'players.$[].lockedAt': null,
-          'players.$[].rematchReady': false,
-          processedActionIds: [],
-        },
-        $push: { history: historyEntry },
-      },
-      { new: true },
-    );
-    if (restarted) {
-      await emitMatch(namespace, gameId);
-      scheduleMatch(namespace, gameId, deadline, () =>
-        finalizeSelection(namespace, gameId).catch(console.error),
-      );
+    if (match.rematchMatchId) {
+      return { ok: true, data: await gameState(match.rematchMatchId) };
     }
+    const restarted = await beginMatch(
+      namespace,
+      match.players[0].user,
+      match.players[1].user,
+    );
+    await GameMatch.updateOne(
+      { _id: gameId, rematchMatchId: null },
+      { $set: { rematchMatchId: restarted._id } },
+    );
+    return { ok: true, data: await gameState(restarted._id) };
   } else {
     await emitMatch(namespace, gameId);
   }
@@ -444,4 +472,3 @@ export async function setupGameSocketIO(io) {
   }
   console.log('✔ Game Socket.IO namespace initialized at /game');
 }
-

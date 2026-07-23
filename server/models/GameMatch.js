@@ -26,6 +26,7 @@ const playerSchema = new mongoose.Schema(
     move: { type: String, enum: ['rock', 'paper', 'scissors'], default: null },
     lockedAt: { type: Date, default: null },
     rematchReady: { type: Boolean, default: false },
+    score: { type: Number, default: 0, min: 0 },
   },
   { _id: false },
 );
@@ -56,6 +57,11 @@ const gameMatchSchema = new mongoose.Schema(
     },
     processedActionIds: { type: [String], default: [] },
     history: { type: [roundSchema], default: [] },
+    rematchMatchId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'GameMatch',
+      default: null,
+    },
   },
   { timestamps: true, versionKey: false },
 );
@@ -64,4 +70,3 @@ gameMatchSchema.index({ 'players.user': 1, phase: 1, updatedAt: -1 });
 
 export default mongoose.models.GameMatch ||
   mongoose.model('GameMatch', gameMatchSchema);
-

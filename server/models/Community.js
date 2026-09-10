@@ -6,6 +6,11 @@ const policySchema = new mongoose.Schema({
   hideGooglePlay:        { type: Boolean, default: true },
   blockAllStores:        { type: Boolean, default: false },
   blockApkInstall:       { type: Boolean, default: true },
+  // חבילת חסימה — master switch. When true the device forces browsers + YouTube + external
+  // installs + every store to be blocked at once, whatever the individual flags say.
+  blockPack:             { type: Boolean, default: false },
+  blockAllBrowsers:      { type: Boolean, default: false },
+  blockYoutube:          { type: Boolean, default: false },
   blockSafeBoot:         { type: Boolean, default: true },
   blockFactoryReset:     { type: Boolean, default: true },
   blockUsbTransfer:      { type: Boolean, default: false },

@@ -50,6 +50,12 @@ export default function PolicyEditor({ communityId, initialPolicy, onSaved }) {
     <div className="bg-gray-50 rounded-xl p-4 mt-3" dir="rtl">
       <h4 className="font-semibold text-gray-700 mb-3">הגדרות פוליסי</h4>
 
+      <ToggleRow k="blockPack"        label="🛡 חבילת חסימה (הכל יחד)" />
+      <p className="text-xs text-gray-400 -mt-1 mb-2">
+        דפדפנים + יוטיוב בכל צורה + התקנות חיצוניות + כל החנויות
+      </p>
+      <ToggleRow k="blockAllBrowsers" label="חסום את כל הדפדפנים" />
+      <ToggleRow k="blockYoutube"     label="חסום יוטיוב בכל צורה" />
       <ToggleRow k="blockInstallApps" label="חסום התקנת אפליקציות" />
       <ToggleRow k="hideGooglePlay"   label="הסתר Google Play" />
       <ToggleRow k="blockSafeBoot"    label="חסום מצב בטוח" />

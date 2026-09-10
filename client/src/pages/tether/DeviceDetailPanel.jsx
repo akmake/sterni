@@ -277,6 +277,9 @@ export default function DeviceDetailPanel({ deviceId, onClose, onNicknameUpdated
               <h3 className="font-semibold text-gray-800 mb-1 text-sm">חסימת חנויות והתקנות</h3>
               <p className="text-xs text-gray-400 mb-3">לחץ לעבור: קהילה (אפור) ← חסום (אדום) ← מותר (ירוק)</p>
               {[
+                { key: 'blockPack',        label: '🛡 חבילת חסימה (הכל יחד)' },
+                { key: 'blockAllBrowsers', label: 'חסום את כל הדפדפנים' },
+                { key: 'blockYoutube',     label: 'חסום יוטיוב בכל צורה' },
                 { key: 'blockInstallApps', label: 'חסום התקנת אפליקציות' },
                 { key: 'blockAllStores',   label: 'חסום כל חנויות אפליקציות' },
                 { key: 'blockApkInstall',  label: 'חסום APK ישיר (sideload)' },

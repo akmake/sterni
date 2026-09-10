@@ -26,6 +26,9 @@ const devicePolicySchema = new mongoose.Schema({
   hideGooglePlay:    { type: Boolean, default: null },
   blockAllStores:    { type: Boolean, default: null },
   blockApkInstall:   { type: Boolean, default: null },
+  blockPack:         { type: Boolean, default: null }, // חבילת חסימה master switch
+  blockAllBrowsers:  { type: Boolean, default: null },
+  blockYoutube:      { type: Boolean, default: null },
   blockSafeBoot:     { type: Boolean, default: null },
   blockFactoryReset: { type: Boolean, default: null },
   blockUsbTransfer:  { type: Boolean, default: null },

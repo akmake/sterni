@@ -22,12 +22,36 @@ const requireTetherAuth = async (req, res, next) => {
   }
   try {
     const decoded = jwt.verify(auth.slice(7), process.env.JWT_ACCESS_SECRET);
-    req.admin = { _id: decoded.id, role: decoded.role };
+
+    // Admin tokens are deliberately long-lived (see /auth/login), so the DB — not the clock —
+    // decides whether a session is still valid. Costs one indexed read per admin request.
+    const admin = await TetherAdmin.findById(decoded.id).select('role active tokenVersion');
+    if (!admin || !admin.active) {
+      return res.status(401).json({ message: 'המשתמש אינו פעיל' });
+    }
+    // Tokens issued before tokenVersion existed carry no `tv` claim — treat them as version 0 so
+    // deploying this does NOT sign every current admin out.
+    if ((decoded.tv ?? 0) !== (admin.tokenVersion ?? 0)) {
+      return res.status(401).json({ message: 'הסשן הסתיים — נא להתחבר מחדש' });
+    }
+
+    req.admin = { _id: admin._id, role: admin.role };
     next();
   } catch {
     return res.status(401).json({ message: 'טוקן לא חוקי / פג תוקף' });
   }
 };
+
+// Active logout — the only thing that ends an admin session. Bumping tokenVersion invalidates
+// every token this admin holds, on every device, which is also the kill switch for a lost phone.
+router.post('/auth/logout', requireTetherAuth, async (req, res) => {
+  try {
+    await TetherAdmin.findByIdAndUpdate(req.admin._id, { $inc: { tokenVersion: 1 } });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
 
 // --- Per-device authentication (device secret token) ---
 // Each device receives an opaque secret at /devices/join; only its SHA-256 hash
@@ -73,10 +97,12 @@ router.post('/auth/login', async (req, res) => {
     const valid = await bcrypt.compare(password, admin.passwordHash);
     if (!valid) return res.status(401).json({ message: 'אימייל או סיסמה שגויים' });
 
+    // No expiresIn on purpose: an admin stays signed in until they actively log out. Revocation
+    // runs through tokenVersion (see requireTetherAuth and /auth/logout) rather than a clock, so
+    // a lost device can still be cut off immediately.
     const token = jwt.sign(
-      { id: admin._id, role: admin.role },
-      process.env.JWT_ACCESS_SECRET,
-      { expiresIn: '30d' }
+      { id: admin._id, role: admin.role, tv: admin.tokenVersion ?? 0 },
+      process.env.JWT_ACCESS_SECRET
     );
 
     res.json({

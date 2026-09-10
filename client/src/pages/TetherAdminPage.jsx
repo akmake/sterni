@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Shield, LogOut } from 'lucide-react';
-import { loadTetherUser, clearTetherSession } from './tether/tetherApi';
+import { loadTetherUser, clearTetherSession, tetherApi, authHeader } from './tether/tetherApi';
 import TetherLogin    from './tether/TetherLogin';
 import Dashboard      from './tether/Dashboard';
 import CommunitiesTab from './tether/CommunitiesTab';
@@ -20,7 +20,18 @@ export default function TetherAdminPage() {
   const [tetherUser, setTetherUser] = useState(() => loadTetherUser());
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  const handleLogout = () => { clearTetherSession(); setTetherUser(null); };
+  // Tokens no longer expire on their own, so the server has to be told to revoke this session —
+  // otherwise the token stays valid forever after "logout". Local state is cleared either way, so
+  // a failed request can never trap the user in a session they asked to leave.
+  const handleLogout = async () => {
+    try {
+      await tetherApi.post('/auth/logout', {}, { headers: authHeader() });
+    } catch {
+      // Offline or already-invalid token — clearing locally is still correct.
+    }
+    clearTetherSession();
+    setTetherUser(null);
+  };
 
   if (!tetherUser) return <TetherLogin onLogin={setTetherUser} />;
 

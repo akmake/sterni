@@ -7,6 +7,9 @@ import com.sterni.dailystudy.data.api.LoginRequest
 import com.sterni.dailystudy.data.api.SyncRequest
 import com.sterni.dailystudy.data.api.UserDataResponse
 import com.sterni.dailystudy.data.api.UserService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
@@ -71,34 +74,98 @@ object UserManager {
         }
     }
 
-    fun pushToServer(context: Context): Boolean {
-        val userId = getUserId(context) ?: return false
-        val readingPrefs = context.getSharedPreferences(READING_PREFS, Context.MODE_PRIVATE)
-
+    /**
+     * Gathers all reading positions and preferences from across all study modules:
+     * - StudyPrefs (font sizes per study, scroll speed, scroll positions per date/study)
+     * - ChumashPrefs (chumash text size, rashi text size, chumash scroll speed)
+     * - ShnayimPrefs (shnayim_mikra_connected)
+     * - TehillimPrefs (last chapter, last verse, free scroll index, free scroll offset)
+     * - RambamPrefs (legacy positions and general text size)
+     */
+    private fun collectLocalData(context: Context): Pair<Map<String, Int>, Map<String, Any>> {
         val positions = mutableMapOf<String, Int>()
         val preferences = mutableMapOf<String, Any>()
 
-        readingPrefs.all.forEach { (key, value) ->
+        // 1. StudyPrefs (font sizes, scroll speed, and reading positions)
+        val studyPrefs = context.getSharedPreferences("StudyPrefs", Context.MODE_PRIVATE)
+        studyPrefs.all.forEach { (key, value) ->
+            if (key.startsWith("font_") || key == "scroll_speed") {
+                if (value is Number) preferences[key] = value.toInt()
+            } else if (key.startsWith("scroll_")) {
+                if (value is Number) positions[key] = value.toInt()
+            }
+        }
+
+        // 2. ChumashPrefs
+        val chumashPrefs = context.getSharedPreferences("ChumashPrefs", Context.MODE_PRIVATE)
+        chumashPrefs.all.forEach { (key, value) ->
+            if (value is Number) preferences[key] = value.toInt()
+        }
+
+        // 3. ShnayimPrefs
+        val shnayimPrefs = context.getSharedPreferences("ShnayimPrefs", Context.MODE_PRIVATE)
+        shnayimPrefs.all.forEach { (key, value) ->
+            if (value is Boolean) preferences["shnayim_$key"] = value
+        }
+
+        // 4. TehillimPrefs
+        val tehillimPrefs = context.getSharedPreferences("TehillimPrefs", Context.MODE_PRIVATE)
+        tehillimPrefs.all.forEach { (key, value) ->
+            if (value is Number) {
+                positions["tehillim_$key"] = value.toInt()
+            }
+        }
+
+        // 5. RambamPrefs
+        val rambamPrefs = context.getSharedPreferences(READING_PREFS, Context.MODE_PRIVATE)
+        rambamPrefs.all.forEach { (key, value) ->
             if (value is Int) {
                 if (key in PREFERENCE_KEYS) preferences[key] = value
                 else positions[key] = value
             }
         }
 
-        val shnayimPrefs = context.getSharedPreferences("ShnayimPrefs", Context.MODE_PRIVATE)
-        shnayimPrefs.all.forEach { (key, value) ->
-            if (value is Boolean) preferences["shnayim_$key"] = value
-        }
+        return Pair(positions, preferences)
+    }
+
+    /**
+     * Performs a two-way sync: sends current local positions and settings,
+     * receives the merged server state, and applies it locally across all preferences.
+     */
+    fun sync(context: Context): Boolean {
+        val userId = getUserId(context) ?: ensureRegistered(context) ?: return false
+        val (positions, preferences) = collectLocalData(context)
 
         return try {
             val body = SyncRequest(positions, preferences, null)
             val resp = userService(context).sync(userId, body).execute()
-            resp.isSuccessful
+            if (resp.isSuccessful) {
+                val data = resp.body()
+                if (data != null) {
+                    applyServerData(context, data)
+                }
+                true
+            } else false
         } catch (e: Exception) {
-            Log.w(TAG, "Push failed: ${e.message}")
+            Log.w(TAG, "Sync failed: ${e.message}")
             false
         }
     }
+
+    /**
+     * Triggers asynchronous background sync without blocking caller
+     */
+    fun triggerSync(context: Context) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                sync(context)
+            } catch (e: Exception) {
+                Log.w(TAG, "triggerSync failed: ${e.message}")
+            }
+        }
+    }
+
+    fun pushToServer(context: Context): Boolean = sync(context)
 
     fun pullFromServer(context: Context): Boolean {
         val userId = getUserId(context) ?: return false
@@ -116,21 +183,47 @@ object UserManager {
     }
 
     private fun applyServerData(context: Context, data: UserDataResponse) {
-        val readingPrefs = context.getSharedPreferences(READING_PREFS, Context.MODE_PRIVATE)
-        val editor = readingPrefs.edit()
-        data.readingPositions?.forEach { (key, value) -> editor.putInt(key, value) }
+        val studyEditor = context.getSharedPreferences("StudyPrefs", Context.MODE_PRIVATE).edit()
+        val chumashEditor = context.getSharedPreferences("ChumashPrefs", Context.MODE_PRIVATE).edit()
+        val shnayimEditor = context.getSharedPreferences("ShnayimPrefs", Context.MODE_PRIVATE).edit()
+        val tehillimEditor = context.getSharedPreferences("TehillimPrefs", Context.MODE_PRIVATE).edit()
+        val rambamEditor = context.getSharedPreferences(READING_PREFS, Context.MODE_PRIVATE).edit()
+
+        data.readingPositions?.forEach { (key, value) ->
+            if (key.startsWith("tehillim_")) {
+                val realKey = key.removePrefix("tehillim_")
+                tehillimEditor.putInt(realKey, value)
+            } else if (key.startsWith("scroll_")) {
+                studyEditor.putInt(key, value)
+            }
+            rambamEditor.putInt(key, value)
+        }
+
         data.preferences?.forEach { (key, value) ->
             when (value) {
-                is Number -> editor.putInt(key, value.toInt())
+                is Number -> {
+                    val intVal = value.toInt()
+                    if (key.startsWith("font_") || key == "scroll_speed") {
+                        studyEditor.putInt(key, intVal)
+                    }
+                    if (key == "chumash_text_size" || key == "rashi_text_size" || key == "chumash_scroll_speed") {
+                        chumashEditor.putInt(key, intVal)
+                    }
+                    rambamEditor.putInt(key, intVal)
+                }
                 is Boolean -> {
                     if (key.startsWith("shnayim_")) {
                         val realKey = key.removePrefix("shnayim_")
-                        context.getSharedPreferences("ShnayimPrefs", Context.MODE_PRIVATE)
-                            .edit().putBoolean(realKey, value).apply()
+                        shnayimEditor.putBoolean(realKey, value)
                     }
                 }
             }
         }
-        editor.apply()
+
+        studyEditor.apply()
+        chumashEditor.apply()
+        shnayimEditor.apply()
+        tehillimEditor.apply()
+        rambamEditor.apply()
     }
 }

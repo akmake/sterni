@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sterni.dailystudy.data.model.Section
+import com.sterni.dailystudy.sync.UserManager
 import com.sterni.dailystudy.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -63,7 +64,16 @@ fun StudyDetailScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    LaunchedEffect(studyKey, date) { viewModel.load(studyKey, date, label) }
+    LaunchedEffect(studyKey, date) {
+        UserManager.triggerSync(context)
+        viewModel.load(studyKey, date, label)
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            UserManager.triggerSync(context)
+        }
+    }
 
     val prefs = remember { context.getSharedPreferences("StudyPrefs", Context.MODE_PRIVATE) }
     val isShnayim = studyKey == "shnayimMikra"
@@ -121,6 +131,7 @@ fun StudyDetailScreen(
                         .putInt("rashi_text_size", rSize)
                         .putInt("chumash_scroll_speed", speed)
                         .apply()
+                    UserManager.triggerSync(context)
                     showSettingsDialog = false
                 }
             )
@@ -140,6 +151,7 @@ fun StudyDetailScreen(
                     if (chapters != null) {
                         viewModel.saveCustomChapters(chapters, date, label)
                     }
+                    UserManager.triggerSync(context)
                     showSettingsDialog = false
                 }
             )
@@ -155,6 +167,7 @@ fun StudyDetailScreen(
                         .putInt(fontKey, size)
                         .putInt("scroll_speed", speed)
                         .apply()
+                    UserManager.triggerSync(context)
                     showSettingsDialog = false
                 }
             )

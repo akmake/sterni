@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -28,56 +29,42 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sterni.dailystudy.data.local.TehillimRepository
 import com.sterni.dailystudy.data.model.TehillimChapter
+import com.sterni.dailystudy.data.model.TehillimVerse
+import com.sterni.dailystudy.sync.UserManager
 import com.sterni.dailystudy.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-// ── Hebrew Number Helpers ────────────────────────────────────────────────────
+// ── Hebrew Number Helpers (Exact match to server studyController.js) ──────────
 
-private fun toHebNumRaw(n: Int): String {
-    if (n <= 0) return ""
-    val hundreds = arrayOf("", "ק", "ר", "ש", "ת")
-    val tens = arrayOf("", "י", "כ", "ל", "מ", "נ", "ס", "ע", "פ", "צ")
-    val units = arrayOf("", "א", "ב", "ג", "ד", "ה", "ו", "ז", "ח", "ט")
+private fun getHebrewOrdinal(n: Int): String {
+    if (n <= 0) return n.toString()
+    var h = ""
+    var temp = n
+    if (temp >= 400) { h += "ת"; temp -= 400 }
+    if (temp >= 300) { h += "ש"; temp -= 300 }
+    if (temp >= 200) { h += "ר"; temp -= 200 }
+    if (temp >= 100) { h += "ק"; temp -= 100 }
 
-    val sb = StringBuilder()
-    var num = n
+    if (temp == 15) return h + "טו"
+    if (temp == 16) return h + "טז"
 
-    while (num >= 400) {
-        sb.append("ת")
-        num -= 400
-    }
-    if (num >= 100) {
-        val h = num / 100
-        if (h in 1..4) sb.append(hundreds[h])
-        num %= 100
-    }
-    if (num == 15) {
-        sb.append("טו")
-    } else if (num == 16) {
-        sb.append("טז")
-    } else {
-        val t = num / 10
-        val u = num % 10
-        if (t in 1..9) sb.append(tens[t])
-        if (u in 1..9) sb.append(units[u])
-    }
-    return sb.toString()
-}
+    if (temp >= 90) { h += "צ"; temp -= 90 }
+    else if (temp >= 80) { h += "פ"; temp -= 80 }
+    else if (temp >= 70) { h += "ע"; temp -= 70 }
+    else if (temp >= 60) { h += "ס"; temp -= 60 }
+    else if (temp >= 50) { h += "נ"; temp -= 50 }
+    else if (temp >= 40) { h += "מ"; temp -= 40 }
+    else if (temp >= 30) { h += "ל"; temp -= 30 }
+    else if (temp >= 20) { h += "כ"; temp -= 20 }
+    else if (temp >= 10) { h += "י"; temp -= 10 }
 
-// Plain letters for verse numbering (matches StudyDetailScreen: א, ב, יא, כג...)
-private fun toHebNum(n: Int): String = toHebNumRaw(n)
+    val ones = arrayOf("", "א", "ב", "ג", "ד", "ה", "ו", "ז", "ח", "ט")
+    if (temp > 0) h += ones[temp]
 
-// Formatted with gershayim for chapter titles (א׳, כ״ג, קי״ט...)
-private fun toHebrewNumWithGershayim(n: Int): String {
-    val raw = toHebNumRaw(n)
-    return when (raw.length) {
-        0 -> ""
-        1 -> "$raw׳"
-        else -> raw.substring(0, raw.length - 1) + "״" + raw.last()
-    }
+    return h
 }
 
 // ── Flattened Reader Item Hierarchy ──────────────────────────────────────────
@@ -86,15 +73,12 @@ private sealed class TehillimReaderItem {
     abstract val chapterNum: Int
 
     data class ChapterHeader(
-        override val chapterNum: Int,
-        val hebrewChapter: String,
-        val title: String
+        override val chapterNum: Int
     ) : TehillimReaderItem()
 
-    data class Verse(
+    data class ChapterBody(
         override val chapterNum: Int,
-        val verseNum: Int,
-        val text: String
+        val verses: List<TehillimVerse>
     ) : TehillimReaderItem()
 }
 
@@ -109,12 +93,23 @@ fun TehillimReaderScreen(
 ) {
     val context = LocalContext.current
     val repository = remember { TehillimRepository(context) }
-    val prefs = remember { context.getSharedPreferences("StudyPrefs", Context.MODE_PRIVATE) }
+    val studyPrefs = remember { context.getSharedPreferences("StudyPrefs", Context.MODE_PRIVATE) }
     val coroutineScope = rememberCoroutineScope()
 
+    // Sync on entry and exit across devices
+    LaunchedEffect(Unit) {
+        UserManager.triggerSync(context)
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            UserManager.triggerSync(context)
+        }
+    }
+
     // Preferences for font & auto-scroll (matching StudyDetailScreen keys)
-    val fontSize = remember { mutableIntStateOf(prefs.getInt("font_tehillim", 20)) }
-    val scrollSpeed = remember { mutableIntStateOf(prefs.getInt("scroll_speed", 40)) }
+    val fontSize = remember { mutableIntStateOf(studyPrefs.getInt("font_tehillim", 20)) }
+    val scrollSpeed = remember { mutableIntStateOf(studyPrefs.getInt("scroll_speed", 40)) }
     var autoScrolling by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
 
@@ -127,31 +122,19 @@ fun TehillimReaderScreen(
         }
     }
 
-    // Flatten all chapters and verses into a single continuous stream
+    // Flatten all chapters into exact StudyDetailScreen structure:
+    // 1. HeaderRow: "פרק כג"
+    // 2. VerseRow: Flowing paragraph with inline "(א) ... (ב) ..."
     val flatItems = remember(chapters) {
         val list = mutableListOf<TehillimReaderItem>()
         chapters.forEach { ch ->
-            list.add(
-                TehillimReaderItem.ChapterHeader(
-                    chapterNum = ch.chapter,
-                    hebrewChapter = ch.hebrewChapter,
-                    title = ch.title
-                )
-            )
-            ch.verses.forEach { v ->
-                list.add(
-                    TehillimReaderItem.Verse(
-                        chapterNum = ch.chapter,
-                        verseNum = v.num,
-                        text = v.text
-                    )
-                )
-            }
+            list.add(TehillimReaderItem.ChapterHeader(ch.chapter))
+            list.add(TehillimReaderItem.ChapterBody(ch.chapter, ch.verses))
         }
         list
     }
 
-    // Lookup table from chapter number to item index in flat list
+    // Lookup table from chapter number to item index of its HeaderRow
     val chapterHeaderIndices = remember(flatItems) {
         flatItems.mapIndexedNotNull { index, item ->
             if (item is TehillimReaderItem.ChapterHeader) item.chapterNum to index else null
@@ -194,12 +177,12 @@ fun TehillimReaderScreen(
                 if (scrollRestored && idx in flatItems.indices) {
                     val item = flatItems[idx]
                     val ch = item.chapterNum
-                    val verseNum = when (item) {
-                        is TehillimReaderItem.ChapterHeader -> 1
-                        is TehillimReaderItem.Verse -> item.verseNum
-                    }
                     currentVisibleChapter = ch
-                    repository.saveScrollPosition(ch, verseNum, idx, off)
+                    repository.saveScrollPosition(ch, 1, idx, off)
+                    studyPrefs.edit()
+                        .putInt("scroll_tehillim_idx", idx)
+                        .putInt("scroll_tehillim_off", off)
+                        .apply()
                 }
             }
     }
@@ -223,10 +206,11 @@ fun TehillimReaderScreen(
             onSave = { size, speed ->
                 fontSize.intValue = size
                 scrollSpeed.intValue = speed
-                prefs.edit()
+                studyPrefs.edit()
                     .putInt("font_tehillim", size)
                     .putInt("scroll_speed", speed)
                     .apply()
+                UserManager.triggerSync(context)
                 showSettingsDialog = false
             }
         )
@@ -237,7 +221,7 @@ fun TehillimReaderScreen(
         if (displayTitle.isNotEmpty() && !isContinueMode && chapterList.size <= 1) {
             displayTitle
         } else {
-            "תהילים • מזמור ${toHebrewNumWithGershayim(currentVisibleChapter)}"
+            "תהילים • פרק ${getHebrewOrdinal(currentVisibleChapter)}"
         }
     }
 
@@ -326,44 +310,53 @@ fun TehillimReaderScreen(
                     items = flatItems,
                     key = { item ->
                         when (item) {
-                            is TehillimReaderItem.ChapterHeader -> "ch_${item.chapterNum}"
-                            is TehillimReaderItem.Verse -> "v_${item.chapterNum}_${item.verseNum}"
+                            is TehillimReaderItem.ChapterHeader -> "header_${item.chapterNum}"
+                            is TehillimReaderItem.ChapterBody -> "body_${item.chapterNum}"
                         }
                     }
                 ) { item ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .absolutePadding(left = 12.dp, right = 16.dp)
-                    ) {
-                        when (item) {
-                            is TehillimReaderItem.ChapterHeader -> {
-                                Text(
-                                    text = "מזמור " + toHebrewNumWithGershayim(item.chapterNum),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 28.dp, bottom = 12.dp),
-                                    textAlign = TextAlign.Center,
-                                    fontSize = 28.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = SblHebrew,
-                                    color = Primary,
-                                    style = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl)
-                                )
-                            }
-                            is TehillimReaderItem.Verse -> {
+                    when (item) {
+                        is TehillimReaderItem.ChapterHeader -> {
+                            // Exact HeaderRow from StudyDetailScreen
+                            Text(
+                                text = "פרק ${getHebrewOrdinal(item.chapterNum)}",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 12.dp, bottom = 12.dp),
+                                textAlign = TextAlign.Center,
+                                fontSize = 30.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = SblHebrew,
+                                color = Primary,
+                                style = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl)
+                            )
+                        }
+                        is TehillimReaderItem.ChapterBody -> {
+                            // Exact VerseRow from StudyDetailScreen:
+                            // Flowing justified paragraph with inline (א) ... (ב) ...
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .absolutePadding(left = 12.dp, right = 16.dp)
+                            ) {
                                 val annotated = buildAnnotatedString {
-                                    withStyle(
-                                        SpanStyle(
-                                            color = Primary,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = (fontSize.intValue - 1).sp
-                                        )
-                                    ) {
-                                        append(toHebNum(item.verseNum))
+                                    item.verses.forEach { v ->
+                                        withStyle(
+                                            SpanStyle(
+                                                color = Primary,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = (fontSize.intValue - 1).sp
+                                            )
+                                        ) {
+                                            append("(${getHebrewOrdinal(v.num)}) ")
+                                        }
+                                        val cleanText = v.text
+                                            .replace("{פ}", "")
+                                            .replace("{ס}", "")
+                                            .trim()
+                                        append(cleanText)
+                                        append(" ")
                                     }
-                                    append(" ")
-                                    append(item.text)
                                 }
                                 Text(
                                     text = annotated,

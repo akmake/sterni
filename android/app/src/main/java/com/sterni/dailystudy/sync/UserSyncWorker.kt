@@ -8,7 +8,7 @@ class UserSyncWorker(context: Context, params: WorkerParameters) : CoroutineWork
 
     override suspend fun doWork(): Result {
         UserManager.ensureRegistered(applicationContext)
-        UserManager.pushToServer(applicationContext)
+        UserManager.sync(applicationContext)
         return Result.success()
     }
 

@@ -65,6 +65,12 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
     }
 
+    DisposableEffect(Unit) {
+        onDispose {
+            UserManager.triggerSync(context)
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()

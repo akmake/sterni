@@ -31,9 +31,10 @@ class MainActivity : ComponentActivity() {
         StudySyncWorker.enqueue(this)
         UserSyncWorker.enqueue(this)
 
-        // Auto-register user identity
+        // Auto-register user identity and sync latest device data
         lifecycleScope.launch(Dispatchers.IO) {
             UserManager.ensureRegistered(this@MainActivity)
+            UserManager.sync(this@MainActivity)
         }
 
         // Geofence silent zones
@@ -63,5 +64,10 @@ class MainActivity : ComponentActivity() {
                 NavGraph(navController = navController)
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        UserManager.triggerSync(this)
     }
 }

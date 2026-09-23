@@ -113,11 +113,13 @@ class ArticleUploadViewModel(app: Application) : AndroidViewModel(app) {
                 val finalText  = rawText.value.trim()
 
                 if (uploadToServer) {
+                    val userId = com.sterni.dailystudy.sync.UserManager.getUserId(getApplication())
                     val saved = RetrofitClient.articleService.saveArticle(
                         SaveArticleBody(
                             rawText   = finalText,
                             pageCount = preview.pageCount,
-                            title     = finalTitle
+                            title     = finalTitle,
+                            userId    = userId
                         )
                     )
                     saveToLocalLibrary(finalTitle, finalText, preview.pageCount, savedId = saved.id)

@@ -51,7 +51,8 @@ class MamaarimViewModel(app: Application) : AndroidViewModel(app) {
 
             withContext(Dispatchers.IO) {
                 try {
-                    val response = RetrofitClient.articleService.getArticles().execute()
+                    val userId = com.sterni.dailystudy.sync.UserManager.getUserId(getApplication())
+                    val response = RetrofitClient.articleService.getArticles(userId).execute()
                     if (response.isSuccessful) {
                         val serverDtos = response.body() ?: emptyList()
 

@@ -41,14 +41,27 @@ export const extractArticle = async (req, res, next) => {
 // Text-only save (no PDF upload needed — used by Android local extraction)
 export const saveArticleText = async (req, res, next) => {
   try {
-    const { title, rawText, pageCount } = req.body;
+    const { title, rawText, pageCount, userId } = req.body;
     if (!rawText?.trim()) return res.status(422).json({ message: 'חסר טקסט' });
     const article = await Article.create({
       title:            title?.trim() || 'מאמר חדש',
       originalFilename: '',
       rawText:          rawText.trim(),
       pageCount:        parseInt(pageCount) || 0,
+      userId:           userId || null,
     });
+
+    if (userId) {
+      try {
+        const UserData = (await import('../models/UserData.js')).default;
+        const user = await UserData.findOne({ userId });
+        if (user && !user.savedArticleIds.includes(article._id.toString())) {
+          user.savedArticleIds.push(article._id.toString());
+          await user.save();
+        }
+      } catch {}
+    }
+
     res.status(201).json(article);
   } catch (err) {
     next(err);
@@ -64,6 +77,7 @@ export const uploadArticle = async (req, res, next) => {
     const title = req.body.title?.trim() || req.file.originalname.replace(/\.pdf$/i, '');
     const rawText = req.body.rawText?.trim() || '';
     const pageCount = parseInt(req.body.pageCount) || 0;
+    const userId = req.body.userId || null;
 
     if (!rawText) {
       return res.status(422).json({ message: 'לא התקבל טקסט מהקובץ' });
@@ -74,7 +88,19 @@ export const uploadArticle = async (req, res, next) => {
       originalFilename: req.file.originalname,
       rawText,
       pageCount,
+      userId,
     });
+
+    if (userId) {
+      try {
+        const UserData = (await import('../models/UserData.js')).default;
+        const user = await UserData.findOne({ userId });
+        if (user && !user.savedArticleIds.includes(article._id.toString())) {
+          user.savedArticleIds.push(article._id.toString());
+          await user.save();
+        }
+      } catch {}
+    }
 
     res.status(201).json(article);
   } catch (err) {
@@ -84,7 +110,11 @@ export const uploadArticle = async (req, res, next) => {
 
 export const getArticles = async (req, res, next) => {
   try {
-    const articles = await Article.find({}, '-rawText').sort({ createdAt: -1 });
+    const { userId } = req.query;
+    const filter = userId
+      ? { $or: [{ userId: null }, { userId }] }
+      : {};
+    const articles = await Article.find(filter, '-rawText').sort({ createdAt: -1 });
     res.json(articles);
   } catch (err) {
     next(err);

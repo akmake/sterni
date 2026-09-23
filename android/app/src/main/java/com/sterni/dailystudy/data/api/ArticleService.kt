@@ -15,12 +15,17 @@ data class ArticleDto(
 )
 
 data class ExtractResponse(val rawText: String, val pageCount: Int)
-data class SaveArticleBody(val rawText: String, val pageCount: Int, val title: String)
+data class SaveArticleBody(
+    val rawText: String,
+    val pageCount: Int,
+    val title: String,
+    val userId: String? = null
+)
 
 interface ArticleService {
 
     @GET("articles")
-    fun getArticles(): Call<List<ArticleDto>>
+    fun getArticles(@Query("userId") userId: String? = null): Call<List<ArticleDto>>
 
     @GET("articles/{id}")
     fun getArticleById(@Path("id") id: String): Call<ArticleDto>

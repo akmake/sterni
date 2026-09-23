@@ -9,7 +9,7 @@ const articleSchema = new mongoose.Schema(
     },
     originalFilename: {
       type: String,
-      required: true,
+      default: '',
     },
     rawText: {
       type: String,
@@ -18,6 +18,11 @@ const articleSchema = new mongoose.Schema(
     pageCount: {
       type: Number,
       default: 0,
+    },
+    userId: {
+      type: String,
+      default: null,
+      index: true,
     },
   },
   { timestamps: true }

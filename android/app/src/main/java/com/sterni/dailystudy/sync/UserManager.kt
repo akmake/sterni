@@ -183,7 +183,8 @@ object UserManager {
                             com.sterni.dailystudy.data.api.SaveArticleBody(
                                 rawText = text,
                                 pageCount = 0,
-                                title = item.title
+                                title = item.title,
+                                userId = getUserId(context)
                             )
                         ).execute()
                         val serverId = response.body()?.id

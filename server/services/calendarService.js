@@ -40,11 +40,38 @@ const TEHILLIM_SCHEDULE = [
   'Psalms 145-150',   // ל
 ];
 
-async function getHebrewDayOfMonth(dateString) {
+const VEZOT_HABERAKHAH = {
+  title: { en: 'Parashat HaShavua', he: 'פרשת וזאת הברכה' },
+  ref: 'Deuteronomy 33:1-34:12',
+  displayValue: { he: 'פרשת וזאת הברכה' },
+  extraDetails: {
+    aliyot: [
+      'Deuteronomy 33:1-33:7',    // א' (יום ראשון)
+      'Deuteronomy 33:8-33:12',   // ב' (יום שני)
+      'Deuteronomy 33:13-33:17',  // ג' (יום שלישי)
+      'Deuteronomy 33:18-33:21',  // ד' (יום רביעי)
+      'Deuteronomy 33:22-33:26',  // ה' (יום חמישי)
+      'Deuteronomy 33:27-33:29',  // ו' (יום שישי)
+      'Deuteronomy 34:1-34:12',   // שבת / שמחת תורה
+    ],
+  },
+};
+
+async function getHebrewDateInfo(dateString) {
   const [y, m, d] = dateString.split('-').map(Number);
   const url = `${HEBCAL_BASE}/converter?gy=${y}&gm=${m}&gd=${d}&g2h=1&cfg=json`;
-  const data = await fetchJson(url);
-  return data?.hd ?? null; // מספר יום בחודש העברי (1-30)
+  try {
+    const data = await fetchJson(url);
+    return {
+      hd: data?.hd ?? null,
+      hm: data?.hm ?? '',
+      hebrew: data?.hebrew ?? '',
+      events: Array.isArray(data?.events) ? data.events : [],
+    };
+  } catch (err) {
+    console.error('[calendar] Hebrew date converter failed:', err.message);
+    return { hd: null, hm: '', hebrew: '', events: [] };
+  }
 }
 
 // ── Tanya daily cache (persisted to disk) ───────────────────────────────────
@@ -116,7 +143,8 @@ function buildSefariaCalendarUrl(dateString) {
 
 export async function getDailyCalendar(dateString) {
   const items = [];
-  let hebrewDate = '';
+  const hebDateInfo = await getHebrewDateInfo(dateString);
+  let hebrewDate = hebDateInfo.hebrew;
   let sefariaData = null;
 
   // ── 1. Rambam (1 & 3 chapters) + Sefer HaMitzvot ─────────────────────────
@@ -164,50 +192,61 @@ export async function getDailyCalendar(dateString) {
     console.error('[calendar] Rambam/SHM failed:', err.message);
   }
 
-  // ── 2. Parasha (Chumash + Shnayim Mikra) from Hebcal ──────────────────────
-  // If the upcoming Shabbat has no regular Torah reading (e.g. Pesach, Yom Tov),
-  // skip ahead week by week until a regular parashat is found (max 4 attempts).
+  // ── 2. Parasha (Chumash + Shnayim Mikra) ───────────────────────────────────
   try {
-    const baseShabbat = toShabbatDate(dateString);
-    const [bsy, bsm, bsd] = baseShabbat.split('-').map(Number);
-    let parashat = null;
+    // מנהג חב"ד: מיד אחרי השבת שבה קראו האזינו (החל מיום ראשון שלאחריה) ועד שמחת תורה לומדים פרשת וזאת הברכה
+    const isTishreiBeforeSimchatTorah = hebDateInfo.hm === 'Tishrei' && hebDateInfo.hd <= 23 && !hebDateInfo.events.some(e => e.includes('Bereshit'));
+    const isHaazinuOrBefore = hebDateInfo.events.some(e => e.includes('Ha’azinu') || e.includes('Haazinu') || e.includes('Vayeilech'));
+    const isVezotPeriod = isTishreiBeforeSimchatTorah && !isHaazinuOrBefore && (
+      hebDateInfo.events.some(e => e.includes('Vezot Haberakhah') || e.includes('Sukkot') || e.includes('Shmini Atzeret')) ||
+      hebDateInfo.hd >= 4 // החל מיום ראשון שלאחר שבת האזינו (המוקדם ביותר הוא ד' תשרי)
+    );
 
-    for (let attempt = 0; attempt < 4; attempt++) {
-      const shabbat = new Date(Date.UTC(bsy, bsm - 1, bsd + attempt * 7))
-        .toISOString().slice(0, 10);
-      console.log(`[calendar] Hebcal attempt ${attempt + 1}: shabbat=${shabbat} (for ${dateString})`);
-      try {
-        const hc = await fetchJson(
-          `${HEBCAL_BASE}/shabbat?cfg=json&geonameid=281184&M=on&lg=he&leyning=on&dt=${shabbat}`
-        );
-        const found = (hc?.items || []).find(i => i.category === 'parashat');
-        // Require all 7 aliyot — Yom Tov special readings have only 4-5.
-        if (found?.leyning && found.leyning['7']) {
-          parashat = found;
-          break;
+    if (isVezotPeriod) {
+      console.log(`[calendar] Vezot Haberakhah period active for ${dateString} (${hebDateInfo.hebrew})`);
+      items.push(VEZOT_HABERAKHAH);
+    } else {
+      const baseShabbat = toShabbatDate(dateString);
+      const [bsy, bsm, bsd] = baseShabbat.split('-').map(Number);
+      let parashat = null;
+
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const shabbat = new Date(Date.UTC(bsy, bsm - 1, bsd + attempt * 7))
+          .toISOString().slice(0, 10);
+        console.log(`[calendar] Hebcal attempt ${attempt + 1}: shabbat=${shabbat} (for ${dateString})`);
+        try {
+          const hc = await fetchJson(
+            `${HEBCAL_BASE}/shabbat?cfg=json&geonameid=281184&M=on&lg=he&leyning=on&dt=${shabbat}`
+          );
+          const found = (hc?.items || []).find(i => i.category === 'parashat');
+          // Require all 7 aliyot — Yom Tov special readings have only 4-5.
+          if (found?.leyning && found.leyning['7']) {
+            parashat = found;
+            break;
+          }
+          console.log(`[calendar] No regular parashat on ${shabbat} (found=${!!found}, has7=${!!(found?.leyning?.['7'])}), trying next week`);
+        } catch (innerErr) {
+          console.error(`[calendar] Hebcal attempt ${attempt + 1} failed:`, innerErr.message);
         }
-        console.log(`[calendar] No regular parashat on ${shabbat} (found=${!!found}, has7=${!!(found?.leyning?.['7'])}), trying next week`);
-      } catch (innerErr) {
-        console.error(`[calendar] Hebcal attempt ${attempt + 1} failed:`, innerErr.message);
+      }
+
+      if (parashat?.leyning) {
+        const { leyning } = parashat;
+        // 0-indexed aliyot array: index 0 = Sunday = leyning["1"], … index 6 = Shabbat = leyning["7"]
+        const aliyot = ['1', '2', '3', '4', '5', '6', '7'].map(k => leyning[k] || null);
+        const heParasha = parashat.hebrew || parashat.title_orig || '';
+        if (!hebrewDate) hebrewDate = parashat.hdate || '';
+        console.log(`[calendar] Parasha: ${heParasha} | shabbat aliyah: ${aliyot[6]}`);
+        items.push({
+          title: { en: 'Parashat HaShavua', he: heParasha },
+          ref: leyning.torah || aliyot.find(Boolean) || '',
+          displayValue: { he: heParasha },
+          extraDetails: { aliyot },
+        });
       }
     }
-
-    if (parashat?.leyning) {
-      const { leyning } = parashat;
-      // 0-indexed aliyot array: index 0 = Sunday = leyning["1"], … index 6 = Shabbat = leyning["7"]
-      const aliyot = ['1', '2', '3', '4', '5', '6', '7'].map(k => leyning[k] || null);
-      const heParasha = parashat.hebrew || parashat.title_orig || '';
-      hebrewDate = parashat.hdate || '';
-      console.log(`[calendar] Parasha: ${heParasha} | shabbat aliyah: ${aliyot[6]}`);
-      items.push({
-        title: { en: 'Parashat HaShavua', he: heParasha },
-        ref: leyning.torah || aliyot.find(Boolean) || '',
-        displayValue: { he: heParasha },
-        extraDetails: { aliyot },
-      });
-    }
   } catch (err) {
-    console.error('[calendar] Hebcal failed:', err.message);
+    console.error('[calendar] Parasha resolution failed:', err.message);
   }
 
   // ── 3. Tanya + Tehillim from Sefaria calendar ────────────────────────────────
@@ -245,7 +284,7 @@ export async function getDailyCalendar(dateString) {
 
   // ── 4. Tehillim — חישוב לפי יום בחודש העברי (HebCal) ───────────────────────
   try {
-    const heDay = await getHebrewDayOfMonth(dateString);
+    const heDay = hebDateInfo.hd;
     if (heDay >= 1 && heDay <= 30) {
       // בחודש של 29 ימים, יום כ"ט כולל גם את יום ל'
       const day = heDay === 30 ? 30 : heDay;

@@ -10,6 +10,7 @@ import TetherDevice from '../models/TetherDevice.js';
 import ApprovalRequest from '../models/ApprovalRequest.js';
 import TetherAdmin from '../models/TetherAdmin.js';
 import TetherApprovedApp from '../models/TetherApprovedApp.js';
+import TetherUsage from '../models/TetherUsage.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -1154,6 +1155,104 @@ router.post('/devices/:deviceId/apps', requireDeviceAuth, async (req, res) => {
       { installedApps: apps, lastSeen: new Date() }
     );
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Device → server: foreground app-usage sessions.
+// Idempotent: the device retries a batch whose upload failed, so the same session can arrive more
+// than once. An unordered bulk write of upserts keyed on (device, package, start) absorbs that —
+// duplicates update in place instead of piling up, and one bad row cannot fail the whole batch.
+router.post('/devices/:deviceId/usage', requireDeviceAuth, async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const sessions = Array.isArray(req.body?.sessions) ? req.body.sessions : [];
+    if (sessions.length === 0) return res.json({ success: true, stored: 0 });
+
+    const device = await TetherDevice.findOne({ deviceId }).select('communityId');
+
+    const ops = sessions
+      .filter((s) => s?.packageName && Number.isFinite(s.startTs) && Number.isFinite(s.durationMs))
+      .slice(0, 1000)
+      .map((s) => ({
+        updateOne: {
+          filter: { deviceId, packageName: s.packageName, startTs: s.startTs },
+          update: {
+            $set: {
+              deviceId,
+              communityId: device?.communityId ?? null,
+              packageName: s.packageName,
+              appName: s.appName ?? null,
+              startTs: s.startTs,
+              endTs: s.endTs ?? s.startTs + s.durationMs,
+              durationMs: s.durationMs,
+            },
+          },
+          upsert: true,
+        },
+      }));
+
+    if (ops.length > 0) await TetherUsage.bulkWrite(ops, { ordered: false });
+    await TetherDevice.findOneAndUpdate({ deviceId }, { lastSeen: new Date() });
+
+    res.json({ success: true, stored: ops.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin → server: the usage report for one device.
+// Returns both shapes the device page needs: `apps` (totals per package, biggest first — the
+// "what is this device actually doing" answer) and `timeline` (recent individual sessions with
+// their clock times). `days` selects the window, default 7.
+router.get('/admin/devices/:deviceId/usage', requireTetherAuth, async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const days = Math.min(Math.max(parseInt(req.query.days, 10) || 7, 1), 30);
+    const since = Date.now() - days * 24 * 60 * 60 * 1000;
+
+    // Ownership: a non-superadmin may only read devices in their own communities.
+    const device = await TetherDevice.findOne({ deviceId }).select('communityId');
+    if (!device) return res.status(404).json({ message: 'מכשיר לא נמצא' });
+    if (!isSuperAdmin(req.admin)) {
+      const owned = await Community.findOne({ _id: device.communityId, adminId: req.admin._id });
+      if (!owned) return res.status(404).json({ message: 'מכשיר לא נמצא' });
+    }
+
+    const [apps, timeline] = await Promise.all([
+      TetherUsage.aggregate([
+        { $match: { deviceId, startTs: { $gte: since } } },
+        {
+          $group: {
+            _id: '$packageName',
+            appName: { $last: '$appName' },
+            totalMs: { $sum: '$durationMs' },
+            sessions: { $sum: 1 },
+            lastUsedTs: { $max: '$startTs' },
+          },
+        },
+        { $sort: { totalMs: -1 } },
+        { $limit: 100 },
+        {
+          $project: {
+            _id: 0,
+            packageName: '$_id',
+            appName: 1,
+            totalMs: 1,
+            sessions: 1,
+            lastUsedTs: 1,
+          },
+        },
+      ]),
+      TetherUsage.find({ deviceId, startTs: { $gte: since } })
+        .sort({ startTs: -1 })
+        .limit(200)
+        .select('packageName appName startTs endTs durationMs -_id')
+        .lean(),
+    ]);
+
+    res.json({ days, apps, timeline });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

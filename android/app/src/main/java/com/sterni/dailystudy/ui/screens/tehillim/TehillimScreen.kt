@@ -112,6 +112,16 @@ fun TehillimScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = {
+                        val randomChapter = (1..150).random()
+                        onOpenChapter(randomChapter, "פרק $randomChapter (אקראי)")
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Shuffle,
+                            contentDescription = "פרק אקראי",
+                            tint = Primary
+                        )
+                    }
                     IconButton(onClick = { showAgeDialog = true }) {
                         Icon(
                             imageVector = Icons.Default.Cake,
@@ -137,7 +147,7 @@ fun TehillimScreen(
                 timestamp = lastReadPos.timestamp,
                 repository = repository,
                 onClick = {
-                    onOpenChapter(lastReadPos.chapter, "פרק ${repository.getChapter(lastReadPos.chapter)?.hebrewChapter ?: lastReadPos.chapter}")
+                    onOpenChapter(lastReadPos.chapter, "המשך מאיפה שעצרת")
                 }
             )
 

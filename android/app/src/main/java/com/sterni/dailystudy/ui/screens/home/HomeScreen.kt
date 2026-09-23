@@ -336,11 +336,11 @@ private fun QuickAccessRow(
         modifier              = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        QuickChip(label = "תהילים", icon = Icons.AutoMirrored.Filled.MenuBook,  onClick = onTehillimClick,   modifier = Modifier.weight(1f))
-        QuickChip(label = "מאמרים", icon = Icons.AutoMirrored.Filled.List,     onClick = onMamaarimClick,   modifier = Modifier.weight(1f))
-        QuickChip(label = "תפילה",  icon = Icons.Default.Favorite,              onClick = onTefilaClick,     modifier = Modifier.weight(1f))
-        QuickChip(label = "ספריה",  icon = Icons.Default.PictureAsPdf,          onClick = onPdfLibraryClick, modifier = Modifier.weight(1f))
-        QuickChip(label = "כלים",   icon = Icons.Default.Tune,                  onClick = onToolsClick,      modifier = Modifier.weight(1f))
+        QuickChip(label = "מאמרים", icon = Icons.AutoMirrored.Filled.List,        onClick = onMamaarimClick,   modifier = Modifier.weight(1f))
+        QuickChip(label = "תפילה",  icon = Icons.AutoMirrored.Filled.MenuBook,    onClick = onTefilaClick,     modifier = Modifier.weight(1f))
+        QuickChip(label = "תהילים", icon = Icons.Default.AutoStories,             onClick = onTehillimClick,   modifier = Modifier.weight(1f))
+        QuickChip(label = "ספריה",  icon = Icons.Default.PictureAsPdf,             onClick = onPdfLibraryClick, modifier = Modifier.weight(1f))
+        QuickChip(label = "כלים",   icon = Icons.Default.Tune,                     onClick = onToolsClick,      modifier = Modifier.weight(1f))
     }
 }
 

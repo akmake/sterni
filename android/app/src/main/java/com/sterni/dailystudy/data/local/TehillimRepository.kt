@@ -99,12 +99,25 @@ class TehillimRepository(private val context: Context) {
             .apply()
     }
 
+    fun saveScrollPosition(chapter: Int, verse: Int, itemIndex: Int, offset: Int) {
+        prefs.edit()
+            .putInt(KEY_LAST_CHAPTER, chapter)
+            .putInt(KEY_LAST_VERSE, verse)
+            .putInt(KEY_SCROLL_INDEX, itemIndex)
+            .putInt(KEY_SCROLL_OFFSET, offset)
+            .putLong(KEY_LAST_TIME, System.currentTimeMillis())
+            .apply()
+    }
+
     fun getLastReadingPosition(): TehillimReadingPosition {
         val chapter = prefs.getInt(KEY_LAST_CHAPTER, 1)
         val verse = prefs.getInt(KEY_LAST_VERSE, 1)
         val timestamp = prefs.getLong(KEY_LAST_TIME, 0L)
         return TehillimReadingPosition(chapter, verse, timestamp)
     }
+
+    fun getLastScrollIndex(): Int = prefs.getInt(KEY_SCROLL_INDEX, 0)
+    fun getLastScrollOffset(): Int = prefs.getInt(KEY_SCROLL_OFFSET, 0)
 
     // ── Bookmarks ───────────────────────────────────────────────────────────────
 
@@ -205,6 +218,8 @@ class TehillimRepository(private val context: Context) {
         private const val KEY_LAST_CHAPTER = "last_chapter"
         private const val KEY_LAST_VERSE = "last_verse"
         private const val KEY_LAST_TIME = "last_timestamp"
+        private const val KEY_SCROLL_INDEX = "free_scroll_idx"
+        private const val KEY_SCROLL_OFFSET = "free_scroll_off"
         private const val KEY_BOOKMARKS = "bookmarks"
     }
 }

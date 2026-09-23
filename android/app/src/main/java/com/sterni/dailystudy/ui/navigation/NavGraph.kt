@@ -23,6 +23,8 @@ import com.sterni.dailystudy.ui.screens.tools.JerusalemDirectionScreen
 import com.sterni.dailystudy.ui.screens.pdflibrary.PdfStudyScreen
 import com.sterni.dailystudy.ui.screens.mamaarim.ArticleUploadScreen
 import com.sterni.dailystudy.ui.screens.appblocker.AppBlockerScreen
+import com.sterni.dailystudy.ui.screens.tehillim.TehillimScreen
+import com.sterni.dailystudy.ui.screens.tehillim.TehillimReaderScreen
 import java.net.URLDecoder
 import java.net.URLEncoder
 
@@ -49,6 +51,14 @@ sealed class Screen(val route: String) {
     object PdfLibrary     : Screen("pdfLibrary")
     object ArticleUpload  : Screen("articleUpload")
     object AppBlocker     : Screen("appBlocker")
+    object Tehillim       : Screen("tehillim")
+    object TehillimReader : Screen("tehillimReader/{chapter}/{chapters}/{title}") {
+        fun createRoute(chapter: Int, chapters: List<Int> = emptyList(), title: String = ""): String {
+            val chaptersParam = if (chapters.isNotEmpty()) chapters.joinToString(",") else "all"
+            val titleParam = if (title.isNotEmpty()) title else "תהילים"
+            return "tehillimReader/$chapter/${URLEncoder.encode(chaptersParam, "UTF-8")}/${URLEncoder.encode(titleParam, "UTF-8")}"
+        }
+    }
 }
 
 @Composable
@@ -69,7 +79,8 @@ fun NavGraph(navController: NavHostController) {
                 onToolsClick        = { navController.navigate(Screen.Tools.route) },
                 onNewsClick         = { navController.navigate(Screen.News.route) },
                 onTefilaClick       = { navController.navigate(Screen.Tefila.route) },
-                onPdfLibraryClick   = { navController.navigate(Screen.PdfLibrary.route) }
+                onPdfLibraryClick   = { navController.navigate(Screen.PdfLibrary.route) },
+                onTehillimClick     = { navController.navigate(Screen.Tehillim.route) }
             )
         }
 
@@ -174,6 +185,44 @@ fun NavGraph(navController: NavHostController) {
             ArticleUploadScreen(
                 onBack    = { navController.popBackStack() },
                 onSuccess = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.Tehillim.route) {
+            TehillimScreen(
+                onBack = { navController.popBackStack() },
+                onOpenChapter = { ch, title ->
+                    navController.navigate(Screen.TehillimReader.createRoute(ch, emptyList(), title))
+                },
+                onOpenRange = { chapters, title ->
+                    val startCh = chapters.firstOrNull() ?: 1
+                    navController.navigate(Screen.TehillimReader.createRoute(startCh, chapters, title))
+                }
+            )
+        }
+
+        composable(
+            route = Screen.TehillimReader.route,
+            arguments = listOf(
+                navArgument("chapter")  { type = NavType.IntType },
+                navArgument("chapters") { type = NavType.StringType },
+                navArgument("title")    { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val ch = backStackEntry.arguments?.getInt("chapter") ?: 1
+            val rawChapters = URLDecoder.decode(backStackEntry.arguments?.getString("chapters") ?: "", "UTF-8")
+            val chaptersList = if (rawChapters.isNotEmpty() && rawChapters != "all") {
+                rawChapters.split(",").mapNotNull { it.toIntOrNull() }
+            } else {
+                emptyList()
+            }
+            val title = URLDecoder.decode(backStackEntry.arguments?.getString("title") ?: "", "UTF-8")
+
+            TehillimReaderScreen(
+                initialChapter = ch,
+                chapterList = chaptersList,
+                displayTitle = title,
+                onBack = { navController.popBackStack() }
             )
         }
     }

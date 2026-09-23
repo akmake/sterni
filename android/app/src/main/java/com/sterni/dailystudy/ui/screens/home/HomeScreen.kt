@@ -59,6 +59,7 @@ fun HomeScreen(
     onNewsClick:        () -> Unit = {},
     onTefilaClick:      () -> Unit = {},
     onPdfLibraryClick:  () -> Unit = {},
+    onTehillimClick:    () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState     by viewModel.uiState.collectAsStateWithLifecycle()
@@ -160,6 +161,7 @@ fun HomeScreen(
 
                         item {
                             QuickAccessRow(
+                                onTehillimClick   = onTehillimClick,
                                 onMamaarimClick   = onMamaarimClick,
                                 onTefilaClick     = onTefilaClick,
                                 onPdfLibraryClick = onPdfLibraryClick,
@@ -323,6 +325,7 @@ fun HomeHeader(
 
 @Composable
 private fun QuickAccessRow(
+    onTehillimClick:   () -> Unit,
     onMamaarimClick:   () -> Unit,
     onTefilaClick:     () -> Unit,
     onPdfLibraryClick: () -> Unit,
@@ -331,10 +334,11 @@ private fun QuickAccessRow(
 ) {
     Row(
         modifier              = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
+        QuickChip(label = "תהילים", icon = Icons.AutoMirrored.Filled.MenuBook,  onClick = onTehillimClick,   modifier = Modifier.weight(1f))
         QuickChip(label = "מאמרים", icon = Icons.AutoMirrored.Filled.List,     onClick = onMamaarimClick,   modifier = Modifier.weight(1f))
-        QuickChip(label = "תפילה",  icon = Icons.AutoMirrored.Filled.MenuBook,  onClick = onTefilaClick,     modifier = Modifier.weight(1f))
+        QuickChip(label = "תפילה",  icon = Icons.Default.Favorite,              onClick = onTefilaClick,     modifier = Modifier.weight(1f))
         QuickChip(label = "ספריה",  icon = Icons.Default.PictureAsPdf,          onClick = onPdfLibraryClick, modifier = Modifier.weight(1f))
         QuickChip(label = "כלים",   icon = Icons.Default.Tune,                  onClick = onToolsClick,      modifier = Modifier.weight(1f))
     }
@@ -515,9 +519,9 @@ private fun SkeletonHeader() {
 private fun SkeletonQuickRow() {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        repeat(4) {
+        repeat(5) {
             Box(
                 Modifier.weight(1f).height(64.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFFF0F0F0))
             )

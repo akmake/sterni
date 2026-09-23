@@ -106,54 +106,17 @@ class ZmanBriefWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, para
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         val today = sdf.format(Date())
 
-        val selectedCity = ctx.getSharedPreferences("ZmanimPrefs", Context.MODE_PRIVATE)
-            .getInt("selected_city", 0)
-        val locationIds = listOf(531, 247, 689, 688)
-        val locationId = locationIds.getOrElse(selectedCity) { 531 }
-
-        val cacheFile = File(ctx.filesDir, "zmanim_cache/city_$locationId.json")
-        if (!cacheFile.exists()) return null
+        val selectedId = com.sterni.dailystudy.zmanim.ZmanimLocationRepository.getSelectedLocationId(ctx)
+        val location = com.sterni.dailystudy.zmanim.ZmanimLocationRepository.findLocationById(ctx, selectedId)
 
         return try {
-            val gson = Gson()
-            val listType = object : TypeToken<List<ZmanimDay>>() {}.type
-            val days: List<ZmanimDay> = gson.fromJson(cacheFile.readText(), listType) ?: return null
-            val todayData = days.find { it.date == today } ?: return null
-
-            val zmanOrder = listOf(
-                "AlosHashachar"    to "עלות השחר",
-                "EarliestTefillin" to "משיכיר",
-                "NetzHachamah"     to "הנץ החמה",
-                "LatestShema"      to "סוף זמן ק\"ש",
-                "LatestTefillah"   to "סוף זמן תפילה",
-                "Chatzos"          to "חצות היום",
-                "MinchahGedolah"   to "מנחה גדולה",
-                "MinchahKetanah"   to "מנחה קטנה",
-                "PlagHaminchah"    to "פלג המנחה",
-                "CandleLighting"   to "הדלקת נרות",
-                "Shkiah"           to "שקיעת החמה",
-                "Tzeis"            to "צאת הכוכבים",
-                "ChatzosNight"     to "חצות הלילה"
-            )
-            val byType = todayData.zmanim.associateBy { it.type }
-
-            for ((type, label) in zmanOrder) {
-                val dto = byType[type] ?: continue
-                val millis = timeToMillis(today, dto.time)
-                if (millis > now) return label to dto.time
+            val zmanim = com.sterni.dailystudy.zmanim.ChabadZmanimCalculator.calculateZmanim(today, location)
+            for (zman in zmanim) {
+                if (zman.timeMillis > now) {
+                    return zman.label to zman.time
+                }
             }
             null
         } catch (_: Exception) { null }
-    }
-
-    private fun timeToMillis(isoDate: String, timeStr: String): Long {
-        return try {
-            val (year, month, day) = isoDate.split("-").map { it.toInt() }
-            val parts = timeStr.split(":")
-            Calendar.getInstance(TimeZone.getTimeZone("Asia/Jerusalem")).apply {
-                set(year, month - 1, day, parts[0].toInt(), parts[1].toInt(), 0)
-                set(Calendar.MILLISECOND, 0)
-            }.timeInMillis
-        } catch (_: Exception) { 0L }
     }
 }

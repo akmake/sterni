@@ -16,6 +16,8 @@ import com.sterni.dailystudy.ui.screens.settings.SettingsScreen
 import com.sterni.dailystudy.ui.screens.study.StudyDetailScreen
 import com.sterni.dailystudy.ui.screens.tracker.StudyTrackerScreen
 import com.sterni.dailystudy.ui.screens.zmanim.ZmanimScreen
+import com.sterni.dailystudy.ui.screens.zmanim.ZmanimMapPickerScreen
+import com.sterni.dailystudy.zmanim.ZmanimLocationRepository
 import com.sterni.dailystudy.ui.screens.tefila.TefilaScreen
 import com.sterni.dailystudy.ui.screens.tools.ToolsScreen
 import com.sterni.dailystudy.ui.screens.tools.PermissionsScreen
@@ -59,6 +61,7 @@ sealed class Screen(val route: String) {
             return "tehillimReader/$chapter/${URLEncoder.encode(chaptersParam, "UTF-8")}/${URLEncoder.encode(titleParam, "UTF-8")}"
         }
     }
+    object ZmanimMapPicker : Screen("zmanimMapPicker")
 }
 
 @Composable
@@ -107,7 +110,24 @@ fun NavGraph(navController: NavHostController) {
         }
 
         composable(Screen.Zmanim.route) {
-            ZmanimScreen(onBack = { navController.popBackStack() })
+            ZmanimScreen(
+                onBack = { navController.popBackStack() },
+                onOpenMapPicker = { navController.navigate(Screen.ZmanimMapPicker.route) }
+            )
+        }
+
+        composable(Screen.ZmanimMapPicker.route) {
+            ZmanimMapPickerScreen(
+                onBack = { navController.popBackStack() },
+                onLocationSelected = { loc ->
+                    val ctx = navController.context
+                    ZmanimLocationRepository.setSelectedLocationId(ctx, loc.id)
+                    if (loc.isCustom) {
+                        ZmanimLocationRepository.saveCustomLocation(ctx, loc)
+                    }
+                    navController.popBackStack()
+                }
+            )
         }
 
         composable(Screen.Mamaarim.route) {

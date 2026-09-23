@@ -4,12 +4,10 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import com.sterni.dailystudy.data.api.ZmanimDay
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
-import java.io.File
+import com.sterni.dailystudy.zmanim.ChabadZmanimCalculator
+import com.sterni.dailystudy.zmanim.ZmanimLocationRepository
 import java.util.Calendar
-import java.util.TimeZone
 
 object ZmanimRescheduler {
 
@@ -29,7 +27,6 @@ object ZmanimRescheduler {
         "חצות הלילה"     to "ChatzosNight",
     )
 
-    private val CITY_LOCATION_IDS = listOf(531, 247, 689, 688)
     private val gson = Gson()
 
     fun rescheduleNext(context: Context, zmanLabel: String) {
@@ -54,13 +51,12 @@ object ZmanimRescheduler {
     }
 
     private fun scheduleForDay(context: Context, config: AlarmConfig, daysFromNow: Int): Boolean {
-        val type = LABEL_TO_TYPE[config.zmanLabel] ?: return false
+        val type = LABEL_TO_TYPE[config.zmanLabel]
 
-        val cityPrefs  = context.getSharedPreferences("ZmanimPrefs", Context.MODE_PRIVATE)
-        val cityIndex  = cityPrefs.getInt("selected_city", 0).coerceIn(0, CITY_LOCATION_IDS.lastIndex)
-        val locationId = CITY_LOCATION_IDS[cityIndex]
+        val selectedId = ZmanimLocationRepository.getSelectedLocationId(context)
+        val location = ZmanimLocationRepository.findLocationById(context, selectedId)
 
-        val cal = Calendar.getInstance(TimeZone.getTimeZone("Asia/Jerusalem")).apply {
+        val cal = Calendar.getInstance(location.getTimeZone()).apply {
             add(Calendar.DAY_OF_YEAR, daysFromNow)
         }
         val dateStr = "%04d-%02d-%02d".format(
@@ -69,16 +65,11 @@ object ZmanimRescheduler {
             cal.get(Calendar.DAY_OF_MONTH)
         )
 
-        val cacheFile = File(File(context.filesDir, "zmanim_cache"), "city_$locationId.json")
-        if (!cacheFile.exists()) return false
-
         return try {
-            val listType = object : TypeToken<List<ZmanimDay>>() {}.type
-            val days: List<ZmanimDay> = gson.fromJson(cacheFile.readText(), listType) ?: return false
-            val day = days.find { it.date == dateStr } ?: return false
-            val dto = day.zmanim.find { it.type == type } ?: return false
+            val zmanim = ChabadZmanimCalculator.calculateZmanim(dateStr, location)
+            val zman = zmanim.find { it.type == type || it.label == config.zmanLabel } ?: return false
 
-            val zmanMillis = timeToMillis(dateStr, dto.time)
+            val zmanMillis = zman.timeMillis
             if (zmanMillis <= 0) return false
 
             val offsetMs = config.offsetMinutes * 60_000L
@@ -100,17 +91,8 @@ object ZmanimRescheduler {
             )
             am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, alarmMs, pi)
             true
-        } catch (_: Exception) { false }
-    }
-
-    private fun timeToMillis(isoDate: String, timeStr: String): Long {
-        return try {
-            val (y, m, d) = isoDate.split("-").map { it.toInt() }
-            val parts = timeStr.split(":")
-            Calendar.getInstance(TimeZone.getTimeZone("Asia/Jerusalem")).apply {
-                set(y, m - 1, d, parts[0].toInt(), parts[1].toInt(), 0)
-                set(Calendar.MILLISECOND, 0)
-            }.timeInMillis
-        } catch (_: Exception) { 0L }
+        } catch (_: Exception) {
+            false
+        }
     }
 }

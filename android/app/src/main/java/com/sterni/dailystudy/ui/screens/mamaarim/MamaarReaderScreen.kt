@@ -96,6 +96,7 @@ private fun ReaderContent(mamaar: Mamaar, onBack: () -> Unit) {
                 .putInt("${scrollKey}_idx", listState.firstVisibleItemIndex)
                 .putInt("${scrollKey}_off", listState.firstVisibleItemScrollOffset)
                 .apply()
+            com.sterni.dailystudy.sync.UserManager.triggerSync(context)
         }
     }
 

@@ -113,17 +113,19 @@ class ArticleUploadViewModel(app: Application) : AndroidViewModel(app) {
                 val finalText  = rawText.value.trim()
 
                 if (uploadToServer) {
-                    RetrofitClient.articleService.saveArticle(
+                    val saved = RetrofitClient.articleService.saveArticle(
                         SaveArticleBody(
                             rawText   = finalText,
                             pageCount = preview.pageCount,
                             title     = finalTitle
                         )
                     )
+                    saveToLocalLibrary(finalTitle, finalText, preview.pageCount, savedId = saved.id)
                 } else {
-                    saveToLocalLibrary(finalTitle, finalText, preview.pageCount)
+                    saveToLocalLibrary(finalTitle, finalText, preview.pageCount, savedId = null)
                 }
 
+                com.sterni.dailystudy.sync.UserManager.triggerSync(getApplication())
                 _state.value = UploadState.Success
             } catch (e: Exception) {
                 _state.value = UploadState.Error("שגיאה בשמירה: ${e.message}")
@@ -131,11 +133,11 @@ class ArticleUploadViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun saveToLocalLibrary(titleStr: String, text: String, pages: Int) {
+    private fun saveToLocalLibrary(titleStr: String, text: String, pages: Int, savedId: String? = null) {
         val ctx      = getApplication<Application>()
         val cacheDir = File(ctx.filesDir, "articles_cache").also { it.mkdirs() }
 
-        val id     = "local_${System.currentTimeMillis()}"
+        val id     = savedId ?: "local_${System.currentTimeMillis()}"
         val nowIso = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
             .apply { timeZone = TimeZone.getTimeZone("UTC") }
             .format(Date())

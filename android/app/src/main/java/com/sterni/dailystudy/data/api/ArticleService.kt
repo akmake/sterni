@@ -42,4 +42,7 @@ interface ArticleService {
 
     @POST("articles/save")
     suspend fun saveArticle(@Body body: SaveArticleBody): ArticleDto
+
+    @POST("articles/save")
+    fun saveArticleCall(@Body body: SaveArticleBody): Call<ArticleDto>
 }

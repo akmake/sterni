@@ -129,26 +129,126 @@ object UserManager {
     }
 
     /**
-     * Performs a two-way sync: sends current local positions and settings,
-     * receives the merged server state, and applies it locally across all preferences.
+     * Performs a two-way sync: sends current local positions, settings and articles,
+     * receives the merged server state, and applies it locally across all preferences and library.
      */
     fun sync(context: Context): Boolean {
         val userId = getUserId(context) ?: ensureRegistered(context) ?: return false
         val (positions, preferences) = collectLocalData(context)
+        val localArticleIds = syncLocalArticles(context)
 
         return try {
-            val body = SyncRequest(positions, preferences, null)
+            val body = SyncRequest(positions, preferences, localArticleIds)
             val resp = userService(context).sync(userId, body).execute()
             if (resp.isSuccessful) {
                 val data = resp.body()
                 if (data != null) {
                     applyServerData(context, data)
+                    syncDownloadedArticles(context, data.savedArticleIds)
                 }
                 true
             } else false
         } catch (e: Exception) {
             Log.w(TAG, "Sync failed: ${e.message}")
             false
+        }
+    }
+
+    /**
+     * Syncs any locally scanned articles (local_*) to the server and returns the active article IDs.
+     */
+    private fun syncLocalArticles(context: Context): List<String> {
+        val cacheDir = java.io.File(context.filesDir, "articles_cache").also { it.mkdirs() }
+        val listFile = java.io.File(cacheDir, "list.json")
+        val gson = com.google.gson.Gson()
+        val type = object : com.google.gson.reflect.TypeToken<List<com.sterni.dailystudy.data.api.ArticleDto>>() {}.type
+
+        val currentList: MutableList<com.sterni.dailystudy.data.api.ArticleDto> = try {
+            if (listFile.exists()) gson.fromJson(listFile.readText(), type) ?: mutableListOf()
+            else mutableListOf()
+        } catch (_: Exception) { mutableListOf() }
+
+        var listChanged = false
+        val articleIds = mutableListOf<String>()
+
+        for (i in currentList.indices) {
+            val item = currentList[i]
+            if (item.id.startsWith("local_")) {
+                val textFile = java.io.File(cacheDir, "text_${item.id}.txt")
+                if (textFile.exists()) {
+                    try {
+                        val text = textFile.readText()
+                        // Upload article via RetrofitClient
+                        val response = com.sterni.dailystudy.data.api.RetrofitClient.articleService.saveArticleCall(
+                            com.sterni.dailystudy.data.api.SaveArticleBody(
+                                rawText = text,
+                                pageCount = 0,
+                                title = item.title
+                            )
+                        ).execute()
+                        val serverId = response.body()?.id
+                        if (serverId != null) {
+                            currentList[i] = item.copy(id = serverId)
+                            textFile.renameTo(java.io.File(cacheDir, "text_$serverId.txt"))
+                            articleIds.add(serverId)
+                            listChanged = true
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to upload local article ${item.id}: ${e.message}")
+                    }
+                }
+            } else {
+                articleIds.add(item.id)
+            }
+        }
+
+        if (listChanged) {
+            listFile.writeText(gson.toJson(currentList))
+        }
+
+        return articleIds
+    }
+
+    /**
+     * Downloads any articles saved in user's cloud account that are not yet cached on this device.
+     */
+    private fun syncDownloadedArticles(context: Context, serverArticleIds: List<String>?) {
+        if (serverArticleIds.isNullOrEmpty()) return
+        val cacheDir = java.io.File(context.filesDir, "articles_cache").also { it.mkdirs() }
+        val listFile = java.io.File(cacheDir, "list.json")
+        val gson = com.google.gson.Gson()
+        val type = object : com.google.gson.reflect.TypeToken<List<com.sterni.dailystudy.data.api.ArticleDto>>() {}.type
+
+        val currentList: MutableList<com.sterni.dailystudy.data.api.ArticleDto> = try {
+            if (listFile.exists()) gson.fromJson(listFile.readText(), type) ?: mutableListOf()
+            else mutableListOf()
+        } catch (_: Exception) { mutableListOf() }
+
+        val localIds = currentList.map { it.id }.toSet()
+        var updated = false
+
+        for (id in serverArticleIds) {
+            if (id !in localIds) {
+                try {
+                    val resp = com.sterni.dailystudy.data.api.RetrofitClient.articleService.getArticleById(id).execute()
+                    if (resp.isSuccessful) {
+                        val article = resp.body()
+                        if (article != null) {
+                            currentList.add(0, article.copy(rawText = null))
+                            if (!article.rawText.isNullOrBlank()) {
+                                java.io.File(cacheDir, "text_$id.txt").writeText(article.rawText)
+                            }
+                            updated = true
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to download synced article $id: ${e.message}")
+                }
+            }
+        }
+
+        if (updated) {
+            listFile.writeText(gson.toJson(currentList))
         }
     }
 

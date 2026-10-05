@@ -10,7 +10,9 @@ interface ApiService {
 
     @GET("study/day")
     suspend fun getDailyStudy(
-        @Query("date") date: String? = null
+        @Query("date") date: String? = null,
+        @Query("diaspora") diaspora: Boolean? = null,
+        @Query("timezone") timezone: String? = null
     ): Response<StudyDay>
 
     @GET("study/tehillim-chapters")

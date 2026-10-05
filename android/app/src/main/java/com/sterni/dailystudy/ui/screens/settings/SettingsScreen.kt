@@ -313,7 +313,9 @@ private suspend fun downloadDays(context: Context, total: Int, onProgress: (Stri
         if (StudyCache.get(context, date) != null) continue
         onProgress("מוריד ${i + 1} / $total...")
         try {
-            val response = RetrofitClient.apiService.getDailyStudy(date)
+            val tz = java.util.TimeZone.getDefault().id
+            val isDiaspora = tz != "Asia/Jerusalem"
+            val response = RetrofitClient.apiService.getDailyStudy(date, diaspora = isDiaspora, timezone = tz)
             val day = if (response.isSuccessful) response.body() else null
             if (day != null) StudyCache.save(context, date, day)
         } catch (_: Exception) {}

@@ -111,7 +111,9 @@ class StudyDetailViewModel @Inject constructor(
                 dailySections = cachedStudy.sections!!
             } else {
                 try {
-                    val response = apiService.getDailyStudy(date)
+                    val tz = java.util.TimeZone.getDefault().id
+                    val isDiaspora = tz != "Asia/Jerusalem"
+                    val response = apiService.getDailyStudy(date, diaspora = isDiaspora, timezone = tz)
                     val day = if (response.isSuccessful) response.body() else null
                     if (day != null) {
                         StudyCache.save(ctx, date, day)

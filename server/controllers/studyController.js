@@ -1,4 +1,5 @@
 import { getDailyCalendar } from '../services/calendarService.js';
+import { findTreatiseInfo, getBookSiyum } from '../services/rambamBookManager.js';
 
 const SEFARIA_BASE_URL = 'https://www.sefaria.org';
 const DEFAULT_TIMEZONE = 'Asia/Jerusalem';
@@ -277,7 +278,7 @@ function findCalendarItem(calendarItems, matchers, configKey) {
   return matches[0] || null;
 }
 
-// הלוגיקה החדשה לרמב"ם שמתרגמת את Java ל-JS
+// הלוגיקה המשודרגת לרמב"ם שתומכת בפתיחת ספר, פתיחת הלכות, מניין המצוות וסיום ספר
 function parseRambamAndroidStyle(textData) {
   const heRaw = textData?.he || textData?.text;
   if (!heRaw || !Array.isArray(heRaw)) return [];
@@ -286,21 +287,72 @@ function parseRambamAndroidStyle(textData) {
   const result = [];
   let globalId = 1;
 
-  if (Array.isArray(heRaw[0])) {
-    // מערך דו ממדי - 3 פרקים
-    heRaw.forEach((chapterArr, chIndex) => {
-      const actualChapterNum = startChapter + chIndex;
-      
-      // הזרקת כותרת הפרק בדומה לאנדרואיד
+  const treatiseInfo = findTreatiseInfo(textData.ref || textData.indexTitle || textData.book);
+
+  // 1. פתיחת ספר ומניין המצוות בתחילת הלכות (פרק א')
+  if (startChapter === 1 && treatiseInfo) {
+    if (treatiseInfo.isFirstInBook) {
       result.push({
         id: String(globalId++),
         isHeader: true,
-        he: `פרק ${getHebrewOrdinal(actualChapterNum)}`,
+        isAliyahHeader: true,
+        he: `— ${treatiseInfo.bookTitle} —`,
+        en: '',
+        rashi: []
+      });
+      if (treatiseInfo.bookIntro) {
+        result.push({
+          id: String(globalId++),
+          isHeader: false,
+          he: treatiseInfo.bookIntro,
+          en: '',
+          rashi: []
+        });
+      }
+    }
+
+    result.push({
+      id: String(globalId++),
+      isHeader: true,
+      isAliyahHeader: true,
+      he: `— ${treatiseInfo.heTitle} —`,
+      en: '',
+      rashi: []
+    });
+    if (treatiseInfo.mitzvotText) {
+      result.push({
+        id: String(globalId++),
+        isHeader: false,
+        he: treatiseInfo.mitzvotText,
+        en: '',
+        rashi: []
+      });
+    }
+  }
+
+  const getChapterHeader = (chNum, isFirstInChunk) => {
+    if (startChapter === 1 && chNum === 1) {
+      return `פרק ${getHebrewOrdinal(chNum)}`;
+    }
+    if (isFirstInChunk && treatiseInfo) {
+      return `${treatiseInfo.heTitle} - פרק ${getHebrewOrdinal(chNum)}`;
+    }
+    return `פרק ${getHebrewOrdinal(chNum)}`;
+  };
+
+  if (Array.isArray(heRaw[0])) {
+    // מערך דו ממדי - מספר פרקים
+    heRaw.forEach((chapterArr, chIndex) => {
+      const actualChapterNum = startChapter + chIndex;
+
+      result.push({
+        id: String(globalId++),
+        isHeader: true,
+        he: getChapterHeader(actualChapterNum, chIndex === 0),
         en: '',
         rashi: []
       });
 
-      // הזרקת ההלכות
       chapterArr.forEach((halakha, hIndex) => {
         if (halakha && typeof halakha === 'string') {
           result.push({
@@ -313,16 +365,39 @@ function parseRambamAndroidStyle(textData) {
           });
         }
       });
+
+      // בדיקת סיום ספר בסוף הפרק האחרון של הספר
+      if (treatiseInfo && actualChapterNum === treatiseInfo.chapterCount && treatiseInfo.isLastInBook) {
+        const siyum = getBookSiyum(treatiseInfo.bookNum);
+        if (siyum) {
+          result.push({
+            id: String(globalId++),
+            isHeader: true,
+            isAliyahHeader: true,
+            he: siyum.header,
+            en: '',
+            rashi: []
+          });
+          result.push({
+            id: String(globalId++),
+            isHeader: false,
+            he: siyum.text,
+            en: '',
+            rashi: []
+          });
+        }
+      }
     });
   } else {
-    // פרק יחיד — מוסיפים כותרת כדי ש-last1 slice יוכל לחתוך נכון
+    // פרק יחיד
     result.push({
       id: String(globalId++),
       isHeader: true,
-      he: `פרק ${getHebrewOrdinal(startChapter)}`,
+      he: getChapterHeader(startChapter, true),
       en: '',
       rashi: []
     });
+
     heRaw.forEach((halakha, hIndex) => {
       if (halakha && typeof halakha === 'string') {
         result.push({
@@ -335,7 +410,30 @@ function parseRambamAndroidStyle(textData) {
         });
       }
     });
+
+    // בדיקת סיום ספר בסוף הפרק האחרון של הספר
+    if (treatiseInfo && startChapter === treatiseInfo.chapterCount && treatiseInfo.isLastInBook) {
+      const siyum = getBookSiyum(treatiseInfo.bookNum);
+      if (siyum) {
+        result.push({
+          id: String(globalId++),
+          isHeader: true,
+          isAliyahHeader: true,
+          he: siyum.header,
+          en: '',
+          rashi: []
+        });
+        result.push({
+          id: String(globalId++),
+          isHeader: false,
+          he: siyum.text,
+          en: '',
+          rashi: []
+        });
+      }
+    }
   }
+
   return result;
 }
 
@@ -476,72 +574,110 @@ async function fetchTextByMode(ref, mode) {
     } catch (_) {}
   }
 
-  // Rashi + cross-chapter: e.g. "Leviticus 6:12-7:10"
-  // Sefaria returns only partial Rashi for multi-chapter ranges.
-  // Fix: get the chapter structure first, then fetch each chapter separately.
-  if (mode === 'rashi') {
-    const crossMatch = ref.match(/^(.+)\s+(\d+):(\d+)-(\d+):(\d+)$/);
-    if (crossMatch && crossMatch[2] !== crossMatch[4]) {
-      const book      = crossMatch[1];
-      const startCh   = parseInt(crossMatch[2], 10);
-      const startVs   = parseInt(crossMatch[3], 10);
-      const endVs     = parseInt(crossMatch[5], 10);
+function parseRashiCommentsForVerse(rawVerseRashi) {
+  if (!rawVerseRashi) return [];
+  const list = Array.isArray(rawVerseRashi) ? rawVerseRashi : [rawVerseRashi];
+  return list
+    .map(c => stripHtml(c))
+    .filter(Boolean)
+    .map(text => ({ he: text }));
+}
 
-      // Step 1: get chapter boundaries from main text (no commentary needed)
-      const mainData = await fetchJson(`/api/texts/${safeRef}`, { context: 0, commentary: 0, pad: 0, lang: 'he' });
-      const he2D = mainData?.he || mainData?.text;
+async function fetchChumashWithRashi(ref) {
+  const safeRef = encodeURI(ref.replace(/ /g, '_'));
+  const rashiRef = ref.startsWith('Rashi on ') ? ref : `Rashi on ${ref}`;
+  const safeRashiRef = encodeURI(rashiRef.replace(/ /g, '_'));
 
-      if (Array.isArray(he2D) && Array.isArray(he2D[0])) {
-        const allSections = [];
-        let idCounter = 1;
+  const [torahData, rashiData] = await Promise.all([
+    fetchJson(`/api/texts/${safeRef}`, { context: 0, commentary: 0, pad: 0, lang: 'he' }),
+    fetchJson(`/api/texts/${safeRashiRef}`, { context: 0, commentary: 0, pad: 0, lang: 'he' }).catch((err) => {
+      console.warn(`[rashi] Failed fetching Rashi for ${ref}:`, err.message);
+      return null;
+    })
+  ]);
 
-        for (let ci = 0; ci < he2D.length; ci += 1) {
-          const chapter   = startCh + ci;
-          const chStartVs = ci === 0 ? startVs : 1;
-          const chEndVs   = ci === he2D.length - 1 ? endVs : chStartVs + he2D[ci].length - 1;
-          const chRef     = `${book} ${chapter}:${chStartVs}-${chEndVs}`;
-          const safeChRef = encodeURI(chRef.replace(/ /g, '_'));
+  const torahRaw = torahData?.he || torahData?.text;
+  const rashiRaw = rashiData?.he || rashiData?.text;
 
-          // Chapter header between chapters
-          if (ci > 0) {
-            allSections.push({
-              id: String(idCounter++),
-              isHeader: true,
-              isChapterHeader: true,
-              he: `פרק ${getHebrewOrdinal(chapter)}`,
-              en: '', rashi: [],
-            });
-          }
+  const startChapter = Number(torahData?.sections?.[0]) || 1;
+  const startVerse = Number(torahData?.sections?.[1]) || 1;
 
-          // Fetch this chapter with full Rashi
-          try {
-            const chData = await fetchJson(`/api/texts/${safeChRef}`, { context: 0, commentary: 1, pad: 0, lang: 'he' });
-            const chSections = mapSectionsHebrew(chData, chStartVs);
+  const sections = [];
+  let globalId = 1;
 
-            const rashis = mapRashiOnly(chData);
-            rashis.forEach(r => {
-              const vMatch = r.anchorRef ? r.anchorRef.match(/:(\d+)/) : null;
-              const vNum = vMatch ? parseInt(vMatch[1], 10) : chStartVs;
-              const target = chSections.find(s => s.verseNum === vNum);
-              if (target) target.rashi.push(r);
-              else if (chSections.length > 0) chSections[chSections.length - 1].rashi.push(r);
-            });
+  // Multi-chapter range (e.g. Genesis 1:1-2:3) -> torahRaw is 2D array [ [verses of ch1], [verses of ch2] ]
+  if (Array.isArray(torahRaw) && Array.isArray(torahRaw[0])) {
+    let chapter = startChapter;
+    for (let ci = 0; ci < torahRaw.length; ci++) {
+      const chVerses = Array.isArray(torahRaw[ci]) ? torahRaw[ci] : [];
+      const chRashi = Array.isArray(rashiRaw?.[ci]) ? rashiRaw[ci] : [];
+      const chStartVerse = (ci === 0) ? startVerse : 1;
 
-            chSections.forEach(s => allSections.push({ ...s, id: String(idCounter++) }));
-          } catch (err) {
-            console.error(`[rashi] Chapter ${chapter} fetch failed:`, err.message);
-          }
-        }
-
-        return { sections: allSections };
+      // Add chapter header between chapters
+      if (ci > 0) {
+        sections.push({
+          id: String(globalId++),
+          isHeader: true,
+          isChapterHeader: true,
+          he: `פרק ${getHebrewOrdinal(chapter)}`,
+          en: '',
+          rashi: []
+        });
       }
+
+      for (let vi = 0; vi < chVerses.length; vi++) {
+        const verseText = stripHtml(chVerses[vi]);
+        if (!verseText) continue;
+        const verseNum = chStartVerse + vi;
+        const verseRashi = parseRashiCommentsForVerse(chRashi?.[vi]);
+
+        sections.push({
+          id: String(globalId++),
+          isHeader: false,
+          he: verseText,
+          en: '',
+          rashi: verseRashi,
+          verseNum,
+          chapterNum: chapter
+        });
+      }
+      chapter++;
     }
+    return { sections };
   }
 
-  // Standard flow (single chapter, or non-rashi mode)
+  // Single-chapter range (e.g. Genesis 2:4-2:19)
+  const verses = Array.isArray(torahRaw) ? torahRaw : (torahRaw ? [torahRaw] : []);
+  const rashiList = Array.isArray(rashiRaw) ? rashiRaw : (rashiRaw ? [rashiRaw] : []);
+
+  for (let vi = 0; vi < verses.length; vi++) {
+    const verseText = stripHtml(verses[vi]);
+    if (!verseText) continue;
+    const verseNum = startVerse + vi;
+    const verseRashi = parseRashiCommentsForVerse(rashiList[vi]);
+
+    sections.push({
+      id: String(globalId++),
+      isHeader: false,
+      he: verseText,
+      en: '',
+      rashi: verseRashi,
+      verseNum,
+      chapterNum: startChapter
+    });
+  }
+
+  return { sections };
+}
+
+  if (mode === 'rashi') {
+    return fetchChumashWithRashi(ref);
+  }
+
+  // Standard flow (non-rashi mode)
   const textData = await fetchJson(`/api/texts/${safeRef}`, {
     context: 0,
-    commentary: mode === 'rashi' ? 1 : 0,
+    commentary: 0,
     pad: 0,
     lang: 'he',
   });
@@ -553,17 +689,6 @@ async function fetchTextByMode(ref, mode) {
   const baseVerseMatch = textData.ref ? textData.ref.match(/:(\d+)/) : null;
   const startVerse = baseVerseMatch ? parseInt(baseVerseMatch[1], 10) : 1;
   const sections = mapSectionsHebrew(textData, startVerse);
-
-  if (mode === 'rashi') {
-    const rashis = mapRashiOnly(textData);
-    rashis.forEach(r => {
-      const vNumMatch = r.anchorRef ? r.anchorRef.match(/:(\d+)/) : null;
-      const vNum = vNumMatch ? parseInt(vNumMatch[1], 10) : startVerse;
-      const targetSec = sections.find(s => s.verseNum === vNum);
-      if (targetSec) targetSec.rashi.push(r);
-      else if (sections.length > 0) sections[sections.length - 1].rashi.push(r);
-    });
-  }
 
   return { sections };
 }
@@ -641,10 +766,112 @@ async function resolveStudy(calendarItems, config, dateString) {
     };
   }
 
-  // חומש – עלייה לפי יום השבוע
-  if (config.kind === 'aliyah' && item.extraDetails && Array.isArray(item.extraDetails.aliyot)) {
-    const dayOfWeek = new Date(dateString + 'T00:00:00Z').getUTCDay();
-    refsToFetch = [item.extraDetails.aliyot[dayOfWeek === 6 ? 6 : dayOfWeek]].filter(Boolean);
+  // חומש – עלייה לפי יום השבוע / שמחת תורה (מנהג חב"ד)
+  if (config.kind === 'aliyah') {
+    if (item.extraDetails?.isSimchatTorah) {
+      const { vezotAliyot = [], bereshitAliyot = [] } = item.extraDetails;
+      const allSections = [];
+      let globalId = 1;
+
+      // 1. כותרת פתיחה: סיום התורה בפרשת וזאת הברכה
+      allSections.push({
+        id: String(globalId++),
+        isHeader: true,
+        isAliyahHeader: false,
+        he: '— פרשת וזאת הברכה (סיום התורה) —',
+        en: '',
+        rashi: [],
+      });
+
+      // טעינה מקבילית של כל עליות וזאת הברכה של היום
+      const vezotPayloads = await Promise.all(
+        vezotAliyot.map(a => fetchTextByMode(a.ref, config.detailMode).catch(err => {
+          console.error(`[chumash] failed fetching Vezot aliyah ${a.ref}:`, err.message);
+          return null;
+        }))
+      );
+
+      for (let i = 0; i < vezotAliyot.length; i++) {
+        const a = vezotAliyot[i];
+        allSections.push({
+          id: String(globalId++),
+          isHeader: true,
+          isAliyahHeader: true,
+          he: `וזאת הברכה — עליית ${a.name}`,
+          en: '',
+          rashi: [],
+        });
+        const payload = vezotPayloads[i];
+        if (payload?.sections) {
+          for (const s of payload.sections) {
+            if (s.isHeader && !s.isChapterHeader) continue;
+            allSections.push({ ...s, id: String(globalId++) });
+          }
+        }
+      }
+
+      // 2. סיום חמישה חומשי תורה
+      allSections.push({
+        id: String(globalId++),
+        isHeader: true,
+        isAliyahHeader: false,
+        he: 'חֲזַק חֲזַק וְנִתְחַזֵּק',
+        en: '',
+        rashi: [],
+      });
+
+      // 3. כותרת: התחלת התורה בפרשת בראשית
+      allSections.push({
+        id: String(globalId++),
+        isHeader: true,
+        isAliyahHeader: false,
+        he: '— פרשת בראשית (התחלת התורה) —',
+        en: '',
+        rashi: [],
+      });
+
+      // טעינה מקבילית של עליות בראשית של היום
+      const bereshitPayloads = await Promise.all(
+        bereshitAliyot.map(a => fetchTextByMode(a.ref, config.detailMode).catch(err => {
+          console.error(`[chumash] failed fetching Bereshit aliyah ${a.ref}:`, err.message);
+          return null;
+        }))
+      );
+
+      for (let i = 0; i < bereshitAliyot.length; i++) {
+        const a = bereshitAliyot[i];
+        allSections.push({
+          id: String(globalId++),
+          isHeader: true,
+          isAliyahHeader: true,
+          he: `בראשית — עליית ${a.name}`,
+          en: '',
+          rashi: [],
+        });
+        const payload = bereshitPayloads[i];
+        if (payload?.sections) {
+          for (const s of payload.sections) {
+            if (s.isHeader && !s.isChapterHeader) continue;
+            allSections.push({ ...s, id: String(globalId++) });
+          }
+        }
+      }
+
+      const label = 'שמחת תורה — וזאת הברכה ובראשית';
+      return {
+        ...config,
+        available: true,
+        label,
+        ref: `${vezotAliyot[0]?.ref || ''} ... ${bereshitAliyot[bereshitAliyot.length - 1]?.ref || ''}`,
+        preview: allSections.find(s => !s.isHeader)?.he?.slice(0, 180) || '',
+        sections: allSections,
+      };
+    }
+
+    if (item.extraDetails && Array.isArray(item.extraDetails.aliyot)) {
+      const dayOfWeek = new Date(dateString + 'T00:00:00Z').getUTCDay();
+      refsToFetch = [item.extraDetails.aliyot[dayOfWeek === 6 ? 6 : dayOfWeek]].filter(Boolean);
+    }
   }
 
   let allSections = [];
@@ -696,9 +923,16 @@ export const getDailyStudy = async (req, res, next) => {
     const date = normalizeDateParam(req.query.date);
     if (!date) return res.status(400).json({ message: 'Invalid date.' });
 
-    console.log(`[study] requested date: "${req.query.date}" → normalized: "${date}"`);
+    let isDiaspora = true;
+    if (req.query.diaspora !== undefined) {
+      isDiaspora = req.query.diaspora === 'true' || req.query.diaspora === '1';
+    } else if (req.query.timezone) {
+      isDiaspora = req.query.timezone !== 'Asia/Jerusalem';
+    }
 
-    const { items: calendarItems, hebrewDate } = await getDailyCalendar(date);
+    console.log(`[study] requested date: "${req.query.date}" → normalized: "${date}", diaspora=${isDiaspora}`);
+
+    const { items: calendarItems, hebrewDate } = await getDailyCalendar(date, isDiaspora);
 
     // Parallel fetch — all 6 studies run concurrently instead of sequentially
     const configs = Object.values(STUDY_CONFIG);
@@ -708,6 +942,7 @@ export const getDailyStudy = async (req, res, next) => {
     const studies = Object.fromEntries(configs.map((c, i) => [c.key, results[i]]));
 
     const rambamLabel = studies.rambam?.label || '–';
+
     console.log(`[study] response for ${date} | rambam: ${rambamLabel}`);
     res.json({ date, timezone: DEFAULT_TIMEZONE, hebrewDate, studies });
   } catch (error) {

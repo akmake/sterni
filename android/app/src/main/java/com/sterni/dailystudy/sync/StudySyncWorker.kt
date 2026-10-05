@@ -34,7 +34,9 @@ class StudySyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
             val dateStr = sdf.format(calendar.time)
             if (StudyCache.get(ctx, dateStr) == null) {
                 try {
-                    val response = apiService.getDailyStudy(dateStr)
+                    val tz = java.util.TimeZone.getDefault().id
+                    val isDiaspora = tz != "Asia/Jerusalem"
+                    val response = apiService.getDailyStudy(dateStr, diaspora = isDiaspora, timezone = tz)
                     val day = if (response.isSuccessful) response.body() else null
                     if (day != null) StudyCache.save(ctx, dateStr, day)
                     successCount++

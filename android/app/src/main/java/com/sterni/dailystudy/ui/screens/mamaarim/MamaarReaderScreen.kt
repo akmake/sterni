@@ -33,6 +33,7 @@ import com.sterni.dailystudy.data.model.Mamaar
 import com.sterni.dailystudy.data.model.MamaarSection
 import com.sterni.dailystudy.ui.theme.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.isActive
 
 @Composable
@@ -70,9 +71,11 @@ fun MamaarReaderScreen(
 private fun ReaderContent(mamaar: Mamaar, onBack: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("RambamPrefs", Context.MODE_PRIVATE) }
+    // scroll_speed is shared by all readers and synced from StudyPrefs
+    val studyPrefs = remember { context.getSharedPreferences("StudyPrefs", Context.MODE_PRIVATE) }
 
     val fontSize    = remember { mutableIntStateOf(prefs.getInt("mamaar_text_size_sp", 20)) }
-    val scrollSpeed = remember { mutableIntStateOf(prefs.getInt("scroll_speed", 40)) }
+    val scrollSpeed = remember { mutableIntStateOf(studyPrefs.getInt("scroll_speed", 40)) }
 
     val listState = rememberLazyListState()
     var autoScrolling by remember { mutableStateOf(false) }
@@ -88,6 +91,20 @@ private fun ReaderContent(mamaar: Mamaar, onBack: () -> Unit) {
             if (idx > 0) listState.scrollToItem(idx, off)
             scrollRestored = true
         }
+    }
+
+    // Save continuously — onDispose alone misses the app being killed or swiped away
+    LaunchedEffect(listState) {
+        snapshotFlow { Pair(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) }
+            .distinctUntilChanged()
+            .collect { (idx, off) ->
+                if (scrollRestored) {
+                    prefs.edit()
+                        .putInt("${scrollKey}_idx", idx)
+                        .putInt("${scrollKey}_off", off)
+                        .apply()
+                }
+            }
     }
 
     DisposableEffect(scrollKey) {
@@ -216,7 +233,7 @@ private fun ReaderContent(mamaar: Mamaar, onBack: () -> Unit) {
                         value = scrollSpeed.intValue.toFloat(),
                         onValueChange = {
                             scrollSpeed.intValue = it.toInt()
-                            prefs.edit().putInt("scroll_speed", it.toInt()).apply()
+                            studyPrefs.edit().putInt("scroll_speed", it.toInt()).apply()
                         },
                         valueRange = 10f..100f
                     )

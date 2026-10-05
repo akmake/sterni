@@ -172,6 +172,13 @@ Prefix `/api/logs/admin`. UI: `AdminLogsPage.jsx` (+ `pages/logs/` components).
 |--------|------|-------------|
 | `*` | `/tzitzit/*` | Tzitzit management |
 
+### Daily Study
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/study/day?date=YYYY-MM-DD&diaspora=true&timezone=...` | Returns daily study tracks (Chumash with Rashi, Rambam 1/3 chapters with Siyumim, book introductions and mitzvot list, Tanya, Sefer HaMitzvot, Shnayim Mikra, Tehillim). Supports Chabad Chitas transition on Simchat Torah (completing Vezot Haberakhah and starting Bereshit) for Israel (22 Tishrei) and Diaspora (23 Tishrei). |
+| GET | `/study/tehillim-chapters?chapters=...` | Returns chapters for personal Tehillim reader |
+
+
 ---
 
 ## When updating this file

@@ -18,9 +18,12 @@ object UserManager {
     private const val PREFS_NAME = "UserIdentity"
     private const val KEY_USER_ID = "user_id"
     private const val READING_PREFS = "RambamPrefs"
+    private const val TEHILLIM_TIMESTAMP_KEY = "last_timestamp"
+    // Preferences owned by RambamPrefs. scroll_speed is owned by StudyPrefs (shared by all readers).
     private val PREFERENCE_KEYS = setOf(
-        "text_size_sp", "mamaar_text_size_sp", "scroll_speed", "auto_scroll_speed"
+        "text_size_sp", "mamaar_text_size_sp", "auto_scroll_speed"
     )
+    private val CHUMASH_KEYS = setOf("chumash_text_size", "rashi_text_size", "chumash_scroll_speed")
 
     private fun prefs(context: Context): SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -80,7 +83,11 @@ object UserManager {
      * - ChumashPrefs (chumash text size, rashi text size, chumash scroll speed)
      * - ShnayimPrefs (shnayim_mikra_connected)
      * - TehillimPrefs (last chapter, last verse, free scroll index, free scroll offset)
-     * - RambamPrefs (legacy positions and general text size)
+     * - RambamPrefs (mamaar reader: scroll positions and text size)
+     *
+     * Each key is read only from the store that owns it (see [isMamaarPosition]).
+     * Older versions copied every synced key into RambamPrefs as well; those stale
+     * copies are ignored here — reading them last used to overwrite the fresh values.
      */
     private fun collectLocalData(context: Context): Pair<Map<String, Int>, Map<String, Any>> {
         val positions = mutableMapOf<String, Int>()
@@ -91,7 +98,7 @@ object UserManager {
         studyPrefs.all.forEach { (key, value) ->
             if (key.startsWith("font_") || key == "scroll_speed") {
                 if (value is Number) preferences[key] = value.toInt()
-            } else if (key.startsWith("scroll_")) {
+            } else if (key.startsWith("scroll_") && !isMamaarPosition(key)) {
                 if (value is Number) positions[key] = value.toInt()
             }
         }
@@ -99,7 +106,7 @@ object UserManager {
         // 2. ChumashPrefs
         val chumashPrefs = context.getSharedPreferences("ChumashPrefs", Context.MODE_PRIVATE)
         chumashPrefs.all.forEach { (key, value) ->
-            if (value is Number) preferences[key] = value.toInt()
+            if (value is Number && key in CHUMASH_KEYS) preferences[key] = value.toInt()
         }
 
         // 3. ShnayimPrefs
@@ -111,22 +118,25 @@ object UserManager {
         // 4. TehillimPrefs
         val tehillimPrefs = context.getSharedPreferences("TehillimPrefs", Context.MODE_PRIVATE)
         tehillimPrefs.all.forEach { (key, value) ->
-            if (value is Number) {
+            // last_timestamp is a Long — truncating it to Int and writing it back crashes getLong()
+            if (value is Number && key != TEHILLIM_TIMESTAMP_KEY) {
                 positions["tehillim_$key"] = value.toInt()
             }
         }
 
-        // 5. RambamPrefs
+        // 5. RambamPrefs (mamaar reader)
         val rambamPrefs = context.getSharedPreferences(READING_PREFS, Context.MODE_PRIVATE)
         rambamPrefs.all.forEach { (key, value) ->
             if (value is Int) {
                 if (key in PREFERENCE_KEYS) preferences[key] = value
-                else positions[key] = value
+                else if (isMamaarPosition(key)) positions[key] = value
             }
         }
 
         return Pair(positions, preferences)
     }
+
+    private fun isMamaarPosition(key: String) = key.startsWith("scroll_mamaar_")
 
     /**
      * Performs a two-way sync: sends current local positions, settings and articles,
@@ -143,7 +153,9 @@ object UserManager {
             if (resp.isSuccessful) {
                 val data = resp.body()
                 if (data != null) {
-                    applyServerData(context, data)
+                    // Server is client-wins, so keys we just sent come back unchanged — writing them
+                    // back would only clobber anything the user scrolled while the request was in flight.
+                    applyServerData(context, data, positions.keys, preferences.keys)
                     syncDownloadedArticles(context, data.savedArticleIds)
                 }
                 true
@@ -283,7 +295,16 @@ object UserManager {
         }
     }
 
-    private fun applyServerData(context: Context, data: UserDataResponse) {
+    /**
+     * Writes server values into the single store that owns each key (mirror of [collectLocalData]).
+     * Keys in [skipPositions] / [skipPreferences] were just sent by this device and are left alone.
+     */
+    private fun applyServerData(
+        context: Context,
+        data: UserDataResponse,
+        skipPositions: Set<String> = emptySet(),
+        skipPreferences: Set<String> = emptySet()
+    ) {
         val studyEditor = context.getSharedPreferences("StudyPrefs", Context.MODE_PRIVATE).edit()
         val chumashEditor = context.getSharedPreferences("ChumashPrefs", Context.MODE_PRIVATE).edit()
         val shnayimEditor = context.getSharedPreferences("ShnayimPrefs", Context.MODE_PRIVATE).edit()
@@ -291,26 +312,28 @@ object UserManager {
         val rambamEditor = context.getSharedPreferences(READING_PREFS, Context.MODE_PRIVATE).edit()
 
         data.readingPositions?.forEach { (key, value) ->
+            if (key in skipPositions) return@forEach
             if (key.startsWith("tehillim_")) {
                 val realKey = key.removePrefix("tehillim_")
-                tehillimEditor.putInt(realKey, value)
+                // Ignore the corrupted timestamp already stored on the server by older versions
+                if (realKey != TEHILLIM_TIMESTAMP_KEY) tehillimEditor.putInt(realKey, value)
+            } else if (isMamaarPosition(key)) {
+                rambamEditor.putInt(key, value)
             } else if (key.startsWith("scroll_")) {
                 studyEditor.putInt(key, value)
             }
-            rambamEditor.putInt(key, value)
         }
 
         data.preferences?.forEach { (key, value) ->
+            if (key in skipPreferences) return@forEach
             when (value) {
                 is Number -> {
                     val intVal = value.toInt()
-                    if (key.startsWith("font_") || key == "scroll_speed") {
-                        studyEditor.putInt(key, intVal)
+                    when {
+                        key.startsWith("font_") || key == "scroll_speed" -> studyEditor.putInt(key, intVal)
+                        key in CHUMASH_KEYS -> chumashEditor.putInt(key, intVal)
+                        key in PREFERENCE_KEYS -> rambamEditor.putInt(key, intVal)
                     }
-                    if (key == "chumash_text_size" || key == "rashi_text_size" || key == "chumash_scroll_speed") {
-                        chumashEditor.putInt(key, intVal)
-                    }
-                    rambamEditor.putInt(key, intVal)
                 }
                 is Boolean -> {
                     if (key.startsWith("shnayim_")) {

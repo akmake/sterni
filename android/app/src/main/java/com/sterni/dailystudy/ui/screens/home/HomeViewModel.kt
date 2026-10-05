@@ -52,7 +52,9 @@ class HomeViewModel @Inject constructor(
             }
 
             try {
-                val response = apiService.getDailyStudy(dateString)
+                val tz = java.util.TimeZone.getDefault().id
+                val isDiaspora = tz != "Asia/Jerusalem"
+                val response = apiService.getDailyStudy(dateString, diaspora = isDiaspora, timezone = tz)
                 val day = if (response.isSuccessful) response.body() else null
                 if (day != null) {
                     StudyCache.save(ctx, dateString, day)

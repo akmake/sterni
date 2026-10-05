@@ -112,8 +112,21 @@ class TehillimRepository(private val context: Context) {
     fun getLastReadingPosition(): TehillimReadingPosition {
         val chapter = prefs.getInt(KEY_LAST_CHAPTER, 1)
         val verse = prefs.getInt(KEY_LAST_VERSE, 1)
-        val timestamp = prefs.getLong(KEY_LAST_TIME, 0L)
+        val timestamp = readTimestamp()
         return TehillimReadingPosition(chapter, verse, timestamp)
+    }
+
+    // Older sync versions overwrote the Long timestamp with a truncated Int, which made
+    // getLong() throw ClassCastException. Drop such a value instead of crashing.
+    private fun readTimestamp(): Long {
+        return when (val raw = prefs.all[KEY_LAST_TIME]) {
+            is Long -> raw
+            null -> 0L
+            else -> {
+                prefs.edit().remove(KEY_LAST_TIME).apply()
+                0L
+            }
+        }
     }
 
     fun getLastScrollIndex(): Int = prefs.getInt(KEY_SCROLL_INDEX, 0)

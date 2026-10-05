@@ -8,12 +8,15 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.sterni.dailystudy.cache.StudyCache
 import com.sterni.dailystudy.data.model.Section
+import com.sterni.dailystudy.data.model.Study
 import com.sterni.dailystudy.data.api.ApiService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 private const val TEHILLIM_PREFS          = "TehillimPrefs"
@@ -29,8 +32,11 @@ data class StudyDetailUiState(
     val subtitle: String = "",
     val sections: List<Section> = emptyList(),
     val customChapters: List<Int> = emptyList(),
-    val error: String? = null
+    val error: String? = null,
+    val isRangeMode: Boolean = false,
+    val rangeDates: List<String> = emptyList()
 )
+
 
 @HiltViewModel
 class StudyDetailViewModel @Inject constructor(
@@ -163,4 +169,111 @@ class StudyDetailViewModel @Inject constructor(
             }
         }
     }
+
+    fun loadRange(key: String, fromDate: String, toDate: String, label: String) {
+        val ctx = getApplication<Application>()
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(loading = true, error = null)
+
+            val formatter = DateTimeFormatter.ISO_LOCAL_DATE
+            val start = try { LocalDate.parse(fromDate, formatter) } catch (_: Exception) { null }
+            val end = try { LocalDate.parse(toDate, formatter) } catch (_: Exception) { null }
+
+            if (start == null || end == null || start.isAfter(end)) {
+                load(key, fromDate, label)
+                return@launch
+            }
+
+            val dates = mutableListOf<String>()
+            var curr: LocalDate = start
+            while (!curr.isAfter(end)) {
+                dates.add(curr.format(formatter))
+                curr = curr.plusDays(1)
+            }
+
+
+            val tz = java.util.TimeZone.getDefault().id
+            val isDiaspora = tz != "Asia/Jerusalem"
+
+            val allSections = mutableListOf<Section>()
+            val dayNames = arrayOf("ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת")
+            var resolvedTitle = label
+
+            for (dStr in dates) {
+                var dayStudy: Study? = null
+                var hebrewDateStr = ""
+
+                val cached = StudyCache.get(ctx, dStr)
+                if (cached?.studies?.containsKey(key) == true) {
+                    dayStudy = cached.studies[key]
+                    hebrewDateStr = cached.hebrewDate ?: ""
+                } else {
+                    try {
+                        val response = apiService.getDailyStudy(dStr, diaspora = isDiaspora, timezone = tz)
+                        val body = if (response.isSuccessful) response.body() else null
+                        if (body != null) {
+                            StudyCache.save(ctx, dStr, body)
+                            dayStudy = body.studies?.get(key)
+                            hebrewDateStr = body.hebrewDate ?: ""
+                        }
+                    } catch (_: Exception) {}
+                }
+
+                if (resolvedTitle.isEmpty() && !dayStudy?.title.isNullOrEmpty()) {
+                    resolvedTitle = dayStudy?.title ?: label
+                }
+
+                val daySections = dayStudy?.sections ?: emptyList()
+                if (daySections.isNotEmpty()) {
+                    val dt = LocalDate.parse(dStr, formatter)
+                    val dow = dt.dayOfWeek.value % 7 // 7 (Sun) -> 0 ... 6 (Sat) -> 6
+                    val dowHeb = dayNames[dow]
+
+                    val headerText = if (hebrewDateStr.isNotEmpty()) {
+                        "— יום $dowHeb, $hebrewDateStr —"
+                    } else {
+                        "— יום $dowHeb ($dStr) —"
+                    }
+
+                    // Add Day Separator Header
+                    allSections.add(
+                        Section(
+                            id = "day_header_$dStr",
+                            isHeader = true,
+                            isAliyahHeader = false,
+                            he = headerText,
+                            dayDate = dStr,
+                            indexInDay = 0
+                        )
+                    )
+
+                    // Add the day's sections tagged with date and indexInDay
+                    daySections.forEachIndexed { idx, sec ->
+                        allSections.add(
+                            sec.copy(
+                                id = "${dStr}_${sec.id ?: idx}",
+                                dayDate = dStr,
+                                indexInDay = idx
+                            )
+                        )
+                    }
+                }
+            }
+
+            if (allSections.isEmpty()) {
+                load(key, fromDate, label)
+                return@launch
+            }
+
+            _uiState.value = StudyDetailUiState(
+                loading = false,
+                title = resolvedTitle,
+                subtitle = "השלמת שיעורים (${dates.size} ימים)",
+                sections = allSections,
+                isRangeMode = true,
+                rangeDates = dates
+            )
+        }
+    }
 }
+

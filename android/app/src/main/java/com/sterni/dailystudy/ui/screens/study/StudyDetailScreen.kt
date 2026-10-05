@@ -3,6 +3,8 @@ package com.sterni.dailystudy.ui.screens.study
 import android.content.Context
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -179,26 +181,61 @@ fun StudyDetailScreen(
     val scrollKey = "scroll_${studyKey}_${date}"
     var scrollRestored by remember { mutableStateOf(false) }
 
-    LaunchedEffect(state.sections.isNotEmpty()) {
+    var tripleTapCount by remember { mutableIntStateOf(0) }
+    var lastTapTime by remember { mutableLongStateOf(0L) }
+
+    LaunchedEffect(state.isRangeMode) {
+        scrollRestored = false
+    }
+
+    LaunchedEffect(state.sections.isNotEmpty(), state.isRangeMode) {
         if (state.sections.isNotEmpty() && !scrollRestored) {
-            val idx = prefs.getInt("${scrollKey}_idx", 0)
-            val off = prefs.getInt("${scrollKey}_off", 0)
+            val keyToRestore = if (state.isRangeMode) "scroll_${studyKey}_range_${date}" else scrollKey
+            val idx = prefs.getInt("${keyToRestore}_idx", 0)
+            val off = prefs.getInt("${keyToRestore}_off", 0)
             if (idx > 0 || off > 0) {
-                listState.scrollToItem(idx, off)
+                val safeIdx = idx.coerceIn(0, state.sections.size - 1)
+                listState.scrollToItem(safeIdx, off)
             }
             scrollRestored = true
         }
     }
 
     // Save scroll position whenever it changes (debounced by the nature of snapshotFlow)
-    LaunchedEffect(listState) {
+    LaunchedEffect(listState, state.isRangeMode) {
         snapshotFlow { Pair(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) }
             .collect { (idx, off) ->
                 if (scrollRestored) {
-                    prefs.edit()
-                        .putInt("${scrollKey}_idx", idx)
-                        .putInt("${scrollKey}_off", off)
-                        .apply()
+                    if (state.isRangeMode) {
+                        prefs.edit()
+                            .putInt("scroll_${studyKey}_range_${date}_idx", idx)
+                            .putInt("scroll_${studyKey}_range_${date}_off", off)
+                            .apply()
+
+                        val currentSection = state.sections.getOrNull(idx)
+                        val currentDate = currentSection?.dayDate
+                        if (currentDate != null) {
+                            prefs.edit()
+                                .putInt("scroll_${studyKey}_${currentDate}_idx", currentSection.indexInDay)
+                                .putInt("scroll_${studyKey}_${currentDate}_off", off)
+                                .apply()
+
+                            for (rDate in state.rangeDates) {
+                                if (rDate < currentDate) {
+                                    prefs.edit()
+                                        .putInt("scroll_${studyKey}_${rDate}_idx", 999999)
+                                        .apply()
+                                } else {
+                                    break
+                                }
+                            }
+                        }
+                    } else {
+                        prefs.edit()
+                            .putInt("${scrollKey}_idx", idx)
+                            .putInt("${scrollKey}_off", off)
+                            .apply()
+                    }
                 }
             }
     }
@@ -228,8 +265,32 @@ fun StudyDetailScreen(
                             Icon(Icons.Default.ArrowForward, contentDescription = "Back", tint = Primary)
                         }
                         Text(
-                            text = title,
-                            modifier = Modifier.weight(1f),
+                            text = if (state.isRangeMode) "${title} (רצף)" else title,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null
+                                ) {
+                                    val now = System.currentTimeMillis()
+                                    if (now - lastTapTime < 500) {
+                                        tripleTapCount++
+                                    } else {
+                                        tripleTapCount = 1
+                                    }
+                                    lastTapTime = now
+
+                                    if (tripleTapCount >= 3) {
+                                        tripleTapCount = 0
+                                        val today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)
+                                        if (date < today) {
+                                            android.widget.Toast.makeText(context, "טוען השלמת שיעורים עד היום...", android.widget.Toast.LENGTH_SHORT).show()
+                                            viewModel.loadRange(studyKey, fromDate = date, toDate = today, label = title)
+                                        } else {
+                                            android.widget.Toast.makeText(context, "הנך כבר בשיעור של היום", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                },
                             textAlign = TextAlign.Center,
                             fontSize = 19.sp,
                             fontWeight = FontWeight.Bold,

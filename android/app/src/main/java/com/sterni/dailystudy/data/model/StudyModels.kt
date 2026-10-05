@@ -30,10 +30,13 @@ data class Section(
     val ordinal: String? = null,
     val rashi: List<RashiItem>? = null,
     val verseNum: Int? = null,
-    val chapterNum: Int? = null
+    val chapterNum: Int? = null,
+    val dayDate: String? = null,
+    val indexInDay: Int = 0
 ) {
     data class RashiItem(val he: String? = null)
 }
+
 
 data class TehillimChaptersResponse(
     val sections: List<Section>? = null

@@ -46,7 +46,7 @@ const STUDY_CONFIG = {
     accent: 'violet',
     kind: 'segment',
     matchers: ['tanya yomi', 'daily tanya', 'tanya'],
-    detailMode: 'plain',
+    detailMode: 'tanya',
     rules: ['חלוקה יומית רציפה לאורך שנה.'],
   },
   seferHamitzvot: {
@@ -555,9 +555,116 @@ function parseTehillimStyle(textData, ref) {
   return result;
 }
 
+function getTanyaHebrewHeader(ref) {
+  if (!ref) return 'תניא יומי';
+  const match = ref.match(/(Likkutei\s+Amarim|Sha'ar\s+HaYichud\s+VeHaEmunah|Iggeret\s+HaTeshuvah|Iggeret\s+HaKodesh|Kuntres\s+Acharon)\s*(\d+)?/i);
+  let partName = 'תניא';
+  let chapterNum = null;
+
+  if (match) {
+    const rawPart = match[1].toLowerCase();
+    if (rawPart.includes('likkutei')) partName = 'ליקוטי אמרים';
+    else if (rawPart.includes('yichud')) partName = 'שער היחוד והאמונה';
+    else if (rawPart.includes('teshuvah')) partName = 'אגרת התשובה';
+    else if (rawPart.includes('kodesh')) partName = 'אגרת הקודש';
+    else if (rawPart.includes('kuntres')) partName = 'קונטרס אחרון';
+
+    if (match[2]) chapterNum = parseInt(match[2], 10);
+  }
+
+  if (chapterNum) {
+    const unitWord = (partName === 'אגרת הקודש') ? 'סימן' : 'פרק';
+    return `${partName} — ${unitWord} ${getHebrewOrdinal(chapterNum)}`;
+  }
+  return partName;
+}
+
+function parseTanyaStyle(textData, ref) {
+  const heRaw = textData?.he || textData?.text;
+  if (!heRaw) return [];
+
+  const mainHeader = getTanyaHebrewHeader(ref);
+  const isKodesh = ref && ref.toLowerCase().includes('kodesh');
+  const unitWord = isKodesh ? 'סימן' : 'פרק';
+
+  const baseVerseMatch = textData.ref ? textData.ref.match(/:(\d+)/) : null;
+  const startVerse = baseVerseMatch ? parseInt(baseVerseMatch[1], 10) : 1;
+  const startChapter = Number(textData?.sections?.[0]) || parseStartChapter(ref) || 1;
+
+  const result = [];
+  let id = 1;
+
+  // Header at the start showing the section and chapter
+  result.push({
+    id: String(id++),
+    isHeader: true,
+    isChapterHeader: true,
+    he: mainHeader,
+    en: '',
+    rashi: []
+  });
+
+  if (Array.isArray(heRaw) && Array.isArray(heRaw[0])) {
+    let chapter = startChapter;
+    for (let ci = 0; ci < heRaw.length; ci++) {
+      const chVerses = Array.isArray(heRaw[ci]) ? heRaw[ci] : [];
+      const chStartVerse = (ci === 0) ? startVerse : 1;
+
+      if (ci > 0) {
+        result.push({
+          id: String(id++),
+          isHeader: true,
+          isChapterHeader: true,
+          he: `${unitWord} ${getHebrewOrdinal(chapter)}`,
+          en: '',
+          rashi: []
+        });
+      }
+
+      for (let vi = 0; vi < chVerses.length; vi++) {
+        const text = stripHtml(chVerses[vi]);
+        if (!text) continue;
+        result.push({
+          id: String(id++),
+          isHeader: false,
+          he: text,
+          en: '',
+          rashi: [],
+          verseNum: chStartVerse + vi,
+          chapterNum: chapter
+        });
+      }
+      chapter++;
+    }
+    return result;
+  }
+
+  const verses = Array.isArray(heRaw) ? heRaw : [heRaw];
+  for (let vi = 0; vi < verses.length; vi++) {
+    const text = stripHtml(verses[vi]);
+    if (!text) continue;
+    result.push({
+      id: String(id++),
+      isHeader: false,
+      he: text,
+      en: '',
+      rashi: [],
+      verseNum: startVerse + vi,
+      chapterNum: startChapter
+    });
+  }
+
+  return result;
+}
+
 async function fetchTextByMode(ref, mode) {
   if (!ref) return { sections: [] };
   const safeRef = encodeURI(ref.replace(/ /g, '_'));
+
+  if (mode === 'tanya') {
+    const textData = await fetchJson(`/api/texts/${safeRef}`, { context: 0, commentary: 0, pad: 0, lang: 'he' });
+    return { sections: parseTanyaStyle(textData, ref) };
+  }
 
   if (mode === 'tehillim') {
     const textData = await fetchJson(`/api/texts/${safeRef}`, { context: 0, commentary: 0, pad: 0, lang: 'he' });
@@ -906,7 +1013,10 @@ async function resolveStudy(calendarItems, config, dateString) {
     }
   }
 
-  const displayLabel = item?.displayValue?.he || item.ref;
+  let displayLabel = item?.displayValue?.he || item.ref;
+  if (config.key === 'tanya') {
+    displayLabel = getTanyaHebrewHeader(resolvedRef || item.ref);
+  }
 
   return {
     ...config,

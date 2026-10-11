@@ -91,9 +91,14 @@ class ArticleUploadViewModel(app: Application) : AndroidViewModel(app) {
         return try {
             val document = PDDocument.load(tempFile)
             try {
-                ChabadPdfExtractor().extract(document) { done, total ->
+                val extractor = ChabadPdfExtractor()
+                val result = extractor.extract(document) { done, total ->
                     _state.value = UploadState.Extracting(done, total)
                 }
+                // the maamar's name from its running headers — prefilled, still editable in the preview
+                val found = extractor.detectedTitle
+                if (title.value.isBlank() && !found.isNullOrBlank()) title.value = found
+                result
             } finally {
                 document.close()
             }

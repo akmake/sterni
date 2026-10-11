@@ -71,7 +71,7 @@ const communitySchema = new mongoose.Schema({
   },
   adminId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: 'TetherAdmin',
     required: true
   },
   policy: {

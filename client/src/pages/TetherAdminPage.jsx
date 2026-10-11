@@ -58,7 +58,7 @@ export default function TetherAdminPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6">
-        {TABS.map(tab => (
+        {TABS.filter(tab => tab.id !== 'admins' || tetherUser.role === 'superadmin').map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`flex-1 text-sm font-medium py-1.5 rounded-lg transition ${
               activeTab === tab.id ? 'bg-white text-blue-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
@@ -73,7 +73,7 @@ export default function TetherAdminPage() {
       {activeTab === 'communities' && <CommunitiesTab />}
       {activeTab === 'devices'     && <DevicesTab />}
       {activeTab === 'approvals'   && <ApprovalsTab />}
-      {activeTab === 'admins'      && <AdminsTab />}
+      {activeTab === 'admins' && tetherUser.role === 'superadmin' && <AdminsTab />}
     </div>
   );
 }

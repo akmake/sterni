@@ -28,6 +28,11 @@
 | `modules/payments.md` | Payments & payment requests |
 | `modules/communication.md` | Chat, WhatsApp, Email |
 | `modules/admin.md` | Admin panel & logging |
+| `modules/android-article-extraction.md` | Android maamar PDF text extraction |
+| `modules/android-pdf-library.md` | Android local PDF library and reader |
+| `modules/android-mafteach-library.md` | Live Mafteach catalogue, selected PDF downloads and native reading |
+| `modules/android-shulchan-aruch.md` | Bundled body-only Shulchan Aruch HaRav, local search and native reader |
+| `modules/android-text-library-research.md` | Hebrew offline text library: source audit, Shulchan Arukh HaRav coverage, download architecture and study plans |
 
 ## How to use these docs
 

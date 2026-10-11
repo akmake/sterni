@@ -111,7 +111,46 @@
 
 ---
 
-## System-wide
+## Android Text Library Research and core implementation
+
+The research remains a snapshot; the core body-only implementation is now documented separately in
+`docs/modules/android-shulchan-aruch.md`. Notes, illustrations and additional separate works remain
+outside the current pack at the user's request.
+
+| File changed | Must also check |
+|---|---|
+| `docs/research/shulchan-arukh-harav-audit.py` | Regenerate `docs/research/shulchan-arukh-harav-audit.json`; reconcile measured counts, licenses and storage probe with `docs/modules/android-text-library-research.md` |
+| `docs/research/shulchan-arukh-harav-catalog.ps1` | Regenerate `docs/research/shulchan-arukh-harav-catalog.json`; reconcile catalog structure with `docs/modules/android-text-library-research.md` |
+| `docs/modules/android-text-library-research.md` | `docs/README.md`; future runtime implementation must document its actual routes, models and reader/sync coupling separately |
+
+## Android PDF Library and Likutei Sichot
+
+| File changed | Must also check |
+|---|---|
+| `android/scripts/build_sah_pack.py`, `android/app/src/main/assets/sah/` | `SahRepository.kt`, `SahScreen.kt`, `SahLibraryTest.kt`, source audit/catalog JSON and `docs/modules/android-shulchan-aruch.md`; counts, checksums, corpus schema, original body markup and stable references must match |
+| `android/.../shulchanaruch/SahRepository.kt`, `SahViewModel.kt`, `SahScreen.kt` | `PdfStudyScreen.kt`, `SahLibraryTest.kt`, `android/app/src/main/assets/sah/manifest.json`, `docs/modules/android-shulchan-aruch.md`; user state lives only in SahLibrary preferences and is not synchronized through UserManager |
+
+Corpus v2 distributes typed NDJSON, not a desktop SQLite file; keep the allowlisted row arities,
+native schema, source/payload hashes and table counts synchronized. Installer markers contain both
+corpus and generated database hashes. Staging and initialization must remain safe for multiple VMs.
+
+Native layout cache revision 3 couples punctuation-to-line assignment, heading grouping, column/page
+continuations and ViewModel migration. When rebuilding old native caches, preserve existing OCR
+pages and their corrections; test both native migration and cached OCR reopening.
+
+| File changed | Must also check |
+|---|---|
+| `android/.../pdflibrary/PdfStudyScreen.kt`, `PdfStudyViewModel.kt` | `SichaReader.kt`, `SichaTextExtractor.kt`, `SichaTextParser.kt`, `SichaFontRemapper.kt`, `SichaOcrEngine.kt`, `SichaOcrParser.kt`, `SichaScanPreprocessor.kt`, `PdfRenderEngine.kt`, `SichaLayout.kt`, `docs/modules/android-pdf-library.md`; collection, font-size and reading-position fields live only in `PdfLibrary` local preferences, outside the study-position sync |
+| `android/.../pdflibrary/SichaLayout.kt`, `PdfRenderEngine.kt`, `SichaReader.kt`, `SichaTextExtractor.kt`, `SichaTextParser.kt`, `SichaFontRemapper.kt`, `SichaOcrEngine.kt`, `SichaOcrParser.kt`, `SichaScanPreprocessor.kt` | `PdfStudyViewModel.kt`, `PdfStudyScreen.kt`, `SichaLayoutTest.kt`, `SichaTextParserTest.kt`, `SichaNativeReaderTest.kt`, `SichaRenamedFontsTest.kt`, `SichaScannedPdfTest.kt`, `SichaOcrParserTest.kt`, `app/proguard-rules.pro`, `app/build.gradle.kts`, `settings.gradle.kts`, `app/src/main/assets/tessdata/`, `docs/modules/android-pdf-library.md`; native paragraph index, text-cache schema, Unicode decoding and embedded font mappings must stay compatible |
+
+## Android Mafteach catalogue
+
+| File changed | Must also check |
+|---|---|
+| `android/.../pdflibrary/MafteachBrowserScreen.kt`, `MafteachLinks.kt`, `MafteachPdfDownloader.kt` | `PdfStudyScreen.kt`, `PdfStudyViewModel.kt`, `SichaReader.kt`, `MafteachLinksTest.kt`, `MafteachIntegrationTest.kt`, `app/build.gradle.kts`, `docs/modules/android-mafteach-library.md`, `docs/modules/android-pdf-library.md`; source metadata, download cache ownership and OCR consent must remain consistent |
+| `android/.../pdflibrary/PdfStudyViewModel.kt` source import fields | `MafteachBrowserScreen.kt`, `MafteachPdfDownloader.kt`, shared OCR dialog in `PdfStudyScreen.kt`, `docs/modules/android-mafteach-library.md`; source files are local-only and removed only after the last reference |
+
+## System-wide couplings
 
 | File changed | Must also check |
 |---|---|

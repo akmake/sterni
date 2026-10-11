@@ -62,6 +62,8 @@ Full-stack event management + household + finance platform.
 | Payments module | `docs/modules/payments.md` |
 | Admin module | `docs/modules/admin.md` |
 | Chat/WhatsApp/Email | `docs/modules/communication.md` |
+| Android maamar PDF extraction | `docs/modules/android-article-extraction.md` |
+| Android PDF library & reader | `docs/modules/android-pdf-library.md` |
 | Tether MDM module | use `/tether` skill |
 
 ## Tether MDM Module (summary)

@@ -95,7 +95,8 @@ function DefaultRedirect() {
 export default function App() {
   return (
     <>
-    <Routes>
+      <Routes>
+        <Route path="/tether" element={<TetherAdminPage />} />
       {/* ג”€ג”€ג”€ Main app area (with Layout) ג”€ג”€ג”€ */}
       <Route path="/" element={<Layout />}>
 

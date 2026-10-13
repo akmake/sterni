@@ -30,6 +30,9 @@ const getHouseholdNav = (hasTzitzitAccess) => {
 const getManagementNav = (isAuthenticated, isAdmin, hasTzitzitAccess) => {
   const items = [];
 
+  // משתמש לא מחובר — אין תפריט (כל הדפים מוגנים ב-ProtectedRoute)
+  if (!isAuthenticated) return items;
+
   if (hasTzitzitAccess) {
     items.push({ to: '/admin/tzitzit', label: 'ניהול ציציות', icon: Scissors, type: 'link' });
   }

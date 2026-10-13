@@ -7,14 +7,14 @@
 ### Required (server will not start without these)
 | Variable | Description |
 |----------|-------------|
-| `MONGO_URI` | Main MongoDB connection string |
+| `MONGO_URI` | Main MongoDB connection string. Local dev: `mongodb://127.0.0.1:27017/sterni` with `NODE_ENV=development` (otherwise auth cookies are `secure` and login fails over http). When `NODE_ENV !== 'production'`, CORS in `server/app.js` allows any origin |
 | `JWT_ACCESS_SECRET` | Secret for signing access tokens |
 | `JWT_REFRESH_SECRET` | Secret for signing refresh tokens |
 
 ### Required for features
 | Variable | Description | Used by |
 |----------|-------------|---------|
-| `ZIPORI_MONGO_URI` | Secondary MongoDB (hotel data) | `server/db/ziporiDb.js` → all `/api/hotel-data/*` routes |
+| `ZIPORI_MONGO_URI` | Secondary MongoDB (hotel data) | **No longer used at runtime** — hotel data lives in the main DB; only `migrateHotelData.js` reads it |
 | `CLIENT_URL` | Frontend URL for CORS | `server/app.js` (default: `http://localhost:5173`) |
 | `NODE_ENV` | `production` / `development` | CSRF cookie secure flag, various guards |
 | `PORT` | Server port | `server/app.js` (default: 5000) |
@@ -89,10 +89,10 @@ All routes funnel errors to the central handler `server/middlewares/errorHandler
 - Used for: users, groups, projects, finance, household, orders, etc.
 
 ### Zipori DB (secondary, read-mostly)
-- Connected via `mongoose.createConnection(ZIPORI_MONGO_URI)` in `server/db/ziporiDb.js`
+- `server/db/ziporiDb.js` (`mongoose.createConnection(ZIPORI_MONGO_URI)`) — **no longer imported by `app.js`**
 - Models in `server/models/zipori/`: Hotel, PriceList, RoomType, ExtraType
-- Used ONLY by: `server/routes/hotelZiporiDataRoutes.js`
-- **If `ZIPORI_MONGO_URI` is missing → hotel creation page shows no hotels/room types**
+- Used by: nothing at runtime (`hotelZiporiDataRoutes.js` uses main-DB models despite its name)
+- Hotel data is in the main DB — `ZIPORI_MONGO_URI` is not needed
 
 ---
 

@@ -36,7 +36,7 @@ import logsRoutes from './routes/logsRoutes.js';
 import tzitzitRoutes from './routes/tzitzitRoutes.js';
 import hotelOrderRoutes from './routes/hotelOrderRoutes.js';
 import hotelZiporiDataRoutes from './routes/hotelZiporiDataRoutes.js';
-import './db/ziporiDb.js'; // ׳™׳–׳•׳ ׳—׳™׳‘׳•׳¨ ׳-zipori MongoDB
+// zipori DB לא בשימוש יותר — כל נתוני המלונות במסד הראשי
 import familyRoutes from './routes/familyRoutes.js';
 import shoppingRoutes from './routes/shoppingRoutes.js';
 import householdTaskRoutes from './routes/householdTaskRoutes.js';
@@ -112,6 +112,8 @@ const configuredOrigins = [
 
 const corsOrigin = (origin, callback) => {
   if (!origin || configuredOrigins.includes(origin)) return callback(null, true);
+  // פיתוח מקומי — כל origin מותר (127.0.0.1, פורט אחר של Vite, IP ברשת)
+  if (process.env.NODE_ENV !== 'production') return callback(null, true);
   return callback(new Error('Origin is not allowed by CORS'));
 };
 

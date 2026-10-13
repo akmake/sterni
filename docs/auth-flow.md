@@ -92,6 +92,8 @@ The axios instance handles fetching and attaching the CSRF token automatically.
 | `AdminOnlyRoute` | `client/src/components/AdminOnlyRoute.jsx` | Requires `user.role === 'admin'` |
 | `TzitzitRoute` | `client/src/components/TzitzitRoute.jsx` | Special tzitzit access flag |
 
+**Sidebar (`client/src/components/Navbar.jsx`):** `getManagementNav` returns an empty list when `!isAuthenticated` — logged-out users see only the "התחברות" button, no nav items.
+
 ---
 
 ## Common Auth Bugs

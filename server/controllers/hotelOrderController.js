@@ -1,9 +1,13 @@
 import HotelOrder from '../models/HotelOrder.js';
-import ZiporiPriceList from '../models/zipori/PriceList.js';
-import ZiporiRoomType from '../models/zipori/RoomType.js';
-import ZiporiHotel from '../models/zipori/Hotel.js';
+import PriceList from '../models/PriceList.js';
+import RoomType from '../models/RoomType.js';
+import Hotel from '../models/Hotel.js';
 import { calculateRoomTotalPrice } from '../lib/hotelPriceCalculator.js';
 import { getNextHotelOrderNumber } from '../models/HotelCounter.js';
+import User from '../models/userModel.js';
+
+// req.user מכיל רק id/role — שם המשתמש נשלף מה-DB
+const getUserName = async (userId) => (await User.findById(userId).select('name').lean())?.name || '';
 
 const calculateFinalTotal = (roomsPrice, extras, discountPercent) => {
   const extrasTotal = (extras || []).reduce((sum, ex) => sum + (ex.price * ex.quantity), 0);
@@ -27,9 +31,9 @@ export const createHotelOrder = async (req, res) => {
   }
 
   try {
-    const priceListsFromDB = await ZiporiPriceList.find({ hotel: hotelId });
+    const priceListsFromDB = await PriceList.find({ hotel: hotelId });
     const priceListsMap = Object.fromEntries(priceListsFromDB.map(pl => [pl.name, pl.toObject()]));
-    const hotelRoomTypes = await ZiporiRoomType.find({ hotel: hotelId });
+    const hotelRoomTypes = await RoomType.find({ hotel: hotelId });
     const roomTypesMap = Object.fromEntries(hotelRoomTypes.map(rt => [rt._id.toString(), rt]));
 
     let roomsTotalPrice = 0;
@@ -50,11 +54,12 @@ export const createHotelOrder = async (req, res) => {
 
     const finalPrice = calculateFinalTotal(roomsTotalPrice, extras, discountPercent);
     const orderNumber = await getNextHotelOrderNumber();
+    const userName = await getUserName(req.user.id);
 
     const newOrder = await HotelOrder.create({
       orderNumber, hotelId, hotelName: hotelName || 'מלון',
-      user: req.user.id, salespersonName: req.user.name,
-      createdBy: req.user.id, createdByName: req.user.name,
+      user: req.user.id, salespersonName: userName,
+      createdBy: req.user.id, createdByName: userName,
       customerName, customerPhone, customerEmail,
       eventDate: eventDate ? new Date(eventDate) : new Date(),
       status: status || 'בהמתנה', numberOfNights,
@@ -89,16 +94,16 @@ export const updateHotelOrder = async (req, res) => {
     if (status === 'בוצע' && oldStatus !== 'בוצע') {
       if (!optimaNumber) return res.status(400).json({ message: 'חובה להזין מספר הזמנה מאופטימה כדי לסגור עסקה.' });
       order.closedBy = req.user.id;
-      order.closedByName = req.user.name;
+      order.closedByName = await getUserName(req.user.id);
     }
 
     let roomsWithPrice = order.rooms;
     let roomsTotalPrice = 0;
 
     if (req.body.rooms || req.body.numberOfNights) {
-      const priceListsFromDB = await ZiporiPriceList.find({ hotel: order.hotelId });
+      const priceListsFromDB = await PriceList.find({ hotel: order.hotelId });
       const priceListsMap = Object.fromEntries(priceListsFromDB.map(pl => [pl.name, pl.toObject()]));
-      const hotelRoomTypes = await ZiporiRoomType.find({ hotel: order.hotelId });
+      const hotelRoomTypes = await RoomType.find({ hotel: order.hotelId });
       const roomTypesMap = Object.fromEntries(hotelRoomTypes.map(rt => [rt._id.toString(), rt]));
 
       const roomsToProcess = req.body.rooms || order.rooms;
@@ -235,7 +240,7 @@ export const getPublicHotelOrderById = async (req, res) => {
 
     let hotel = { name: order.hotelName };
     try {
-      const hotelDoc = await ZiporiHotel.findById(order.hotelId).lean();
+      const hotelDoc = await Hotel.findById(order.hotelId).lean();
       if (hotelDoc) hotel = { ...hotelDoc, name: hotelDoc.name };
     } catch (_) {}
 
@@ -248,7 +253,7 @@ export const getPublicHotelOrderById = async (req, res) => {
 // סטטיסטיקות
 export const getMyHotelOrderStats = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user._id;
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
     const [openOrders, monthlySales] = await Promise.all([

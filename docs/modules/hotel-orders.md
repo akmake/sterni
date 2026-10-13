@@ -1,6 +1,6 @@
 # Hotel Orders Module
 
-> Last updated: 2026-03-12
+> Last updated: 2026-10-13
 
 ## Overview
 Hotel room booking system. Agents create orders, generate quotes, and track confirmations.
@@ -69,4 +69,7 @@ createdByName
 
 ## Known Issues / Pitfalls
 - Hotel data (hotels, price lists, room types, extras) now lives in the main DB — no longer depends on `ZIPORI_MONGO_URI`
-- The zipori models (`server/models/zipori/`) are no longer used for hotel-data routes — kept for reference only
+- The zipori models (`server/models/zipori/`) are no longer used anywhere at runtime (only `migrateHotelData.js`) — `hotelOrderController.js` reads `PriceList`/`RoomType`/`Hotel` from the main DB, and `app.js` no longer opens the zipori connection
+- `req.user` has no `name` — the controller loads it from `User` (`getUserName`) for `salespersonName`/`createdByName`/`closedByName`
+- `getMyHotelOrderStats` matches on `req.user._id` (ObjectId) — aggregate does not cast strings
+- Saved orders are opened from `/hotel-orders` (sidebar "הזמנות מלון"): edit / quote / confirmation per row

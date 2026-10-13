@@ -30,7 +30,7 @@ const fetchAllPriceListsAsMap = async (hotelId) => {
   return data.reduce((acc, pl) => { acc[pl.name] = pl; return acc; }, {});
 };
 
-const fetchRoomTypes = async (hotelId) => (await api.get(`/hotel-data/room-types/${hotelId}`)).data;
+const fetchRoomTypes = async (hotelId) => (await api.get(`/hotel-data/room-types/by-hotel/${hotelId}`)).data;
 
 const updateOrder = (orderData) => api.put(`/hotel-orders/${orderData._id}`, orderData);
 
@@ -60,7 +60,7 @@ export default function HotelEditOrderPage() {
   const hotelId = order?.hotelId;
 
   const { data: priceLists, isLoading: isLoadingPriceLists } = useQuery({
-    queryKey: ['hotelPriceListsMap', hotelId],
+    queryKey: ['hotelPriceListsMapAll', hotelId],
     queryFn: () => fetchAllPriceListsAsMap(hotelId),
     enabled: !!hotelId,
   });

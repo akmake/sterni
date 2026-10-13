@@ -21,13 +21,16 @@ export const createHotelOrder = async (req, res) => {
   const {
     hotelId, hotelName, rooms, notes, customerName, customerPhone,
     status, numberOfNights = 1, extras = [], discountPercent = 0,
-    customerEmail, eventDate
+    customerEmail, eventDate, optimaNumber
   } = req.body;
 
   if (!hotelId) return res.status(400).json({ message: 'חובה לבחור מלון.' });
   if (!customerName) return res.status(400).json({ message: 'שם הלקוח הוא שדה חובה.' });
   if ((!rooms || rooms.length === 0) && (!extras || extras.length === 0)) {
     return res.status(400).json({ message: 'ההזמנה חייבת להכיל לפחות חדר אחד או תוספת אחת.' });
+  }
+  if (status === 'בוצע' && !optimaNumber) {
+    return res.status(400).json({ message: 'חובה להזין מספר הזמנה מאופטימה כדי לסגור עסקה.' });
   }
 
   try {
@@ -39,7 +42,7 @@ export const createHotelOrder = async (req, res) => {
     let roomsTotalPrice = 0;
     const roomsWithPrice = (rooms || []).map(room => {
       let supplement = 0;
-      let roomTypeName = 'רגיל';
+      let roomTypeName = room.roomType || 'רגיל';
       if (room.roomTypeId && roomTypesMap[room.roomTypeId]) {
         const rt = roomTypesMap[room.roomTypeId];
         supplement = rt.supplementPerNight || 0;
@@ -65,6 +68,9 @@ export const createHotelOrder = async (req, res) => {
       status: status || 'בהמתנה', numberOfNights,
       rooms: roomsWithPrice, extras, discountPercent,
       total_price: finalPrice, notes,
+      ...(status === 'בוצע' && {
+        optimaNumber, closedBy: req.user.id, closedByName: userName,
+      }),
     });
 
     res.status(201).json(newOrder);
@@ -106,7 +112,7 @@ export const updateHotelOrder = async (req, res) => {
       const hotelRoomTypes = await RoomType.find({ hotel: order.hotelId });
       const roomTypesMap = Object.fromEntries(hotelRoomTypes.map(rt => [rt._id.toString(), rt]));
 
-      const roomsToProcess = req.body.rooms || order.rooms;
+      const roomsToProcess = req.body.rooms || order.rooms.map(r => r.toObject());
       roomsWithPrice = roomsToProcess.map(room => {
         let supplement = room.roomSupplement || 0;
         let roomTypeName = room.roomType || 'רגיל';
@@ -124,8 +130,7 @@ export const updateHotelOrder = async (req, res) => {
     }
 
     const extras = req.body.extras !== undefined ? req.body.extras : order.extras;
-    let finalPrice = calculateFinalTotal(roomsTotalPrice, extras, discountPercent);
-    if (req.body.total_price !== undefined) finalPrice = req.body.total_price;
+    const finalPrice = calculateFinalTotal(roomsTotalPrice, extras, discountPercent);
 
     const statusChanged = status !== oldStatus;
     if (statusChanged) {
@@ -196,13 +201,15 @@ export const searchHotelOrders = async (req, res) => {
   try {
     const { query } = req.query;
     if (!query) return res.json([]);
+    // טקסט המשתמש הוא מחרוזת רגילה, לא regex ("+972", "(" וכו' הפילו את השאילתה)
+    const safe = String(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const orders = await HotelOrder.find({
       $and: [
         { status: { $ne: 'לא רלוונטי' } },
         {
           $or: [
-            { customerName: { $regex: query, $options: 'i' } },
-            { customerPhone: { $regex: query, $options: 'i' } },
+            { customerName: { $regex: safe, $options: 'i' } },
+            { customerPhone: { $regex: safe, $options: 'i' } },
             ...(!isNaN(query) ? [{ orderNumber: Number(query) }] : [])
           ]
         }

@@ -28,7 +28,7 @@ const fetchPriceListsAsMap = async (hotelId) => {
   return data.reduce((acc, pl) => { acc[pl.name] = pl; return acc; }, {});
 };
 
-const fetchRoomTypes = async (hotelId) => (await api.get(`/hotel-data/room-types/${hotelId}`)).data;
+const fetchRoomTypes = async (hotelId) => (await api.get(`/hotel-data/room-types/by-hotel/${hotelId}`)).data;
 
 const createOrder = (orderData) => api.post('/hotel-orders', orderData);
 
@@ -36,7 +36,7 @@ const updateExistingOrder = (payload) => api.put(`/hotel-orders/${payload.orderI
 
 const searchExistingOrder = async (query) => {
   if (!query || query.length < 3) return [];
-  const { data } = await api.get(`/hotel-orders/search?query=${query}`);
+  const { data } = await api.get(`/hotel-orders/search?query=${encodeURIComponent(query)}`);
   return data;
 };
 
@@ -51,7 +51,7 @@ export default function HotelNewOrderPage() {
   const [orderDetails, setOrderDetails] = useState({
     customerName: '', customerPhone: '', customerEmail: '',
     eventDate: new Date().toISOString().split('T')[0],
-    status: 'בהמתנה', notes: '',
+    status: 'בהמתנה', notes: '', optimaNumber: '',
   });
 
   const [isNotesDialogOpen, setIsNotesDialogOpen] = useState(false);
@@ -121,7 +121,7 @@ export default function HotelNewOrderPage() {
         setRooms([]);
         setExtras([]);
         setDiscountPercent(0);
-        setOrderDetails({ customerName: '', customerPhone: '', customerEmail: '', eventDate: new Date().toISOString().split('T')[0], status: 'בהמתנה', notes: '' });
+        setOrderDetails({ customerName: '', customerPhone: '', customerEmail: '', eventDate: new Date().toISOString().split('T')[0], status: 'בהמתנה', notes: '', optimaNumber: '' });
         setSelectedHotel(null);
         setSelectedHotelName('');
         setNumberOfNights(1);
@@ -169,6 +169,7 @@ export default function HotelNewOrderPage() {
     if (!selectedHotel) { toast.error('חובה לבחור מלון.'); return null; }
     if (!orderDetails.customerName) { toast.error('חובה להזין שם לקוח.'); return null; }
     if (rooms.length === 0 && extras.length === 0) { toast.error('יש להוסיף לפחות חדר אחד או תוספת.'); return null; }
+    if (orderDetails.status === 'בוצע' && !orderDetails.optimaNumber) { toast.error('לסגירת הזמנה (בוצע) חובה להזין מספר הזמנה מאופטימה.'); return null; }
     return { ...orderDetails, hotelId: selectedHotel, hotelName: selectedHotelName, rooms, extras, discountPercent, total_price: totals.finalTotal, numberOfNights };
   };
 
@@ -227,6 +228,12 @@ export default function HotelNewOrderPage() {
                 </SelectContent>
               </Select>
             </div>
+            {orderDetails.status === 'בוצע' && (
+              <div>
+                <Label htmlFor="optimaNumber" className="mb-1.5 block">מספר הזמנה באופטימה</Label>
+                <Input id="optimaNumber" name="optimaNumber" value={orderDetails.optimaNumber} onChange={handleDetailsChange} placeholder="חובה לסגירה" />
+              </div>
+            )}
             <div className="lg:col-span-3">
               <Label className="mb-1.5 block">הערות להזמנה</Label>
               <div

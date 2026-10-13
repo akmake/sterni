@@ -7,6 +7,7 @@ const roomSchema = new mongoose.Schema({
   babies: { type: Number, required: true, min: 0 },
   price_list_names: [String],
   price: { type: Number, required: true },
+  roomTypeId: { type: String, default: null }, // RoomType._id — נדרש כדי שדף העריכה יבחר את סוג החדר
   roomType: { type: String, required: true, default: 'רגיל' },
   roomSupplement: { type: Number, default: 0 },
   notes: { type: String, trim: true }

@@ -113,3 +113,17 @@ All routes funnel errors to the central handler `server/middlewares/errorHandler
 ## Background Services (start on boot)
 - `startEmailListener()` — polls email inbox
 - `connectToWhatsApp()` — initializes Baileys WhatsApp connection
+
+## Memory footprint (server)
+
+Measured locally 2026-10-13: idle server ≈ 150–215 MB RSS (WhatsApp not connected, no traffic).
+
+| Source | Cost | Notes |
+|--------|------|-------|
+| Chromium from `utils/articleFetcher.js` (news article fetch) | 150–300 MB, **separate process** | Was kept open forever after first use. Now closed after 2 min idle (`BROWSER_IDLE_MS`) |
+| Chromium from `controllers/quotePdfController.js` | per request | Launched and closed per PDF |
+| Baileys WhatsApp (`services/whatsappService.js`) | ~35 MB + session/sockets | Only when connected |
+| mongoose / socket.io / express | ~55 MB | Baseline |
+| `googleapis` | ~100 MB if imported | Only `utils/googleSheets.js` imports it, and nothing imports that file — keep it that way |
+
+In-memory caches are capped: `articleFetcher` cache (`CACHE_MAX = 100`), `loggingMiddleware` `geoCache` (`GEO_CACHE_MAX = 5000`, one entry per unique IP). `alertThrottle` and `deviceInfoCache` already self-prune.

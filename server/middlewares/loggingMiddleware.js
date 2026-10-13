@@ -19,6 +19,7 @@ export const makeDeviceKey = (ip, ua) => {
 // Cache for geolocation data to avoid excessive API calls
 const geoCache = new Map();
 const GEO_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+const GEO_CACHE_MAX = 5000; // כל IP ייחודי (כולל בוטים) נשמר — בלי תקרה ה-Map גדל לנצח
 
 // Throttle suspicious-visitor alerts — at most one alert per IP per 10 min
 const alertThrottle = new Map();
@@ -108,6 +109,11 @@ const getGeolocation = async (ipAddress) => {
       };
 
       // Cache the result
+      if (geoCache.size >= GEO_CACHE_MAX) {
+        const now = Date.now();
+        for (const [k, v] of geoCache) if (now - v.timestamp > GEO_CACHE_TTL) geoCache.delete(k);
+        while (geoCache.size >= GEO_CACHE_MAX) geoCache.delete(geoCache.keys().next().value);
+      }
       geoCache.set(ipAddress, { data: location, timestamp: Date.now() });
       return location;
     }

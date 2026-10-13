@@ -1,4 +1,6 @@
 import express from 'express';
+import rateLimit from 'express-rate-limit';
+import { downloadHotelOrderPdf } from '../controllers/hotelOrderPdfController.js';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import {
   createHotelOrder,
@@ -15,6 +17,7 @@ import {
 const router = express.Router();
 
 // Public route (no auth required)
+router.get('/public/:id/pdf', rateLimit({ windowMs: 60000, max: 10, standardHeaders: true, legacyHeaders: false }), downloadHotelOrderPdf);
 router.get('/public/:id', getPublicHotelOrderById);
 
 router.use(requireAuth);

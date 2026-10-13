@@ -4,8 +4,21 @@ import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 puppeteer.use(StealthPlugin());
 
 let browser = null;
+let idleTimer = null;
+const BROWSER_IDLE_MS = 2 * 60 * 1000; // Chromium תופס 150-300MB — נסגר אחרי 2 דקות בלי שימוש
+
+function scheduleBrowserClose() {
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(async () => {
+    const b = browser;
+    browser = null;
+    try { await b?.close(); } catch {}
+  }, BROWSER_IDLE_MS);
+  idleTimer.unref();
+}
 
 async function getBrowser() {
+  clearTimeout(idleTimer);
   if (!browser || !browser.connected) {
     browser = await puppeteer.launch({
       headless: 'new',
@@ -26,7 +39,15 @@ function getCached(url) {
   return entry.data;
 }
 
+const CACHE_MAX = 100;
+
 function setCache(url, data) {
+  // תקרה — בלי זה ה-Map גדל לנצח (רשומות פגות נמחקו רק כשניגשו אליהן)
+  if (cache.size >= CACHE_MAX) {
+    const now = Date.now();
+    for (const [k, v] of cache) if (now - v.ts > CACHE_TTL) cache.delete(k);
+    while (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value);
+  }
   cache.set(url, { data, ts: Date.now() });
 }
 
@@ -168,5 +189,6 @@ export async function fetchArticleContent(url) {
 
   } finally {
     await page.close();
+    scheduleBrowserClose();
   }
 }

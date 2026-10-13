@@ -281,6 +281,9 @@ export default function HotelEditOrderPage() {
               numberOfNights={numberOfNights}
               onRemoveRoom={removeRoom}
               onUpdateRoom={updateRoom}
+              onAddRooms={(newRooms, sourceIndex) => setRooms(current => [
+                ...current.slice(0, sourceIndex + 1), ...newRooms, ...current.slice(sourceIndex + 1),
+              ])}
             />
 
             <div className="mt-8 bg-slate-50 p-6 rounded-lg border border-slate-100 space-y-3">

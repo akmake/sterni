@@ -3,6 +3,10 @@ node_modules/
 /client/node_modules
 /server/node_modules
 
+# Temporary font tooling
+/tmp/font-tools/
+/output/pdf/quote-preview-1.png
+
 # Build files
 /client/dist
 /client/build

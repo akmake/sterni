@@ -26,6 +26,9 @@ HotelOrdersPage (list)
 | `client/src/pages/HotelEditOrderPage.jsx` | Edit existing order |
 | `client/src/pages/HotelQuotePage.jsx` | Quote generation/PDF |
 | `client/src/pages/HotelOrderConfirmationPage.jsx` | Booking confirmation |
+| `server/services/hotelOrderPdf.js` | Shared Hebrew PDF template and text-based rendering |
+| `server/controllers/hotelOrderPdfController.js` | Loads saved order data for PDF generation |
+| `client/src/components/orders/HotelPdfPreview.jsx` | Displays the actual generated PDF |
 | `client/src/pages/HotelOrdersPage.jsx` | Orders list |
 | `client/src/components/orders/AddRoomForm.jsx` | Room adding form |
 | `client/src/components/orders/OrderSummaryTable.jsx` | Order summary |
@@ -58,6 +61,16 @@ createdByName
 - Lives in `client/src/lib/priceCalculator.js`
 - Inputs: room config + price lists map + number of nights + room supplement
 - Called on: room add, nights change, price list change
+
+## Hotel PDF documents
+- `GET /api/hotel-orders/public/:id/pdf?type=quote|confirmation&includePayment=true|false` follows the existing public-order access model and is rate limited.
+- Downloads, email attachments and print previews all use the server renderer. No canvas, screenshots or image-based text.
+- On-screen preview uses PDF.js to display the generated PDF on white pages with a selectable text layer; it does not generate the downloaded document or use the browser's dark embedded PDF viewer.
+- The template is built from persisted order data; user content is escaped. Assets are embedded locally and JavaScript is disabled during rendering.
+- Noto Sans Hebrew is bundled in `server/assets/fonts` with its OFL license. Chromium handles RTL layout and isolated LTR numbers, phone numbers, email addresses and amounts.
+- A4 pages flow by content height. Table headings repeat and ordinary rows stay together. Confirmation download/preview includes the payment appendix; email preserves the existing behavior of omitting it.
+- The hotel renderer respects `PUPPETEER_EXECUTABLE_PATH`, then tries Puppeteer's installed Chrome, then automatically discovers Chrome or Edge in standard Windows installation directories. On other platforms install Puppeteer's Chrome (`npx puppeteer browsers install chrome`) or configure `PUPPETEER_EXECUTABLE_PATH`.
+- Run `node --test server/services/hotelOrderPdf.test.js` for template checks. Set `GENERATE_HOTEL_PDF_SAMPLES=1` to also write short, confirmation and long examples into `output/pdf`.
 
 ## Duplicate Detection
 - On `HotelNewOrderPage`, after 3 seconds of inactivity on phone/name fields

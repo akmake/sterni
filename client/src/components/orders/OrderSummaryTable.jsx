@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { calculateRoomTotalPrice } from '@/lib/priceCalculator';
+import { duplicateHotelRoomForCouple } from '@/lib/duplicateHotelRoom.js';
 import { Button } from '@/components/ui/Button.jsx';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem,
@@ -7,9 +8,26 @@ import {
 } from "@/components/ui/dropdown-menu.jsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.jsx";
 import { Input } from '@/components/ui/Input.jsx';
-import { SlidersHorizontal, Moon, Trash2 } from 'lucide-react';
+import { SlidersHorizontal, Moon, Trash2, Plus } from 'lucide-react';
 
-export function OrderSummaryTable({ rooms, priceLists, roomTypes, numberOfNights, onRemoveRoom, onUpdateRoom }) {
+function AddSimilarRooms({ roomNumber, onAdd }) {
+  const [quantity, setQuantity] = useState('1');
+  const count = Number(quantity);
+  const valid = Number.isInteger(count) && count >= 1 && count <= 100;
+  return <div className="flex items-center justify-end gap-2">
+    <span className="text-xs text-gray-500">חדרים נוספים לזוג</span>
+    <Input type="number" min="1" max="100" step="1" value={quantity}
+      aria-label={`כמה חדרים להוסיף לפי חדר ${roomNumber}`}
+      onChange={event => setQuantity(event.target.value)}
+      className="h-8 w-16 text-center text-xs" />
+    <Button type="button" variant="outline" size="sm" className="h-8 gap-1 text-xs"
+      disabled={!valid} onClick={() => { onAdd(count); setQuantity('1'); }}>
+      <Plus size={13} /> הוסף חדר
+    </Button>
+  </div>;
+}
+
+export function OrderSummaryTable({ rooms, priceLists, roomTypes, numberOfNights, onRemoveRoom, onUpdateRoom, onAddRooms }) {
   const totalPrice = rooms.reduce((sum, room) => sum + room.price, 0);
 
   const handleCellChange = (index, field, value) => {
@@ -81,7 +99,8 @@ export function OrderSummaryTable({ rooms, priceLists, roomTypes, numberOfNights
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {rooms.map((room, index) => (
-              <tr key={index}>
+              <React.Fragment key={index}>
+              <tr>
                 <td className="px-2 py-2">
                   <Select value={room.roomTypeId || ''} onValueChange={(val) => handleRoomTypeChange(index, val)}>
                     <SelectTrigger className="h-8 text-xs w-full bg-white border-gray-200">
@@ -139,6 +158,14 @@ export function OrderSummaryTable({ rooms, priceLists, roomTypes, numberOfNights
                   </Button>
                 </td>
               </tr>
+              {onAddRooms && index === rooms.length - 1 && <tr>
+                <td colSpan={9} className="px-2 pb-3 pt-1 bg-gray-50/50">
+                  <AddSimilarRooms roomNumber={index + 1} onAdd={count => onAddRooms(
+                    duplicateHotelRoomForCouple(room, count, priceLists, roomTypes, numberOfNights), index
+                  )} />
+                </td>
+              </tr>}
+              </React.Fragment>
             ))}
           </tbody>
         </table>

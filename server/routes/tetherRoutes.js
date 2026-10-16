@@ -11,10 +11,17 @@ import ApprovalRequest from '../models/ApprovalRequest.js';
 import TetherAdmin from '../models/TetherAdmin.js';
 import TetherApprovedApp from '../models/TetherApprovedApp.js';
 import TetherUsage from '../models/TetherUsage.js';
+import TetherAppIcon from '../models/TetherAppIcon.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const router = express.Router();
+
+// App icons (see TetherAppIcon): SHA-1 hex keys, PNG only, small.
+const ICON_HASH_RE = /^[a-f0-9]{40}$/;
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const ICON_MAX_BASE64 = 200 * 1024; // ~150 KB decoded; a 96px icon is typically a few KB
+const ICON_MAX_PER_REQUEST = 50;
 
 const requireTetherAuth = async (req, res, next) => {
   const auth = req.headers['authorization'];
@@ -1215,9 +1222,70 @@ router.post('/devices/:deviceId/apps', requireDeviceAuth, async (req, res) => {
       { deviceId },
       { installedApps: apps, lastSeen: new Date() }
     );
-    res.json({ success: true });
+
+    // Tell the device which icons we have never stored, so each one is uploaded once.
+    const hashes = [...new Set((Array.isArray(apps) ? apps : [])
+      .map((a) => a?.iconHash)
+      .filter((h) => typeof h === 'string' && ICON_HASH_RE.test(h)))];
+    let missingIcons = [];
+    if (hashes.length) {
+      const known = await TetherAppIcon.find({ hash: { $in: hashes } }).select('hash').lean();
+      const knownSet = new Set(known.map((k) => k.hash));
+      missingIcons = hashes.filter((h) => !knownSet.has(h));
+    }
+    res.json({ success: true, missingIcons });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Device → server: launcher icons the server asked for in the /apps reply.
+// The hash is recomputed here and must match, so an icon can only ever be stored under its own
+// content hash — a device cannot plant a different image behind a hash other devices report.
+router.post('/devices/:deviceId/app-icons', requireDeviceAuth, async (req, res) => {
+  try {
+    const icons = Array.isArray(req.body?.icons) ? req.body.icons.slice(0, ICON_MAX_PER_REQUEST) : [];
+    let stored = 0;
+    for (const icon of icons) {
+      if (typeof icon?.hash !== 'string' || !ICON_HASH_RE.test(icon.hash)) continue;
+      if (typeof icon.data !== 'string' || icon.data.length > ICON_MAX_BASE64) continue;
+      const buf = Buffer.from(icon.data, 'base64');
+      if (buf.length < 8 || !buf.subarray(0, 8).equals(PNG_SIGNATURE)) continue;
+      if (crypto.createHash('sha1').update(buf).digest('hex') !== icon.hash) continue;
+      const r = await TetherAppIcon.updateOne(
+        { hash: icon.hash },
+        {
+          $setOnInsert: {
+            hash: icon.hash,
+            data: buf,
+            contentType: 'image/png',
+            packageName: typeof icon.packageName === 'string' ? icon.packageName.slice(0, 200) : null,
+            createdAt: new Date()
+          }
+        },
+        { upsert: true }
+      );
+      if (r.upsertedCount) stored += 1;
+    }
+    res.json({ success: true, stored });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin → app icon image. Content-addressed and immutable, so the app may cache it for good.
+router.get('/admin/app-icons/:hash', requireTetherAuth, async (req, res) => {
+  try {
+    const { hash } = req.params;
+    if (!ICON_HASH_RE.test(hash)) return res.status(400).json({ message: 'hash לא תקין' });
+    // Not lean(): a hydrated document gives `data` as a plain Buffer rather than a BSON Binary.
+    const icon = await TetherAppIcon.findOne({ hash });
+    if (!icon) return res.status(404).json({ message: 'אייקון לא נמצא' });
+    res.set('Content-Type', icon.contentType || 'image/png');
+    res.set('Cache-Control', 'private, max-age=31536000, immutable');
+    res.send(icon.data);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 });
 

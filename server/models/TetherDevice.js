@@ -91,7 +91,8 @@ const tetherDeviceSchema = new mongoose.Schema({
   installedApps: [{
     packageName: String,
     appName:     String,
-    isSystemApp: Boolean
+    isSystemApp: Boolean,
+    iconHash:    String   // → TetherAppIcon.hash; absent for devices on an older app version
   }],
 
   // Per-device policy overrides (merged on top of community policy)

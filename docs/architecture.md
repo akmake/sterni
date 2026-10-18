@@ -4,6 +4,17 @@
 
 ## Environment Variables
 
+### Production local-only database configuration — 2026-10-16
+
+At the owner's explicit request, `/var/www/sterni/server/.env` on `46.224.63.165` now points
+`MONGO_URI`, `LOCAL_MONGO_URI` and `ZIPORI_MONGO_URI` to `mongodb://127.0.0.1:27017/sterni`.
+The `sterni-backend` PM2 process was restarted with those same variables using `--update-env`.
+The prior environment file is backed up outside the Git checkout under the owner's private
+`~/.config/sterni/env-backups/` directory. No data was copied, deleted or restored by this switch.
+The backend logged `MongoDB Connected: 127.0.0.1`, listened on 5000, and the public homepage
+and `/api/csrf-token` returned HTTP 200. The previous Atlas DNS failure no longer blocks startup.
+This records the live server configuration; environment values must not be committed to Git.
+
 ### Required (server will not start without these)
 | Variable | Description |
 |----------|-------------|

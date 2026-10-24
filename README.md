@@ -1,3 +1,25 @@
+# sterni
+
+Project repository for **sterni**.
+
+## Repository layout
+
+- `client` — frontend.
+- `server` — backend.
+- `android` — Android integration.
+- `docs` — documentation.
+
+## Package scripts
+
+- `npm run install-all`: `npm install --prefix client && npm install --prefix server`
+- `npm run dev`: `concurrently -n client,server -c 'bgBlue.bold,bgMagenta.bold' "npm run dev --prefix client" "npm run dev --prefix server"`
+- `npm run build`: `npm run build --prefix client`
+- `npm run start`: `npm run start --prefix server`
+- `npm run docker:up`: `docker-compose up -d --build`
+- `npm run docker:down`: `docker-compose down`
+
+## Existing documentation
+
 # פרויקט קייטרינג - Full Stack
 
 פרויקט Full-Stack מודרני המדגים מערכת הזמנות לקייטרינג.

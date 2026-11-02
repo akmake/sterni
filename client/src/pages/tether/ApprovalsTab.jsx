@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { CheckCircle, RefreshCw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { tetherApi, authHeader, timeAgo } from './tetherApi';
+import { tetherApi, authHeader } from './tetherApi';
+import ApprovalCard from './ApprovalCard';
+import { resolveApprovalRequest } from './CommunityDetail';
 
 export default function ApprovalsTab() {
   const [approvals, setApprovals] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [resolving, setResolving] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -18,12 +21,14 @@ export default function ApprovalsTab() {
 
   useEffect(() => { load(); }, [load]);
 
-  const resolve = async (id, status) => {
+  const resolve = async (request, body) => {
+    setResolving(request.id);
     try {
-      await tetherApi.put(`/admin/approvals/${id}`, { status }, { headers: authHeader() });
-      setApprovals(a => a.filter(r => r.id !== id));
-      toast.success(status === 'approved' ? 'אושר' : 'נדחה');
-    } catch { toast.error('שגיאה'); }
+      await resolveApprovalRequest(request, body);
+      setApprovals(a => a.filter(r => r.id !== request.id));
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'שגיאה');
+    } finally { setResolving(null); }
   };
 
   if (loading) return <div className="text-center py-16 text-gray-400">טוען...</div>;
@@ -32,7 +37,7 @@ export default function ApprovalsTab() {
     <div dir="rtl">
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-semibold text-gray-800">בקשות אישור ממתינות ({approvals.length})</h2>
-        <button onClick={load} className="text-gray-400 hover:text-gray-600"><RefreshCw size={16} /></button>
+        <button onClick={load} aria-label="רענן" className="text-gray-400 hover:text-gray-600"><RefreshCw size={16} /></button>
       </div>
 
       {approvals.length === 0 ? (
@@ -43,23 +48,7 @@ export default function ApprovalsTab() {
       ) : (
         <div className="space-y-3">
           {approvals.map(req => (
-            <div key={req.id} className="bg-white border border-orange-200 rounded-xl p-4 flex items-center justify-between">
-              <div>
-                <div className="font-medium text-gray-800">{req.action}</div>
-                {req.packageName && <div className="text-xs text-gray-500 mt-0.5">{req.packageName}</div>}
-                <div className="text-xs text-gray-400 mt-1">מכשיר: {req.deviceId?.slice(-12)} · {timeAgo(req.createdAt)}</div>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => resolve(req.id, 'approved')}
-                  className="flex items-center gap-1 bg-green-100 text-green-700 px-3 py-1.5 rounded-lg text-sm hover:bg-green-200 transition">
-                  <CheckCircle size={14} /> אשר
-                </button>
-                <button onClick={() => resolve(req.id, 'rejected')}
-                  className="flex items-center gap-1 bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-sm hover:bg-red-200 transition">
-                  <XCircle size={14} /> דחה
-                </button>
-              </div>
-            </div>
+            <ApprovalCard key={req.id} request={req} onResolve={resolve} busy={resolving === req.id} />
           ))}
         </div>
       )}

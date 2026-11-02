@@ -7,13 +7,19 @@ import CommunitiesTab from './tether/CommunitiesTab';
 import DevicesTab     from './tether/DevicesTab';
 import ApprovalsTab   from './tether/ApprovalsTab';
 import AdminsTab      from './tether/AdminsTab';
+import ProvisioningTab   from './tether/ProvisioningTab';
+import GlobalOverviewTab from './tether/GlobalOverviewTab';
+import ApprovedAppsTab   from './tether/ApprovedAppsTab';
 
 const TABS = [
-  { id: 'dashboard',   label: 'דשבורד' },
-  { id: 'communities', label: 'קהילות' },
-  { id: 'devices',     label: 'מכשירים' },
-  { id: 'approvals',   label: 'אישורים' },
-  { id: 'admins',      label: 'מנהלים' },
+  { id: 'dashboard',    label: 'דשבורד' },
+  { id: 'communities',  label: 'קהילות' },
+  { id: 'devices',      label: 'מכשירים' },
+  { id: 'approvals',    label: 'אישורים' },
+  { id: 'provisioning', label: 'חיבור מכשיר' },
+  { id: 'admins',       label: 'מנהלים',       superadmin: true },
+  { id: 'global',       label: 'סקירה גלובלית', superadmin: true },
+  { id: 'catalog',      label: 'קטלוג',         superadmin: true },
 ];
 
 export default function TetherAdminPage() {
@@ -34,6 +40,8 @@ export default function TetherAdminPage() {
   };
 
   if (!tetherUser) return <TetherLogin onLogin={setTetherUser} />;
+
+  const isSuperAdmin = tetherUser.role === 'superadmin';
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6" dir="rtl">
@@ -57,10 +65,10 @@ export default function TetherAdminPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6">
-        {TABS.filter(tab => tab.id !== 'admins' || tetherUser.role === 'superadmin').map(tab => (
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 overflow-x-auto">
+        {TABS.filter(tab => !tab.superadmin || isSuperAdmin).map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 text-sm font-medium py-1.5 rounded-lg transition ${
+            className={`flex-1 shrink-0 whitespace-nowrap text-sm font-medium py-1.5 px-2.5 rounded-lg transition ${
               activeTab === tab.id ? 'bg-white text-blue-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
             }`}>
             {tab.label}
@@ -69,11 +77,14 @@ export default function TetherAdminPage() {
       </div>
 
       {/* Content */}
-      {activeTab === 'dashboard'   && <Dashboard />}
-      {activeTab === 'communities' && <CommunitiesTab />}
-      {activeTab === 'devices'     && <DevicesTab />}
-      {activeTab === 'approvals'   && <ApprovalsTab />}
-      {activeTab === 'admins' && tetherUser.role === 'superadmin' && <AdminsTab />}
+      {activeTab === 'dashboard'    && <Dashboard onNavigate={setActiveTab} isSuperAdmin={isSuperAdmin} />}
+      {activeTab === 'communities'  && <CommunitiesTab />}
+      {activeTab === 'devices'      && <DevicesTab />}
+      {activeTab === 'approvals'    && <ApprovalsTab />}
+      {activeTab === 'provisioning' && <ProvisioningTab />}
+      {activeTab === 'admins'  && isSuperAdmin && <AdminsTab />}
+      {activeTab === 'global'  && isSuperAdmin && <GlobalOverviewTab />}
+      {activeTab === 'catalog' && isSuperAdmin && <ApprovedAppsTab />}
     </div>
   );
 }

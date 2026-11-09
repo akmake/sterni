@@ -36,6 +36,8 @@ import logsRoutes from './routes/logsRoutes.js';
 import tzitzitRoutes from './routes/tzitzitRoutes.js';
 import hotelOrderRoutes from './routes/hotelOrderRoutes.js';
 import hotelZiporiDataRoutes from './routes/hotelZiporiDataRoutes.js';
+import companyOsRoutes from './companyos/routes.js';
+import { setupCompanySocket } from './companyos/realtime.js';
 // zipori DB לא בשימוש יותר — כל נתוני המלונות במסד הראשי
 import familyRoutes from './routes/familyRoutes.js';
 import shoppingRoutes from './routes/shoppingRoutes.js';
@@ -126,6 +128,7 @@ const io = new Server(httpServer, {
 app.set('io', io);
 setupSocketIO(io);
 await setupGameSocketIO(io);
+setupCompanySocket(io);
 
 // --- Trust Proxy (׳§׳¨׳™׳˜׳™ ׳׳–׳™׳”׳•׳™ IP ׳׳׳™׳×׳™ ׳׳׳—׳•׳¨׳™ Nginx/Cloudflare) ---
 app.set('trust proxy', 1);
@@ -217,6 +220,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/hotel-orders', hotelOrderRoutes);
 app.use('/api/hotel-data', hotelZiporiDataRoutes);
+app.use('/api/v1', companyOsRoutes);
 
 // Error Handling
 app.use('*', (req, res) => {

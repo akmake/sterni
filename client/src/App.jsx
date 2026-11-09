@@ -27,6 +27,7 @@ import TasksPage          from './pages/TasksPage';
 import KitchenPrintPageA3 from './pages/KitchenPrintPageA3';
 import FullScheduleReportPage from '@/pages/FullScheduleReportPage';
 const NotFoundPage = React.lazy(() => import("@/pages/NotFoundPage"));
+const CompanyApp = React.lazy(() => import("@/companyos/CompanyApp"));
 import ChatPage from './pages/ChatPage';
 import WhatsAppPage from './pages/WhatsAppPage';
 import NewsPage from './pages/NewsPage';
@@ -97,6 +98,7 @@ export default function App() {
     <>
       <Routes>
         <Route path="/tether" element={<TetherAdminPage />} />
+        <Route path="/company/*" element={<React.Suspense fallback={null}><CompanyApp /></React.Suspense>} />
       {/* ג”€ג”€ג”€ Main app area (with Layout) ג”€ג”€ג”€ */}
       <Route path="/" element={<Layout />}>
 

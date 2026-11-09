@@ -12,6 +12,7 @@
 | `server/models/Software.js` | `server/controllers/softwareController.js`, `docs/modules/software-library.md`, `docs/database.md` |
 | `server/routes/softwareRoutes.js` | `server/app.js`, `docs/api-reference.md`, `docs/modules/software-library.md` |
 | `client/src/pages/SoftwareLibraryPage.jsx` | `client/src/App.jsx` (route), `client/src/components/Navbar.jsx` (nav item) |
+| `server/companyos/*`, `client/src/companyos/*` | `docs/modules/company-os.md`, Android client in the `ApgMan` repo (`CompanyOsApi.kt`, `Models.kt`) |
 
 ---
 

@@ -1,4 +1,4 @@
-import { getDailyCalendar } from '../services/calendarService.js';
+import { getDailyCalendar, getCachedTanyaRef } from '../services/calendarService.js';
 import { findTreatiseInfo, getBookSiyum } from '../services/rambamBookManager.js';
 
 const SEFARIA_BASE_URL = 'https://www.sefaria.org';
@@ -150,18 +150,43 @@ function buildSefariaCalendarParams(dateString) {
   };
 }
 
-function parseChapterVerseRef(ref) {
+function parseTanyaRef(ref) {
   if (!ref) return null;
-  const match = String(ref).match(/^(.*)\s(\d+):(\d+)$/);
-  if (!match) return null;
-  return {
-    book: match[1],
-    chapter: Number(match[2]),
-    verse: Number(match[3]),
-  };
+  const twoDepth = String(ref).match(/^(.*)\s(\d+):(\d+)$/);
+  if (twoDepth) {
+    return {
+      book: twoDepth[1],
+      chapter: Number(twoDepth[2]),
+      verse: Number(twoDepth[3]),
+      isTwoDepth: true,
+    };
+  }
+  const oneDepth = String(ref).match(/^(.*)\s(\d+)$/);
+  if (oneDepth) {
+    return {
+      book: oneDepth[1],
+      chapter: null,
+      verse: Number(oneDepth[2]),
+      isTwoDepth: false,
+    };
+  }
+  return null;
+}
+
+function getTanyaBookLastChapter(book) {
+  const b = String(book || '').toLowerCase();
+  if (b.includes('kodesh')) return 32;
+  if (b.includes('teshuvah')) return 12;
+  if (b.includes('yichud')) return 12;
+  if (b.includes('kuntres') || b.includes('acharon')) return 9;
+  if (b.includes('likkutei') || b.includes('likutei')) return 53;
+  return null;
 }
 
 async function getTanyaRefForDate(dateString) {
+  const cached = getCachedTanyaRef(dateString);
+  if (cached) return cached;
+
   const sefaria = await fetchJson('/api/calendars', buildSefariaCalendarParams(dateString));
   const item = (Array.isArray(sefaria?.calendar_items) ? sefaria.calendar_items : [])
     .find((i) => String(i?.title?.en || '').toLowerCase().includes('tanya'));
@@ -169,7 +194,7 @@ async function getTanyaRefForDate(dateString) {
 }
 
 async function getChapterLength(book, chapter) {
-  const chapterRef = `${book} ${chapter}`;
+  const chapterRef = chapter != null ? `${book} ${chapter}` : book;
   const safeRef = encodeURI(chapterRef.replace(/ /g, '_'));
   const textData = await fetchJson(`/api/texts/${safeRef}`, { context: 0, commentary: 0, pad: 0, lang: 'he' });
   const he = Array.isArray(textData?.he) ? textData.he : [];
@@ -177,7 +202,7 @@ async function getChapterLength(book, chapter) {
 }
 
 async function buildTanyaDailyRangeRef(startRef, dateString) {
-  const start = parseChapterVerseRef(startRef);
+  const start = parseTanyaRef(startRef);
   if (!start) return startRef;
 
   const nextDate = shiftDate(dateString, 1);
@@ -188,9 +213,63 @@ async function buildTanyaDailyRangeRef(startRef, dateString) {
     return startRef;
   }
 
-  const next = parseChapterVerseRef(nextRef);
-  if (!next || next.book !== start.book) return startRef;
+  const next = parseTanyaRef(nextRef);
 
+  // Transition to a different book or end of cycle
+  if (!next || next.book !== start.book) {
+    if (start.isTwoDepth) {
+      const maxChapter = getTanyaBookLastChapter(start.book);
+      const endChapter = maxChapter != null ? Math.max(start.chapter, maxChapter) : start.chapter;
+      let endVerse;
+      try {
+        endVerse = await getChapterLength(start.book, endChapter);
+      } catch (_) {
+        return startRef;
+      }
+      if (start.chapter === endChapter) {
+        return endVerse > start.verse
+          ? `${start.book} ${start.chapter}:${start.verse}-${endVerse}`
+          : `${start.book} ${start.chapter}:${start.verse}`;
+      }
+      return `${start.book} ${start.chapter}:${start.verse}-${endChapter}:${endVerse}`;
+    } else {
+      let endVerse;
+      try {
+        endVerse = await getChapterLength(start.book, null);
+      } catch (_) {
+        return startRef;
+      }
+      return endVerse > start.verse
+        ? `${start.book} ${start.verse}-${endVerse}`
+        : `${start.book} ${start.verse}`;
+    }
+  }
+
+  // Same book, but start is 1-depth and next is 2-depth (e.g. Compiler's Foreword -> Chapter 1)
+  if (!start.isTwoDepth && next.isTwoDepth) {
+    let endVerse;
+    try {
+      endVerse = await getChapterLength(start.book, null);
+    } catch (_) {
+      return startRef;
+    }
+    return endVerse > start.verse
+      ? `${start.book} ${start.verse}-${endVerse}`
+      : `${start.book} ${start.verse}`;
+  }
+
+  // Both are 1-depth
+  if (!start.isTwoDepth && !next.isTwoDepth) {
+    const endVerse = next.verse - 1;
+    if (endVerse >= start.verse) {
+      return endVerse > start.verse
+        ? `${start.book} ${start.verse}-${endVerse}`
+        : `${start.book} ${start.verse}`;
+    }
+    return startRef;
+  }
+
+  // Both are 2-depth
   let endChapter = next.chapter;
   let endVerse = next.verse - 1;
 
@@ -209,7 +288,9 @@ async function buildTanyaDailyRangeRef(startRef, dateString) {
   }
 
   if (start.chapter === endChapter) {
-    return `${start.book} ${start.chapter}:${start.verse}-${endVerse}`;
+    return endVerse > start.verse
+      ? `${start.book} ${start.chapter}:${start.verse}-${endVerse}`
+      : `${start.book} ${start.chapter}:${start.verse}`;
   }
   return `${start.book} ${start.chapter}:${start.verse}-${endChapter}:${endVerse}`;
 }
@@ -557,20 +638,25 @@ function parseTehillimStyle(textData, ref) {
 
 function getTanyaHebrewHeader(ref) {
   if (!ref) return 'תניא יומי';
-  const match = ref.match(/(Likkutei\s+Amarim|Sha'ar\s+HaYichud\s+VeHaEmunah|Iggeret\s+HaTeshuvah|Iggeret\s+HaKodesh|Kuntres\s+Acharon)\s*(\d+)?/i);
+  const match = ref.match(/(Likkutei\s+Amarim|Likutei\s+Amarim|Sha'?ar\s+HaYichud\s+Ve[Hh]aEmunah|Iggeret\s+HaTeshuvah|Iggeret\s+HaKodesh|Kuntres\s+Acharon)\s*(\d+)?/i);
   let partName = 'תניא';
   let chapterNum = null;
 
   if (match) {
     const rawPart = match[1].toLowerCase();
-    if (rawPart.includes('likkutei')) partName = 'ליקוטי אמרים';
+    if (rawPart.includes('likkutei') || rawPart.includes('likutei')) partName = 'ליקוטי אמרים';
     else if (rawPart.includes('yichud')) partName = 'שער היחוד והאמונה';
     else if (rawPart.includes('teshuvah')) partName = 'אגרת התשובה';
     else if (rawPart.includes('kodesh')) partName = 'אגרת הקודש';
-    else if (rawPart.includes('kuntres')) partName = 'קונטרס אחרון';
+    else if (rawPart.includes('kuntres') || rawPart.includes('acharon')) partName = 'קונטרס אחרון';
 
     if (match[2]) chapterNum = parseInt(match[2], 10);
   }
+
+  if (ref.includes('Chinukh Katan')) return `${partName} — חינוך קטן`;
+  if (ref.includes("Compiler's Foreword") || ref.includes('Foreword')) return `${partName} — הקדמת המלקט`;
+  if (ref.includes('Title Page')) return `${partName} — שער הספר`;
+  if (ref.includes('Approbation')) return `${partName} — הסכמות`;
 
   if (chapterNum) {
     const unitWord = (partName === 'אגרת הקודש') ? 'סימן' : 'פרק';
@@ -587,8 +673,16 @@ function parseTanyaStyle(textData, ref) {
   const isKodesh = ref && ref.toLowerCase().includes('kodesh');
   const unitWord = isKodesh ? 'סימן' : 'פרק';
 
+  let startVerse = 1;
   const baseVerseMatch = textData.ref ? textData.ref.match(/:(\d+)/) : null;
-  const startVerse = baseVerseMatch ? parseInt(baseVerseMatch[1], 10) : 1;
+  if (baseVerseMatch) {
+    startVerse = parseInt(baseVerseMatch[1], 10);
+  } else {
+    const depth1Match = textData?.ref ? textData.ref.match(/\s(\d+)(?:-\d+)?$/) : null;
+    if (depth1Match) {
+      startVerse = parseInt(depth1Match[1], 10);
+    }
+  }
   const startChapter = Number(textData?.sections?.[0]) || parseStartChapter(ref) || 1;
 
   const result = [];

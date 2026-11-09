@@ -123,6 +123,10 @@ function saveTanyaCache(map) {
 
 const tanyaCache = loadTanyaCache();
 
+export function getCachedTanyaRef(dateString) {
+  return tanyaCache.get(dateString) || null;
+}
+
 async function fetchJson(url, timeoutMs = 10000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);

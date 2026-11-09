@@ -175,7 +175,7 @@ Prefix `/api/logs/admin`. UI: `AdminLogsPage.jsx` (+ `pages/logs/` components).
 ### Daily Study
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/study/day?date=YYYY-MM-DD&diaspora=true&timezone=...` | Returns daily study tracks (Chumash with Rashi, Rambam 1/3 chapters with Siyumim, book introductions and mitzvot list, Tanya, Sefer HaMitzvot, Shnayim Mikra, Tehillim). Supports Chabad Chitas transition on Simchat Torah (completing Vezot Haberakhah and starting Bereshit) for Israel (22 Tishrei) and Diaspora (23 Tishrei). |
+| GET | `/study/day?date=YYYY-MM-DD&diaspora=true&timezone=...` | Returns daily study tracks (Chumash with Rashi, Rambam 1/3 chapters with Siyumim, book introductions and mitzvot list, Tanya, Sefer HaMitzvot, Shnayim Mikra, Tehillim). Supports Chabad Chitas transition on Simchat Torah (completing Vezot Haberakhah and starting Bereshit) for Israel (22 Tishrei) and Diaspora (23 Tishrei). Tanya daily range resolves transitions across all 5 Tanya sections (including single-depth parts like Chinukh Katan and final-chapter conclusions) and leverages local disk cache. |
 | GET | `/study/tehillim-chapters?chapters=...` | Returns chapters for personal Tehillim reader |
 
 

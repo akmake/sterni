@@ -89,7 +89,12 @@ export const createGroup = async (req, res) => {
     createdBy: req.user._id,
   });
   await CompanyConversationMember.insertMany(
-    [String(req.user._id), ...others].map((userId) => ({ ...orgScope(req), conversationId: conversation._id, userId }))
+      [String(req.user._id), ...others].map((userId) => ({
+        ...orgScope(req),
+        conversationId: conversation._id,
+        userId,
+        role: userId === String(req.user._id) ? 'admin' : 'member',
+      }))
   );
   emitToUsers(others, 'conversations_changed');
   sendData(req, res, { id: conversation._id, type: 'group', name: conversation.name }, 201);
@@ -115,14 +120,43 @@ export const openProjectConversation = async (req, res) => {
 
 export const updateConversationSettings = async (req, res) => {
   const { conversation } = await loadConversation(req, req.params.conversationId);
-  if (typeof req.body.muted !== 'boolean') throw invalid('ערך לא תקין');
+  const changes = {};
+  if (typeof req.body.muted === 'boolean') changes.muted = req.body.muted;
+  if (typeof req.body.favorite === 'boolean') changes.favorite = req.body.favorite;
+  if (typeof req.body.archived === 'boolean') changes.archived = req.body.archived;
+  if (['all', 'mentions', 'none'].includes(req.body.notification_level)) {
+    changes.notificationLevel = req.body.notification_level;
+    changes.muted = req.body.notification_level === 'none';
+  }
+  if (Object.prototype.hasOwnProperty.call(req.body, 'muted_until')) {
+    if (req.body.muted_until === null) changes.mutedUntil = null;
+    else {
+      const date = new Date(req.body.muted_until);
+      if (Number.isNaN(date.getTime()) || date <= new Date()) throw invalid('זמן ההשתקה אינו תקין');
+      changes.mutedUntil = date;
+    }
+  }
+  if (!Object.keys(changes).length) throw invalid('לא נשלחו הגדרות תקינות');
   await CompanyConversationMember.updateOne(
     { conversationId: conversation._id, userId: req.user._id },
-    { $set: { muted: req.body.muted }, $setOnInsert: { organizationId: req.organization._id } },
+    { $set: changes, $setOnInsert: { organizationId: req.organization._id } },
     { upsert: true }
   );
   emitToUsers([String(req.user._id)], 'conversations_changed');
-  sendData(req, res, { muted: req.body.muted });
+  sendData(req, res, changes);
+};
+
+export const clearConversation = async (req, res) => {
+  const { conversation } = await loadConversation(req, req.params.conversationId);
+  await CompanyConversationMember.updateOne(
+    { conversationId: conversation._id, userId: req.user._id },
+    {
+      $set: { clearedBeforeSeq: conversation.lastSeq, lastReadSeq: conversation.lastSeq },
+      $setOnInsert: { organizationId: req.organization._id },
+    },
+    { upsert: true }
+  );
+  sendData(req, res, { cleared_before_seq: conversation.lastSeq });
 };
 
 export const markUnread = async (req, res) => {

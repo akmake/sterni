@@ -1,11 +1,11 @@
 .company-os {
-  --cos-bg: #f2f4f7;
+  --cos-bg: #f5f7f6;
   --cos-surface: #ffffff;
-  --cos-ink: #111817;
-  --cos-muted: #5e6966;
+  --cos-ink: #373643;
+  --cos-muted: #6d6c77;
   --cos-line: #dfe5e3;
-  --cos-mint: #d7f5ee;
-  --cos-mint-strong: #147d6f;
+  --cos-mint: #dff9f1;
+  --cos-mint-strong: #18cb96;
   min-height: 100vh;
   background: var(--cos-bg);
   color: var(--cos-ink);
@@ -50,7 +50,7 @@
 .company-os a { transition: transform 150ms ease, background-color 150ms ease, color 150ms ease; }
 .company-os button:active,
 .company-os a:active { transform: scale(0.985); }
-.company-os :focus-visible { outline: 3px solid rgba(20, 125, 111, 0.35); outline-offset: 2px; }
+.company-os :focus-visible { outline: 3px solid rgba(24, 203, 150, 0.4); outline-offset: 2px; }
 
 .company-shell-header {
   background: rgba(242, 244, 247, 0.94);

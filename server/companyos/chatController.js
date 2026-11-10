@@ -155,14 +155,21 @@ const dmPartnerNames = async (req, conversations) => {
   return names;
 };
 
-const serializeConversation = (conversation, lastReadSeq, partnerName, muted = false) => ({
+const serializeConversation = (conversation, membership, partnerName) => ({
   id: conversation._id,
   type: conversation.type,
   visibility: conversation.visibility,
   name: conversation.type === 'dm' || (conversation.type === 'group' && !conversation.name) ? partnerName : conversation.name,
+  description: conversation.description || '',
+  created_by: conversation.createdBy,
   project_id: conversation.projectId ?? null,
-  muted,
-  unread_count: Math.max(conversation.lastSeq - lastReadSeq, 0),
+  member_role: membership?.role || 'member',
+  muted: Boolean(membership?.muted || membership?.notificationLevel === 'none' || (membership?.mutedUntil && membership.mutedUntil > new Date())),
+  muted_until: membership?.mutedUntil ?? null,
+  notification_level: membership?.notificationLevel || 'all',
+  favorite: Boolean(membership?.favorite),
+  archived: Boolean(membership?.archived),
+  unread_count: Math.max(conversation.lastSeq - (membership?.lastReadSeq ?? 0), 0),
   last_seq: conversation.lastSeq,
   last_message: conversation.lastMessage?.at
     ? {
@@ -192,7 +199,7 @@ export const listConversations = async (req, res) => {
     res,
     conversations.map((c) => {
       const position = positions.get(String(c._id));
-      return serializeConversation(c, position?.lastReadSeq ?? 0, partners.get(String(c._id)), position?.muted ?? false);
+      return serializeConversation(c, position, partners.get(String(c._id)));
     })
   );
 };
@@ -202,7 +209,8 @@ export const unreadTotal = async (req) => {
   const positions = await readPositions(req, conversations.map((c) => c._id));
   return conversations.reduce((sum, c) => {
     const position = positions.get(String(c._id));
-    return position?.muted ? sum : sum + Math.max(c.lastSeq - (position?.lastReadSeq ?? 0), 0);
+    const muted = position?.muted || position?.notificationLevel === 'none' || (position?.mutedUntil && position.mutedUntil > new Date());
+    return muted ? sum : sum + Math.max(c.lastSeq - (position?.lastReadSeq ?? 0), 0);
   }, 0);
 };
 
@@ -219,7 +227,7 @@ export const createChannel = async (req, res) => {
     name,
     createdBy: req.user._id,
   });
-  await CompanyConversationMember.create({ ...orgScope(req), conversationId: conversation._id, userId: req.user._id });
+  await CompanyConversationMember.create({ ...orgScope(req), conversationId: conversation._id, userId: req.user._id, role: 'admin' });
   await recordAudit(req, {
     organizationId: req.organization._id,
     action: 'conversation.created',
@@ -229,7 +237,7 @@ export const createChannel = async (req, res) => {
   });
 
   if (visibility === 'public') emitToTeam(req.organization._id, 'conversations_changed');
-  sendData(req, res, serializeConversation(conversation, 0), 201);
+  sendData(req, res, serializeConversation(conversation, { lastReadSeq: 0, role: 'admin' }), 201);
 };
 
 export const openDirectMessage = async (req, res) => {
@@ -259,12 +267,27 @@ export const openDirectMessage = async (req, res) => {
 
   const partner = await User.findById(userId).select('name');
   const membership = await memberRow(conversation._id, req.user._id);
-  sendData(req, res, serializeConversation(conversation, membership?.lastReadSeq ?? 0, partner?.name), created ? 201 : 200);
+  sendData(req, res, serializeConversation(conversation, membership, partner?.name), created ? 201 : 200);
+};
+
+const canManageConversation = (req, conversation, membership) => {
+  if (conversation.type === 'dm' || conversation.type === 'project') return false;
+  if (String(conversation.createdBy) === String(req.user._id) || membership?.role === 'admin') return true;
+  // Organization owners/admins can manage every non-DM conversation they can already access.
+  // loadConversation still prevents them from discovering private conversations they did not join.
+  return ['owner', 'admin'].includes(req.membership.role);
+};
+
+const requireConversationManager = (req, conversation, membership) => {
+  if (!canManageConversation(req, conversation, membership)) {
+    throw new ApiError(403, 'ACCESS_DENIED', 'רק מנהל השיחה יכול לבצע פעולה זו');
+  }
 };
 
 export const addConversationMember = async (req, res) => {
-  const { conversation } = await loadConversation(req, req.params.conversationId);
-  if (conversation.type === 'dm' || isPublic(conversation)) throw invalid('אפשר להוסיף חברים רק לערוץ פרטי');
+  const { conversation, membership } = await loadConversation(req, req.params.conversationId);
+  if (conversation.type === 'dm' || conversation.type === 'project' || isPublic(conversation)) throw invalid('אי אפשר לנהל משתתפים בשיחה זו');
+  requireConversationManager(req, conversation, membership);
   const { user_id: userId } = req.body;
   await requireOrgColleague(req, userId);
 
@@ -293,7 +316,56 @@ export const addConversationMember = async (req, res) => {
 export const listConversationMembers = async (req, res) => {
   const { conversation } = await loadConversation(req, req.params.conversationId);
   const members = await CompanyConversationMember.find({ conversationId: conversation._id }).populate('userId', 'name');
-  sendData(req, res, members.filter((m) => m.userId).map((m) => ({ user_id: m.userId._id, name: m.userId.name })));
+  sendData(req, res, members.filter((m) => m.userId).map((m) => ({ user_id: m.userId._id, name: m.userId.name, role: m.role || 'member' })));
+};
+
+export const updateConversation = async (req, res) => {
+  const { conversation, membership } = await loadConversation(req, req.params.conversationId);
+  requireConversationManager(req, conversation, membership);
+  const changes = {};
+  if (typeof req.body.name === 'string') {
+    const name = req.body.name.trim();
+    if (!name || name.length > 80) throw invalid('שם השיחה אינו תקין');
+    changes.name = name;
+  }
+  if (typeof req.body.description === 'string') changes.description = req.body.description.trim().slice(0, 500);
+  if (!Object.keys(changes).length) throw invalid('לא נשלחו שינויים');
+  Object.assign(conversation, changes);
+  await conversation.save();
+  await deliver(conversation, 'conversations_changed');
+  sendData(req, res, { id: conversation._id, ...changes });
+};
+
+export const updateConversationMember = async (req, res) => {
+  const { conversation, membership } = await loadConversation(req, req.params.conversationId);
+  requireConversationManager(req, conversation, membership);
+  if (!['admin', 'member'].includes(req.body.role)) throw invalid('תפקיד לא תקין');
+  const target = await CompanyConversationMember.findOne({ conversationId: conversation._id, userId: req.params.userId });
+  if (!target) throw new ApiError(404, 'NOT_FOUND', 'המשתמש אינו משתתף בשיחה');
+  target.role = req.body.role;
+  await target.save();
+  emitToUsers([String(target.userId)], 'conversations_changed');
+  sendData(req, res, { user_id: target.userId, role: target.role });
+};
+
+export const removeConversationMember = async (req, res) => {
+  const { conversation, membership } = await loadConversation(req, req.params.conversationId);
+  requireConversationManager(req, conversation, membership);
+  if (conversation.type === 'dm' || conversation.type === 'project') throw invalid('אי אפשר להסיר משתתפים משיחה זו');
+  if (String(req.params.userId) === String(conversation.createdBy)) throw invalid('אי אפשר להסיר את יוצר השיחה');
+  const removed = await CompanyConversationMember.findOneAndDelete({ conversationId: conversation._id, userId: req.params.userId });
+  if (!removed) throw new ApiError(404, 'NOT_FOUND', 'המשתמש אינו משתתף בשיחה');
+  emitToUsers([String(removed.userId)], 'conversations_changed');
+  sendData(req, res, { removed: true });
+};
+
+export const leaveConversation = async (req, res) => {
+  const { conversation } = await loadConversation(req, req.params.conversationId);
+  if (conversation.type === 'dm' || conversation.type === 'project' || isPublic(conversation)) throw invalid('אי אפשר לעזוב שיחה זו');
+  if (String(conversation.createdBy) === String(req.user._id)) throw invalid('יוצר השיחה צריך להעביר ניהול לפני היציאה');
+  await CompanyConversationMember.deleteOne({ conversationId: conversation._id, userId: req.user._id });
+  emitToUsers([String(req.user._id)], 'conversations_changed');
+  sendData(req, res, { left: true });
 };
 
 // ── Messages ──
@@ -305,13 +377,14 @@ const parseSeq = (value) => {
 };
 
 export const listMessages = async (req, res) => {
-  const { conversation } = await loadConversation(req, req.params.conversationId);
+  const { conversation, membership } = await loadConversation(req, req.params.conversationId);
   const limit = Math.min(Number.parseInt(req.query.limit, 10) || DEFAULT_PAGE, MAX_PAGE);
 
   const filter = { conversationId: conversation._id, parentId: null };
   const seqRange = {};
+  if (membership?.clearedBeforeSeq) seqRange.$gt = membership.clearedBeforeSeq;
   if (req.query.before_seq !== undefined) seqRange.$lt = parseSeq(req.query.before_seq);
-  if (req.query.after_seq !== undefined) seqRange.$gt = parseSeq(req.query.after_seq);
+  if (req.query.after_seq !== undefined) seqRange.$gt = Math.max(parseSeq(req.query.after_seq), membership?.clearedBeforeSeq ?? 0);
   if (Object.keys(seqRange).length > 0) filter.seq = seqRange;
 
   // after_seq is reconnect recovery: oldest first, from that point forward.

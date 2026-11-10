@@ -3,8 +3,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
-  ArrowRight, Bell, BellOff, Bookmark, CheckSquare, EyeOff, Folder, Hash, Lock, MessageSquare,
-  MoreHorizontal, Paperclip, Pencil, Pin, Search, Send, Trash2, Users, X,
+  Archive, ArrowRight, Bell, BellOff, Bookmark, CheckSquare, Clock, Eraser, EyeOff, Folder, Hash,
+  Lock, LogOut, MessageSquare, MoreHorizontal, Paperclip, Pencil, Pin, Search, Send, Settings,
+  Shield, Star, Trash2, UserMinus, UserPlus, Users, X,
 } from 'lucide-react';
 import { companyApi, errorMessage } from './companyApi';
 import { PageHeader } from './CompanyUi';
@@ -172,7 +173,13 @@ function SavedMessages({ orgId }) {
 function ConversationList({ orgId, conversations, selectedId, people }) {
   const [query, setQuery] = useState('');
   const [showSaved, setShowSaved] = useState(false);
+  const [view, setView] = useState('active');
   const searching = query.trim().length > 0;
+  const visible = conversations.filter((conversation) => {
+    if (view === 'archived') return conversation.archived;
+    if (view === 'favorites') return conversation.favorite && !conversation.archived;
+    return !conversation.archived;
+  });
 
   return (
     <div className="h-full overflow-y-auto">
@@ -193,9 +200,14 @@ function ConversationList({ orgId, conversations, selectedId, people }) {
       {!searching && !showSaved && (
         <>
           <NewConversation orgId={orgId} people={people} />
-          {conversations.length === 0 && <p className="p-3 text-sm text-gray-500">אין שיחות עדיין</p>}
+          <div className="px-3 py-2 border-b flex gap-1" role="tablist" aria-label="סינון שיחות">
+            {[['active', 'שיחות'], ['favorites', 'מועדפים'], ['archived', 'ארכיון']].map(([value, label]) => (
+              <button key={value} onClick={() => setView(value)} className={`px-2 py-1 rounded-lg text-xs ${view === value ? 'bg-blue-50 text-blue-800 font-bold' : 'text-gray-500'}`}>{label}</button>
+            ))}
+          </div>
+          {visible.length === 0 && <p className="p-3 text-sm text-gray-500">אין שיחות בתצוגה הזו</p>}
           <ul className="divide-y">
-            {conversations.map((conversation) => (
+            {visible.map((conversation) => (
               <li key={conversation.id}>
                 <Link
                   to={`/company/chat/${conversation.id}`}
@@ -210,6 +222,7 @@ function ConversationList({ orgId, conversations, selectedId, people }) {
                       </span>
                     )}
                   </span>
+                  {conversation.favorite && <Star size={12} className="text-amber-500 fill-current" aria-label="מועדף" />}
                   {conversation.muted && <BellOff size={12} className="text-gray-400" aria-label="מושתק" />}
                   {conversation.unread_count > 0 && (
                     <span className={`text-white text-xs rounded-full px-2 py-0.5 ${conversation.muted ? 'bg-gray-400' : 'bg-blue-700'}`}>
@@ -519,11 +532,120 @@ function PinsBar({ orgId, conversationId }) {
   );
 }
 
-function Thread({ orgId, conversation, currentUserId, people }) {
+function ConversationSettings({ orgId, conversation, currentUserId, orgRole, people, onClose }) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [name, setName] = useState(conversation.name || '');
+  const [description, setDescription] = useState(conversation.description || '');
+  const [newMember, setNewMember] = useState('');
+  const members = useQuery({
+    queryKey: ['company', orgId, 'conversation', conversation.id, 'members'],
+    queryFn: () => companyApi.conversationMembers(orgId, conversation.id),
+  });
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['company', orgId, 'conversations'] });
+    queryClient.invalidateQueries({ queryKey: ['company', orgId, 'conversation', conversation.id, 'members'] });
+  };
+  const useManagedMutation = (mutationFn, success) => useMutation({
+    mutationFn,
+    onSuccess: (result) => { refresh(); success?.(result); },
+    onError: notifyError,
+  });
+  const saveDetails = useManagedMutation(() => companyApi.updateConversation(orgId, conversation.id, { name, description }), () => toast.success('פרטי השיחה נשמרו'));
+  const updateSettings = useManagedMutation((body) => companyApi.updateConversationSettings(orgId, conversation.id, body));
+  const addMember = useManagedMutation(() => companyApi.addConversationMember(orgId, conversation.id, newMember), () => setNewMember(''));
+  const updateMember = useManagedMutation(({ userId, role }) => companyApi.updateConversationMember(orgId, conversation.id, userId, role));
+  const removeMember = useManagedMutation((userId) => companyApi.removeConversationMember(orgId, conversation.id, userId));
+  const clear = useManagedMutation(() => companyApi.clearConversation(orgId, conversation.id), () => {
+    queryClient.removeQueries({ queryKey: ['company', orgId, 'conversation', conversation.id, 'messages'] });
+    onClose();
+  });
+  const leave = useManagedMutation(() => companyApi.leaveConversation(orgId, conversation.id), () => navigate('/company/chat'));
+  const rows = members.data || [];
+  const canManage = conversation.member_role === 'admin' || String(conversation.created_by) === String(currentUserId) || ['owner', 'admin'].includes(orgRole);
+  const existingIds = new Set(rows.map((member) => String(member.user_id)));
+  const candidates = people.filter((person) => !existingIds.has(String(person.user_id)));
+  const canManageMembers = canManage && ['group', 'channel'].includes(conversation.type) && conversation.visibility !== 'public';
+  const canLeave = !['dm', 'project'].includes(conversation.type) && conversation.visibility !== 'public' && String(conversation.created_by) !== String(currentUserId);
+
+  const muteFor = (milliseconds) => updateSettings.mutate({ muted_until: new Date(Date.now() + milliseconds).toISOString(), muted: false });
+
+  return (
+    <div className="absolute inset-0 z-20 bg-white flex flex-col" role="dialog" aria-modal="true" aria-label="הגדרות שיחה">
+      <div className="p-4 border-b flex items-center gap-3">
+        <button onClick={onClose} aria-label="סגירת הגדרות"><ArrowRight size={20} /></button>
+        <div className="flex-1"><h2 className="font-bold text-lg">פרטי השיחה</h2><p className="text-xs text-gray-500">ניהול, הרשאות והתראות</p></div>
+      </div>
+      <div className="flex-1 overflow-y-auto p-4 space-y-5 bg-gray-50">
+        {canManage && (
+          <section className="bg-white border rounded-2xl p-4 space-y-3">
+            <h3 className="font-bold">שם ותיאור</h3>
+            <input className="w-full border rounded-xl px-3" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} aria-label="שם השיחה" />
+            <textarea className="w-full border rounded-xl px-3 py-2" value={description} onChange={(event) => setDescription(event.target.value)} maxLength={500} placeholder="תיאור השיחה" />
+            <button onClick={() => saveDetails.mutate()} disabled={saveDetails.isPending || !name.trim()} className="bg-blue-700 text-white rounded-xl px-4 py-2 font-semibold disabled:opacity-40">שמירה</button>
+          </section>
+        )}
+
+        <section className="bg-white border rounded-2xl overflow-hidden">
+          <button onClick={() => updateSettings.mutate({ favorite: !conversation.favorite })} className="w-full p-4 flex items-center gap-3 border-b text-right">
+            <Star size={18} className={conversation.favorite ? 'text-amber-500 fill-current' : 'text-gray-500'} /><span className="flex-1">{conversation.favorite ? 'הסרה מהמועדפים' : 'הוספה למועדפים'}</span>
+          </button>
+          <button onClick={() => updateSettings.mutate({ archived: !conversation.archived })} className="w-full p-4 flex items-center gap-3 border-b text-right">
+            <Archive size={18} className="text-gray-500" /><span className="flex-1">{conversation.archived ? 'הוצאה מהארכיון' : 'העברה לארכיון'}</span>
+          </button>
+          <label className="p-4 flex items-center gap-3">
+            <Bell size={18} className="text-gray-500" /><span className="flex-1">התראות</span>
+            <select value={conversation.notification_level || 'all'} onChange={(event) => updateSettings.mutate({ notification_level: event.target.value })} className="border rounded-lg px-2 text-sm">
+              <option value="all">כל ההודעות</option><option value="mentions">אזכורים בלבד</option><option value="none">ללא התראות</option>
+            </select>
+          </label>
+          <div className="px-4 pb-4 flex flex-wrap gap-2">
+            <Clock size={16} className="text-gray-500 mt-2" />
+            <button onClick={() => muteFor(8 * 60 * 60 * 1000)} className="border rounded-lg px-3 py-2 text-xs">השתקה ל־8 שעות</button>
+            <button onClick={() => muteFor(7 * 24 * 60 * 60 * 1000)} className="border rounded-lg px-3 py-2 text-xs">לשבוע</button>
+            <button onClick={() => updateSettings.mutate({ muted_until: null, muted: false, notification_level: 'all' })} className="border rounded-lg px-3 py-2 text-xs">ביטול השתקה</button>
+          </div>
+        </section>
+
+        <section className="bg-white border rounded-2xl p-4 space-y-3">
+          <div className="flex items-center gap-2"><Users size={18} /><h3 className="font-bold">משתתפים ({rows.length})</h3></div>
+          {members.isPending && <p className="text-sm text-gray-500">טוען…</p>}
+          {rows.map((member) => (
+            <div key={member.user_id} className="flex items-center gap-3 py-2 border-t first:border-0">
+              <span className="w-9 h-9 rounded-full bg-blue-50 grid place-items-center font-bold">{member.name?.[0]}</span>
+              <span className="flex-1 min-w-0 truncate">{member.name}{String(member.user_id) === String(currentUserId) ? ' (אני)' : ''}</span>
+              {member.role === 'admin' && <span className="text-xs text-blue-800 flex items-center gap-1"><Shield size={12} />מנהל</span>}
+              {canManageMembers && String(member.user_id) !== String(conversation.created_by) && (
+                <>
+                  <button onClick={() => updateMember.mutate({ userId: member.user_id, role: member.role === 'admin' ? 'member' : 'admin' })} className="text-xs text-blue-800">{member.role === 'admin' ? 'הסרת ניהול' : 'הפיכה למנהל'}</button>
+                  <button onClick={() => window.confirm(`להסיר את ${member.name} מהשיחה?`) && removeMember.mutate(member.user_id)} aria-label={`הסרת ${member.name}`} className="text-red-600"><UserMinus size={16} /></button>
+                </>
+              )}
+            </div>
+          ))}
+          {canManageMembers && candidates.length > 0 && (
+            <div className="flex gap-2 pt-2 border-t">
+              <select value={newMember} onChange={(event) => setNewMember(event.target.value)} className="flex-1 border rounded-xl px-2 text-sm"><option value="">בחירת עובד להוספה</option>{candidates.map((person) => <option key={person.user_id} value={person.user_id}>{person.name}</option>)}</select>
+              <button onClick={() => addMember.mutate()} disabled={!newMember} className="bg-blue-700 text-white rounded-xl px-3 disabled:opacity-40" aria-label="הוספת משתתף"><UserPlus size={18} /></button>
+            </div>
+          )}
+        </section>
+
+        <section className="bg-white border rounded-2xl overflow-hidden">
+          <button onClick={() => window.confirm('לנקות את היסטוריית השיחה עבורך? אי אפשר לבטל את הפעולה.') && clear.mutate()} className="w-full p-4 flex items-center gap-3 text-right border-b"><Eraser size={18} /><span>ניקוי השיחה עבורי</span></button>
+          {canLeave && <button onClick={() => window.confirm('לעזוב את השיחה?') && leave.mutate()} className="w-full p-4 flex items-center gap-3 text-right text-red-700"><LogOut size={18} /><span>עזיבת השיחה</span></button>}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function Thread({ orgId, conversation, currentUserId, orgRole, people }) {
   const queryClient = useQueryClient();
   const conversationId = conversation.id;
   const [editing, setEditing] = useState(null);
   const [threadRoot, setThreadRoot] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
   const bottomRef = useRef(null);
   const lastMarked = useRef(0);
 
@@ -566,10 +688,11 @@ function Thread({ orgId, conversation, currentUserId, people }) {
       <div className="p-3 border-b bg-white flex items-center gap-2">
         <Link to="/company/chat" className="sm:hidden" aria-label="חזרה לשיחות"><ArrowRight size={18} /></Link>
         <ConversationIcon conversation={conversation} />
-        <span className="font-bold truncate flex-1">{conversation.name}</span>
+        <span className="flex-1 min-w-0"><span className="font-bold truncate block">{conversation.name}</span>{conversation.description && <span className="text-xs text-gray-500 truncate block">{conversation.description}</span>}</span>
         <button onClick={() => mute.mutate()} aria-label={conversation.muted ? 'ביטול השתקה' : 'השתקה'} className="text-gray-500">
           <MuteIcon size={16} />
         </button>
+        <button onClick={() => setShowSettings(true)} aria-label="הגדרות שיחה" className="text-gray-500"><Settings size={18} /></button>
       </div>
       <PinsBar orgId={orgId} conversationId={conversationId} />
 
@@ -618,6 +741,7 @@ function Thread({ orgId, conversation, currentUserId, people }) {
           onClose={() => setThreadRoot(null)}
         />
       )}
+      {showSettings && <ConversationSettings orgId={orgId} conversation={conversation} currentUserId={currentUserId} orgRole={orgRole} people={people} onClose={() => setShowSettings(false)} />}
     </div>
   );
 }
@@ -650,7 +774,7 @@ export default function ChatPage({ membership, currentUserId }) {
         <ConversationList orgId={orgId} conversations={conversations.data} selectedId={conversationId} people={people} />
       </div>
       <div className={`flex-1 min-w-0 ${conversationId ? '' : 'hidden sm:block'}`}>
-        {selected && <Thread key={selected.id} orgId={orgId} conversation={selected} currentUserId={currentUserId} people={people} />}
+        {selected && <Thread key={selected.id} orgId={orgId} conversation={selected} currentUserId={currentUserId} orgRole={membership.role} people={people} />}
         {!selected && conversationId && <p className="p-4 text-sm text-gray-500">השיחה לא נמצאה, או שאין לך גישה אליה</p>}
         {!conversationId && <p className="p-4 text-sm text-gray-500">בחרו שיחה</p>}
       </div>

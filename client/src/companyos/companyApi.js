@@ -73,6 +73,16 @@ export const companyApi = {
   createChannel: (orgId, body) => api.post(`/v1/orgs/${orgId}/conversations`, body).then(data),
   openDirectMessage: (orgId, userId) =>
     api.post(`/v1/orgs/${orgId}/conversations/dm`, { user_id: userId }).then(data),
+  updateConversation: (orgId, id, body) => api.patch(`/v1/orgs/${orgId}/conversations/${id}`, body).then(data),
+  conversationMembers: (orgId, id) => api.get(`/v1/orgs/${orgId}/conversations/${id}/members`).then(data),
+  addConversationMember: (orgId, id, userId) =>
+    api.post(`/v1/orgs/${orgId}/conversations/${id}/members`, { user_id: userId }).then(data),
+  updateConversationMember: (orgId, id, userId, role) =>
+    api.patch(`/v1/orgs/${orgId}/conversations/${id}/members/${userId}`, { role }).then(data),
+  removeConversationMember: (orgId, id, userId) =>
+    api.delete(`/v1/orgs/${orgId}/conversations/${id}/members/${userId}`).then(data),
+  leaveConversation: (orgId, id) => api.post(`/v1/orgs/${orgId}/conversations/${id}/leave`, {}).then(data),
+  clearConversation: (orgId, id) => api.post(`/v1/orgs/${orgId}/conversations/${id}/clear`, {}).then(data),
   messages: (orgId, id, beforeSeq) =>
     api.get(`/v1/orgs/${orgId}/conversations/${id}/messages`, { params: { before_seq: beforeSeq } }).then((r) => r.data),
   sendMessage: (orgId, id, message) =>
@@ -92,6 +102,8 @@ export const companyApi = {
   savedMessages: (orgId) => api.get(`/v1/orgs/${orgId}/saved-messages`).then(data),
   markUnread: (orgId, id, seq) => api.post(`/v1/orgs/${orgId}/conversations/${id}/unread`, { seq }).then(data),
   setMuted: (orgId, id, muted) => api.patch(`/v1/orgs/${orgId}/conversations/${id}/settings`, { muted }).then(data),
+  updateConversationSettings: (orgId, id, body) =>
+    api.patch(`/v1/orgs/${orgId}/conversations/${id}/settings`, body).then(data),
   searchMessages: (orgId, q) => api.get(`/v1/orgs/${orgId}/messages/search`, { params: { q } }).then(data),
   taskFromMessage: (orgId, id, messageId, projectId) =>
     api.post(`/v1/orgs/${orgId}/conversations/${id}/messages/${messageId}/task`, { project_id: projectId }).then(data),

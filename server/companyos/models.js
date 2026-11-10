@@ -213,6 +213,7 @@ const conversationSchema = new Schema(
     projectId: { type: ObjectId, ref: 'CompanyProject', default: undefined },
     visibility: { type: String, enum: ['public', 'private'], default: 'private' },
     name: { type: String, trim: true, maxlength: 80, default: null },
+      description: { type: String, trim: true, maxlength: 500, default: '' },
     dmKey: { type: String, default: undefined },
     lastSeq: { type: Number, default: 0 },
     lastMessage: {
@@ -241,6 +242,12 @@ const conversationMemberSchema = new Schema(
     userId: { type: ObjectId, ref: 'User', required: true },
     lastReadSeq: { type: Number, default: 0 },
     muted: { type: Boolean, default: false },
+      mutedUntil: { type: Date, default: null },
+      notificationLevel: { type: String, enum: ['all', 'mentions', 'none'], default: 'all' },
+      favorite: { type: Boolean, default: false },
+      archived: { type: Boolean, default: false },
+      clearedBeforeSeq: { type: Number, default: 0 },
+      role: { type: String, enum: ['admin', 'member'], default: 'member' },
   },
   { timestamps: true, versionKey: false, collection: 'company_conversation_members' }
 );

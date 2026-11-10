@@ -18,6 +18,7 @@ import {
 } from './models.js';
 import { emitToOrganization, emitToUsers } from './realtime.js';
 import { loadProject, requireWrite } from './workController.js';
+import { requireDocumentAccess } from './knowledgeController.js';
 
 const invalid = (message) => new ApiError(400, 'VALIDATION_ERROR', message);
 const orgScope = (req) => ({ organizationId: req.organization._id });
@@ -323,7 +324,8 @@ export const downloadFile = async (req, res) => {
   if (!file) throw missing;
 
   try {
-    await loadConversation(req, file.conversationId);
+    if (file.documentId) await requireDocumentAccess(req, file.documentId);
+    else await loadConversation(req, file.conversationId);
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) throw missing;
     throw error;

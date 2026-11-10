@@ -31,7 +31,11 @@ export default function SearchPage({ membership }) {
   const open = (item) => {
     if (item.type === 'project') navigate('/company/projects/' + item.resource_id);
     else if (item.type === 'document') navigate('/company/documents?id=' + item.resource_id);
-    else if (['lead', 'deal', 'account'].includes(item.type)) navigate('/company/crm');
+    else if (item.type === 'lead') navigate('/company/crm?lead=' + item.resource_id);
+    else if (item.type === 'deal') navigate('/company/crm?deal=' + item.resource_id);
+    else if (item.type === 'account') navigate('/company/crm?account=' + item.resource_id);
+    else if (item.type === 'task' && item.project_id) navigate('/company/projects/' + item.project_id);
+    else if (item.type === 'message' && item.conversation_id) navigate('/company/chat/' + item.conversation_id);
   };
 
   return (

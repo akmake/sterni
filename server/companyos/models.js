@@ -292,7 +292,9 @@ savedMessageSchema.index({ remindAt: 1 });
 const fileSchema = new Schema(
   {
     organizationId: { type: ObjectId, ref: 'CompanyOrganization', required: true },
-    conversationId: { type: ObjectId, ref: 'CompanyConversation', required: true },
+    // Exactly one of these: the conversation or the document that owns the file.
+    conversationId: { type: ObjectId, ref: 'CompanyConversation', default: null },
+    documentId: { type: ObjectId, ref: 'CompanyDocument', default: null },
     uploadedBy: { type: ObjectId, ref: 'User', required: true },
     name: { type: String, required: true },
     mime: { type: String, required: true },

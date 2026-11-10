@@ -106,7 +106,7 @@ export const companyApi = {
   updatePresence: (orgId, body) => api.patch(`/v1/orgs/${orgId}/presence`, body).then(data),
   search: (orgId, q, type) =>
     api.get('/v1/orgs/' + orgId + '/search', { params: { q, type: type === 'all' ? undefined : type } }).then(data),
-  documents: (orgId) => api.get('/v1/orgs/' + orgId + '/documents').then((r) => r.data),
+  documents: (orgId, params) => api.get('/v1/orgs/' + orgId + '/documents', { params }).then(data),
   document: (orgId, id) => api.get('/v1/orgs/' + orgId + '/documents/' + id).then(data),
   createDocument: (orgId, body) => api.post('/v1/orgs/' + orgId + '/documents', body).then(data),
   createDocumentRevision: (orgId, id, body) =>
@@ -115,10 +115,38 @@ export const companyApi = {
     api.post('/v1/orgs/' + orgId + '/documents/' + id + '/submit-for-approval', {}).then(data),
   publishDocument: (orgId, id) =>
     api.post('/v1/orgs/' + orgId + '/documents/' + id + '/publish', {}).then(data),
-  decideApproval: (orgId, id, decision, reason) =>
-    api.post('/v1/orgs/' + orgId + '/approvals/' + id + '/decide', { decision, reason }).then(data),
+  decideApproval: (orgId, id, decision, reason, templateId) =>
+    api.post('/v1/orgs/' + orgId + '/approvals/' + id + '/decide', { decision, reason, template_id: templateId || undefined }).then(data),
+  approvals: (orgId) => api.get(`/v1/orgs/${orgId}/approvals`).then(data),
+  updateDocument: (orgId, id, body) => api.patch(`/v1/orgs/${orgId}/documents/${id}`, body).then(data),
+  restoreRevision: (orgId, id, revisionId) =>
+    api.post(`/v1/orgs/${orgId}/documents/${id}/restore`, { revision_id: revisionId }).then(data),
+  archiveDocument: (orgId, id, archived) => api.post(`/v1/orgs/${orgId}/documents/${id}/archive`, { archived }).then(data),
+  addDocumentLink: (orgId, id, type, resourceId) =>
+    api.post(`/v1/orgs/${orgId}/documents/${id}/links`, { resource_type: type, resource_id: resourceId }).then(data),
+  removeDocumentLink: (orgId, id, linkId) => api.delete(`/v1/orgs/${orgId}/documents/${id}/links/${linkId}`).then(data),
+  uploadDocumentFile: (orgId, id, file) => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.post(`/v1/orgs/${orgId}/documents/${id}/files`, form).then(data);
+  },
+  lead: (orgId, id) => api.get(`/v1/orgs/${orgId}/leads/${id}`).then(data),
+  updateLead: (orgId, id, body) => api.patch(`/v1/orgs/${orgId}/leads/${id}`, body).then(data),
+  leadsExportUrl: (orgId) => `/api/v1/orgs/${orgId}/leads/export`,
+  crmActivities: (orgId, type, id) => api.get(`/v1/orgs/${orgId}/crm/${type}/${id}/activities`).then(data),
+  addCrmActivity: (orgId, type, id, body) => api.post(`/v1/orgs/${orgId}/crm/${type}/${id}/activities`, body).then(data),
+  pipeline: (orgId) => api.get(`/v1/orgs/${orgId}/pipeline`).then(data),
+  account: (orgId, id) => api.get(`/v1/orgs/${orgId}/accounts/${id}`).then(data),
+  createAccount: (orgId, body) => api.post(`/v1/orgs/${orgId}/accounts`, body).then(data),
+  addContact: (orgId, id, body) => api.post(`/v1/orgs/${orgId}/accounts/${id}/contacts`, body).then(data),
+  createDeal: (orgId, body) => api.post(`/v1/orgs/${orgId}/deals`, body).then(data),
+  moveDealStage: (orgId, id, stageId) => api.post(`/v1/orgs/${orgId}/deals/${id}/stage`, { stage_id: stageId }).then(data),
+  closeLost: (orgId, id, reason) => api.post(`/v1/orgs/${orgId}/deals/${id}/close-lost`, { reason }).then(data),
+  markQuoteSent: (orgId, id) => api.post(`/v1/orgs/${orgId}/quotes/${id}/mark-sent`, {}).then(data),
+  recordQuoteAcceptance: (orgId, id, acceptedBy) =>
+    api.post(`/v1/orgs/${orgId}/quotes/${id}/record-acceptance`, { accepted_by: acceptedBy }).then(data),
 
-  leads: (orgId) => api.get('/v1/orgs/' + orgId + '/leads').then((r) => r.data),
+  leads: (orgId) => api.get('/v1/orgs/' + orgId + '/leads').then(data),
   createLead: (orgId, body) => api.post('/v1/orgs/' + orgId + '/leads', body).then(data),
   assignLead: (orgId, id, userId) =>
     api.post('/v1/orgs/' + orgId + '/leads/' + id + '/assign', { user_id: userId }).then(data),
@@ -130,9 +158,9 @@ export const companyApi = {
     api.post('/v1/orgs/' + orgId + '/leads/' + id + '/convert', { account_id: accountId || '' }, {
       headers: { 'Idempotency-Key': crypto.randomUUID() },
     }).then(data),
-  accounts: (orgId) => api.get('/v1/orgs/' + orgId + '/accounts').then((r) => r.data),
-  deals: (orgId) => api.get('/v1/orgs/' + orgId + '/deals').then((r) => r.data),
-  quotes: (orgId, dealId) => api.get('/v1/orgs/' + orgId + '/deals/' + dealId + '/quotes').then((r) => r.data),
+  accounts: (orgId) => api.get('/v1/orgs/' + orgId + '/accounts').then(data),
+  deals: (orgId) => api.get('/v1/orgs/' + orgId + '/deals').then(data),
+  quotes: (orgId, dealId) => api.get('/v1/orgs/' + orgId + '/deals/' + dealId + '/quotes').then(data),
   createQuote: (orgId, dealId, body) =>
     api.post('/v1/orgs/' + orgId + '/deals/' + dealId + '/quotes', body).then(data),
   submitQuote: (orgId, id) =>

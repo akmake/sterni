@@ -4,7 +4,7 @@ import { io } from 'socket.io-client';
 import { companyApi } from './companyApi';
 
 const RETRY_MS = 3000;
-const WORK_KEYS = ['tasks', 'projects', 'project', 'home'];
+const WORK_KEYS = ['tasks', 'projects', 'project', 'home', 'leads', 'lead', 'deals', 'quotes', 'accounts', 'account', 'documents', 'document', 'approvals'];
 const CHAT_KEYS = ['conversations', 'conversation', 'home'];
 
 // The socket carries only "something changed"; data is always refetched through

@@ -37,6 +37,8 @@ import tzitzitRoutes from './routes/tzitzitRoutes.js';
 import hotelOrderRoutes from './routes/hotelOrderRoutes.js';
 import hotelZiporiDataRoutes from './routes/hotelZiporiDataRoutes.js';
 import companyOsRoutes from './companyos/routes.js';
+import companyWebhookRoutes from './companyos/webhooks.js';
+import { startFollowupWorker } from './companyos/crmController.js';
 import { setupCompanySocket } from './companyos/realtime.js';
 import { startReminderWorker } from './companyos/chatExtrasController.js';
 import { startDueReminderWorker } from './companyos/workExtrasController.js';
@@ -133,6 +135,7 @@ await setupGameSocketIO(io);
 setupCompanySocket(io);
 startReminderWorker();
 startDueReminderWorker();
+startFollowupWorker();
 
 // --- Trust Proxy (׳§׳¨׳™׳˜׳™ ׳׳–׳™׳”׳•׳™ IP ׳׳׳™׳×׳™ ׳׳׳—׳•׳¨׳™ Nginx/Cloudflare) ---
 app.set('trust proxy', 1);
@@ -191,6 +194,7 @@ app.get('/api/csrf-token', rateLimiter, csrfProtection, (req, res) => {
 });
 
 // --- Protected Routes (׳׳›׳׳ ׳•׳”׳׳׳” ׳”׳›׳ ׳—׳¡׳•׳ ׳׳׳ ׳˜׳•׳§׳) ---
+app.use('/api/company-webhooks', companyWebhookRoutes);
 app.use(csrfProtection);
 
 app.use('/api/emails', requireAuth, emailRoutes);

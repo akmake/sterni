@@ -12,6 +12,11 @@
 | `company_members` | חברות משתמש בארגון: `role`, `status`. ייחודי לפי ארגון ומשתמש |
 | `company_invites` | הזמנות. נשמר רק hash של הטוקן |
 | `company_audit_logs` | יומן פעולות. הוספה בלבד |
+| `company_documents`, `company_document_revisions` | מסמכי ידע וגרסאות בלתי תלויות |
+| `company_approvals` | אישורי מסמך, הצעת מחיר ובקשת הקמת פרויקט |
+| `company_leads` | לידים, שיוך וקבלת אחריות, חיסיון והמרה |
+| `company_accounts`, `company_contacts`, `company_deals` | לקוחות, אנשי קשר ועסקאות נפרדים |
+| `company_quotes` | הצעות מחיר רב-גרסתיות ושורות מחיר |
 
 ## תפקידים
 
@@ -45,6 +50,38 @@
 | GET | `/orgs/:orgId/audit` | `view_audit`. עם `cursor` ו-`limit` |
 
 משתמש שאינו חבר בארגון מקבל 404 ולא 403, כדי לא לחשוף קיום של ארגונים.
+
+### E05: חיפוש, מסמכים, גרסאות ואישורים
+
+`GET /orgs/:orgId/search` מקבל `q`, ‏`type` ו-`limit`. הסינון לפי ארגון, חברות בפרויקט, חברות בשיחה וחיסיון CRM מתבצע לפני החזרת תוצאה. אין ספירה או כותרת של משאב חסום.
+
+| Method | נתיב תחת `/orgs/:orgId` | הערה |
+|---|---|---|
+| GET | `/search` | חיפוש גלובלי מוגן |
+| GET, POST | `/documents` | יצירה דורשת `create_documents` |
+| GET | `/documents/:id` | מסמך, גרסה נוכחית, היסטוריה ואישורים |
+| POST | `/documents/:id/revisions` | גרסה חדשה מבטלת אישורים ממתינים קודמים |
+| POST | `/documents/:id/submit-for-approval` | נועל את הגרסה הנוכחית לבדיקה |
+| POST | `/documents/:id/publish` | `owner`/`admin`, ורק לגרסה מאושרת |
+| POST | `/approvals/:id/decide` | המאשר שהוגדר בלבד; דחייה דורשת סיבה |
+
+מסמך המקושר לפרויקט מציית לחברות בפרויקט. מסמך כללי פתוח לחברי הארגון שאינם אורחים; אורח רואה רק מסמך שבבעלותו.
+
+### E06: CRM, הצעות מחיר והקמת פרויקט
+
+| Method | נתיב תחת `/orgs/:orgId` | הערה |
+|---|---|---|
+| GET, POST | `/leads` | ליד חסוי מוחזר רק ליוצר, לאחראי או לרשימת הגישה המפורשת |
+| POST | `/leads/:id/assign` | מנהל שולח בקשת אחריות; אין קבלה אוטומטית |
+| POST | `/leads/:id/assignment-decision` | המוקצה בלבד; דחייה דורשת סיבה |
+| POST | `/leads/:id/transition` | מעבר לפי מכונת המצבים |
+| POST | `/leads/:id/convert` | `Idempotency-Key`; יוצר Account, Contact ו-Deal פעם אחת |
+| GET | `/accounts`, `/deals` | רשימות CRM מורשות |
+| GET, POST | `/deals/:id/quotes` | POST יוצר גרסה חדשה ומבטל אישורים ממתינים קודמים |
+| POST | `/quotes/:id/submit-for-approval` | טיוטה בלבד |
+| POST | `/deals/:id/close-won` | דורש הצעה מאושרת ויוצר בקשת הקמת פרויקט |
+
+סגירת עסקה כזכייה אינה יוצרת פרויקט מיד. היא יוצרת אישור מסוג `project_creation`. אישור יוצר פרויקט יחיד עם `originDealId`; דחייה משאירה את העסקה כזכייה בלי פרויקט, בהתאם ל-AC-16.
 
 ### עבודה: פרויקטים, משימות, דרישות ובדיקות
 
@@ -107,7 +144,7 @@ socket.io ב-namespace ‏`/company`, בהזדהות עוגיית `jwt`. איר�
 
 ### בדיקות
 
-`npm run test:companyos` בתיקיית `server`. משתמש ב-`MONGO_URL` אם הוגדר, אחרת מרים `mongod` זמני.
+`npm run test:companyos` בתיקיית `server`. משתמש ב-`MONGO_URL` אם הוגדר, אחרת מרים `mongod` זמני. החבילה `knowledge-crm.test.mjs` מכסה E05/E06, כולל AC-11–16, בידוד ארגונים וחיפוש חסוי.
 
 ## התקנה כאפליקציה
 

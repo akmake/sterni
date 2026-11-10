@@ -4,6 +4,7 @@ import { Archive, FilePlus2, FileText, History, Lock, Paperclip, ShieldCheck, X 
 import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { companyApi, errorMessage } from './companyApi';
+import { EmptyState, PageHeader } from './CompanyUi';
 
 const STATUS = {
   draft: 'טיוטה', in_review: 'באישור', approved: 'מאושר', published: 'פורסם',
@@ -277,15 +278,11 @@ export default function DocumentsPage({ membership }) {
 
   return (
     <section className="space-y-4">
-      <div className="flex items-start gap-3">
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">מרכז הידע</h1>
-          <p className="text-sm text-gray-500">מסמכים, החלטות, גרסאות ואישורים במקום אחד.</p>
-        </div>
-        {membership.permissions.create_documents && (
-          <button onClick={() => setEditor('new')} className="bg-blue-700 text-white rounded-xl px-4 py-2 flex gap-2"><FilePlus2 size={18} />מסמך חדש</button>
-        )}
-      </div>
+      <PageHeader
+        title="מרכז הידע"
+        subtitle="מסמכים, החלטות, גרסאות ואישורים במקום אחד."
+        action={membership.permissions.create_documents ? <button onClick={() => setEditor('new')}><FilePlus2 size={18} />מסמך חדש</button> : null}
+      />
       <div className="flex flex-wrap gap-2 text-sm items-center">
         <select className="border rounded-lg px-2 py-1" value={filters.type} onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value }))} aria-label="סינון לפי סוג">
           <option value="">כל הסוגים</option>
@@ -308,7 +305,7 @@ export default function DocumentsPage({ membership }) {
           </button>
         ))}
       </div>
-      {documents.data?.length === 0 && <p className="text-center text-gray-500 py-12">אין מסמכים להצגה.</p>}
+      {documents.data?.length === 0 && <EmptyState title="אין מסמכים להצגה">מסמכים חדשים ומורשים יופיעו כאן.</EmptyState>}
       {editor === 'new' && (
         <Editor
           title="מסמך חדש" isNew pending={action.isPending} templates={templates.data ?? []} people={activePeople}

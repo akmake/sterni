@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Building2, FileText, Folder, Handshake, MessageCircle, Search, UserPlus } from 'lucide-react';
 import { companyApi, errorMessage } from './companyApi';
+import { EmptyState, PageHeader } from './CompanyUi';
 
 const FILTERS = [
   ['all', 'הכול'], ['document', 'מסמכים'], ['project', 'פרויקטים'],
@@ -40,10 +41,7 @@ export default function SearchPage({ membership }) {
 
   return (
     <section className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">חיפוש מאובטח</h1>
-        <p className="text-sm text-gray-500">התוצאות מסוננות בשרת לפי ההרשאות שלך.</p>
-      </div>
+      <PageHeader title="חיפוש" subtitle="התוצאות מסוננות בשרת לפי ההרשאות שלך." />
       <label className="relative block">
         <Search className="absolute right-3 top-3 text-gray-400" size={20} />
         <input
@@ -63,10 +61,10 @@ export default function SearchPage({ membership }) {
           </button>
         ))}
       </div>
-      {query.length < 2 && <p className="text-center text-gray-500 py-14">הקלידו לפחות שני תווים כדי להתחיל.</p>}
+      {query.length < 2 && <EmptyState title="מה מחפשים?">הקלידו לפחות שני תווים כדי להתחיל.</EmptyState>}
       {search.isPending && query.length >= 2 && <p className="text-center py-10">מחפש…</p>}
       {search.isError && <p className="text-red-700 text-center py-10">{errorMessage(search.error)}</p>}
-      {search.data?.length === 0 && <p className="text-center text-gray-500 py-14">לא נמצאו תוצאות מורשות.</p>}
+      {search.data?.length === 0 && <EmptyState title="לא נמצאו תוצאות">אפשר לנסות ניסוח אחר או סוג אחר.</EmptyState>}
       <div className="grid gap-2">
         {(search.data || []).map((item) => {
           const Icon = ICONS[item.type] || Search;

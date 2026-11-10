@@ -3,12 +3,14 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { PROJECT_STATUS_LABELS, companyApi, errorMessage } from './companyApi';
+import { EmptyState, PageHeader } from './CompanyUi';
 
 export default function ProjectsPage({ membership }) {
   const orgId = membership.organization.id;
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
   const [templateId, setTemplateId] = useState('');
+  const [creating, setCreating] = useState(false);
 
   const projects = useQuery({
     queryKey: ['company', orgId, 'projects'],
@@ -25,6 +27,7 @@ export default function ProjectsPage({ membership }) {
     mutationFn: () => (templateId ? companyApi.projectFromTemplate(orgId, templateId, name) : companyApi.createProject(orgId, { name })),
     onSuccess: () => {
       setName('');
+      setCreating(false);
       queryClient.invalidateQueries({ queryKey: ['company', orgId, 'projects'] });
     },
     onError: (error) => toast.error(errorMessage(error)),
@@ -32,9 +35,13 @@ export default function ProjectsPage({ membership }) {
 
   return (
     <section className="space-y-3">
-      <h2 className="font-bold">פרויקטים</h2>
+      <PageHeader
+        title="פרויקטים"
+        subtitle="התקדמות, בעלות וכל העבודה הפעילה במקום אחד."
+        action={membership.permissions.create_projects ? <button onClick={() => setCreating((value) => !value)}>פרויקט חדש</button> : null}
+      />
 
-      {membership.permissions.create_projects && (
+      {membership.permissions.create_projects && creating && (
         <form
           className="bg-white rounded-xl shadow-sm p-3 flex flex-wrap gap-2"
           onSubmit={(event) => {
@@ -64,18 +71,21 @@ export default function ProjectsPage({ membership }) {
       {projects.isPending && <p className="text-sm text-gray-500">טוען…</p>}
       {projects.isError && <p className="text-sm text-red-600">{errorMessage(projects.error)}</p>}
       {projects.isSuccess && projects.data.data.length === 0 && (
-        <p className="text-sm text-gray-500">אין פרויקטים שאתה משויך אליהם</p>
+        <EmptyState title="אין פרויקטים">פרויקטים שאתה משויך אליהם יופיעו כאן.</EmptyState>
       )}
 
       {projects.isSuccess && projects.data.data.length > 0 && (
         <ul className="bg-white rounded-xl shadow-sm divide-y">
           {projects.data.data.map((project) => (
             <li key={project.id}>
-              <Link to={`/company/projects/${project.id}`} className="block p-3">
-                <p className="font-semibold">{project.name}</p>
-                <p className="text-xs text-gray-500">
+              <Link to={`/company/projects/${project.id}`} className="block p-5">
+                <p className="font-bold text-lg">{project.name}</p>
+                <p className="text-sm text-gray-500 mt-1">
                   {PROJECT_STATUS_LABELS[project.status]} · {project.completed_tasks}/{project.task_count} משימות הושלמו
                 </p>
+                <div className="h-1.5 bg-gray-200 rounded-full mt-4 overflow-hidden">
+                  <div className="h-full bg-[#147d6f]" style={{ width: `${project.task_count ? (project.completed_tasks / project.task_count) * 100 : 0}%` }} />
+                </div>
               </Link>
             </li>
           ))}

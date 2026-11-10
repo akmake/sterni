@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { AVAILABILITY_LABELS, ROLE_LABELS, STATUS_LABELS, companyApi, errorMessage } from './companyApi';
+import { EmptyState, PageHeader, SectionHeading } from './CompanyUi';
 
 function MemberRow({ member, assignableRoles, onChange, busy }) {
   const [temporary, setTemporary] = useState(false);
@@ -136,7 +137,7 @@ function InvitesSection({ orgId }) {
   return (
     <section className="space-y-3">
       <div>
-        <h2 className="font-bold">קישור הצטרפות</h2>
+        <SectionHeading title="קישור הצטרפות" />
         <p className="text-sm text-gray-500 mt-1">בוחרים תפקיד, יוצרים קישור ושולחים אותו. העובד ימלא את הפרטים בעצמו.</p>
       </div>
       <form
@@ -225,14 +226,14 @@ function TeamsSection({ orgId, canManage, people }) {
 
   return (
     <section className="space-y-2">
-      <h2 className="font-bold">צוותים</h2>
+      <SectionHeading title="צוותים" />
       {canManage && (
         <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); create.mutate(); }}>
           <input className="flex-1 border rounded-lg px-3 py-2" placeholder="צוות חדש" value={name} onChange={(e) => setName(e.target.value)} required />
           <button disabled={create.isPending} className="bg-blue-700 text-white rounded-lg px-4 font-semibold">יצירה</button>
         </form>
       )}
-      {teams.data?.length === 0 && <p className="text-sm text-gray-500">אין צוותים עדיין</p>}
+      {teams.data?.length === 0 && <EmptyState title="אין צוותים עדיין">צוותים שתיצור יופיעו כאן.</EmptyState>}
       <ul className="bg-white rounded-xl shadow-sm divide-y">
         {(teams.data ?? []).map((team) => {
           const inTeam = new Set(team.members.map((m) => String(m.user_id)));
@@ -278,7 +279,7 @@ function WorkloadSection({ orgId }) {
   const max = Math.max(...workload.data.map((row) => row.open));
   return (
     <section className="space-y-2">
-      <h2 className="font-bold">עומסים</h2>
+      <SectionHeading title="עומסים" />
       <ul className="bg-white rounded-xl shadow-sm divide-y">
         {workload.data.map((row) => (
           <li key={row.user_id} className="p-3">
@@ -316,8 +317,9 @@ export default function TeamPage({ membership }) {
 
   return (
     <div className="space-y-6">
+      <PageHeader title="הצוות" subtitle={`${membership.organization.name} · אנשים, תפקידים ועומסים.`} />
       <section className="space-y-3">
-        <h2 className="font-bold">חברי הצוות</h2>
+        <SectionHeading title="חברי הצוות" detail={members.data ? `${members.data.data.length} אנשים` : null} />
         {members.isPending && <p className="text-sm text-gray-500">טוען…</p>}
         {members.isError && (
           <div className="text-sm text-red-600">

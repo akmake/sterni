@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { companyApi, errorMessage } from './companyApi';
+import { EmptyState, PageHeader } from './CompanyUi';
 
 const linkFor = (item) => {
   if (item.resource_type === 'conversation') return `/company/chat/${item.resource_id}`;
@@ -36,12 +37,11 @@ export default function InboxPage({ membership }) {
 
   return (
     <section className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="font-bold">דואר נכנס</h2>
-        {inbox.data.meta.unread > 0 && (
-          <button onClick={() => markAll.mutate()} className="text-sm text-blue-700 underline">סימון הכול כנקרא</button>
-        )}
-      </div>
+      <PageHeader
+        title="דואר נכנס"
+        subtitle="עדכונים ואישורים שמחכים לתשומת הלב שלך."
+        action={inbox.data.meta.unread > 0 ? <button onClick={() => markAll.mutate()}>סימון הכול</button> : null}
+      />
       {approvals.data?.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 space-y-1">
           <h3 className="font-bold text-sm">ממתין לאישור שלך ({approvals.data.length})</h3>
@@ -52,13 +52,13 @@ export default function InboxPage({ membership }) {
           ))}
         </div>
       )}
-      {inbox.data.data.length === 0 && <p className="text-sm text-gray-500">אין עדכונים חדשים</p>}
+      {inbox.data.data.length === 0 && <EmptyState title="אין עדכונים חדשים">כשתהיה פעילות חדשה היא תופיע כאן.</EmptyState>}
       <ul className="bg-white rounded-2xl shadow-sm divide-y">
         {inbox.data.data.map((item) => (
           <li key={item.id}>
-            <Link to={linkFor(item)} onClick={() => markOne(item.id)} className={`block p-3 ${item.is_read ? '' : 'bg-blue-50'}`}>
-              <p className="font-semibold text-sm">{item.title}</p>
-              {item.body && <p className="text-xs text-gray-600 truncate">{item.body}</p>}
+            <Link to={linkFor(item)} onClick={() => markOne(item.id)} className={`block p-5 ${item.is_read ? '' : 'bg-blue-50'}`}>
+              <p className="font-semibold">{item.title}</p>
+              {item.body && <p className="text-sm text-gray-600 truncate mt-1">{item.body}</p>}
               <p className="text-[11px] text-gray-400">{new Date(item.created_at).toLocaleString('he-IL')}</p>
             </Link>
           </li>

@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { MfaSettings } from './MfaScreens';
 import PushSettings from './PushSettings';
 import { AVAILABILITY_LABELS, ROLE_LABELS, companyApi, errorMessage } from './companyApi';
+import { PageHeader, SectionHeading } from './CompanyUi';
 
 export default function SettingsPage({ membership, user, mfa, onSignOut }) {
   const { organization, permissions, role } = membership;
@@ -29,14 +30,17 @@ export default function SettingsPage({ membership, user, mfa, onSignOut }) {
 
   return (
     <div className="space-y-4">
-      <section className="bg-white rounded-xl shadow-sm p-4">
-        <p className="font-semibold">{user.name}</p>
+      <PageHeader title="הגדרות" subtitle="חשבון, זמינות ואבטחה." />
+      <section className="bg-white rounded-2xl shadow-sm p-6">
+        <div className="w-16 h-16 rounded-full bg-[#147d6f] text-white flex items-center justify-center text-2xl font-bold mb-4">{user.name?.trim()?.[0]}</div>
+        <p className="font-bold text-xl">{user.name}</p>
         <p className="text-sm text-gray-500" dir="ltr" style={{ textAlign: 'right' }}>{user.email}</p>
         <p className="text-sm text-gray-600 mt-1">{ROLE_LABELS[role]}</p>
       </section>
 
-      <section className="bg-white rounded-xl shadow-sm p-4 space-y-2">
-        <label className="block text-sm font-semibold" htmlFor="availability">זמינות</label>
+      <section className="bg-white rounded-2xl shadow-sm p-5 space-y-3">
+        <SectionHeading title="זמינות" />
+        <label className="sr-only" htmlFor="availability">זמינות</label>
         <select
           id="availability"
           className="w-full border rounded-lg px-3 py-2"
@@ -65,7 +69,7 @@ export default function SettingsPage({ membership, user, mfa, onSignOut }) {
 
       {permissions.manage_organization && (
         <form
-          className="bg-white rounded-xl shadow-sm p-4 space-y-3"
+          className="bg-white rounded-2xl shadow-sm p-5 space-y-3"
           onSubmit={(event) => {
             event.preventDefault();
             save.mutate();
@@ -88,7 +92,7 @@ export default function SettingsPage({ membership, user, mfa, onSignOut }) {
         </form>
       )}
 
-      <section className="bg-white rounded-xl shadow-sm p-4">
+      <section className="bg-white rounded-2xl shadow-sm p-5">
         <PushSettings />
       </section>
 

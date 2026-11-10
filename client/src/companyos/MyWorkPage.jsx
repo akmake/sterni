@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import TaskDialog from './TaskDialog';
 import { CalendarView, TaskList, ViewSwitcher } from './TaskViews';
 import { PRIORITY_LABELS, TASK_STATUS_LABELS, companyApi, errorMessage } from './companyApi';
+import { EmptyState, PageHeader } from './CompanyUi';
 
 const VIEWS = { list: 'רשימה', board: 'לוח', calendar: 'לוח שנה' };
 const BULK_STATUSES = Object.fromEntries(Object.entries(TASK_STATUS_LABELS).filter(([key]) => key !== 'done'));
@@ -66,12 +67,13 @@ export default function MyWorkPage({ membership, currentUserId }) {
 
   return (
     <section className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="font-bold">העבודה שלי</h2>
-        <ViewSwitcher views={VIEWS} value={view} onChange={setView} />
-      </div>
+      <PageHeader
+        title="העבודה שלי"
+        subtitle={`${items.length} משימות פתוחות מחכות לטיפול.`}
+        action={<ViewSwitcher views={VIEWS} value={view} onChange={setView} />}
+      />
 
-      {items.length === 0 && <p className="text-sm text-gray-500">אין משימות פתוחות</p>}
+      {items.length === 0 && <EmptyState title="הכול נקי">משימות חדשות שיוקצו לך יופיעו כאן.</EmptyState>}
 
       {checked.length > 0 && (
         <div className="bg-blue-50 rounded-lg p-2 flex flex-wrap items-center gap-2 text-sm">

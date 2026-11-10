@@ -2,6 +2,7 @@ import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { AUDIT_LABELS, ROLE_LABELS, STATUS_LABELS, companyApi, errorMessage } from './companyApi';
+import { PageHeader } from './CompanyUi';
 
 const describe = (entry) => {
   const { metadata } = entry;
@@ -38,12 +39,12 @@ export default function AuditPage({ membership }) {
 
   return (
     <section className="space-y-3">
-      <h2 className="font-bold">יומן פעולות</h2>
+      <PageHeader title="יומן פעולות" subtitle="שינויים רגישים ופעולות ניהול בארגון." />
       <ul className="bg-white rounded-xl shadow-sm divide-y">
         {entries.map((entry) => (
-          <li key={entry.id} className="p-3">
-            <p className="text-sm font-semibold">{AUDIT_LABELS[entry.action] || entry.action}</p>
-            <p className="text-xs text-gray-600">{describe(entry)}</p>
+          <li key={entry.id} className="p-5">
+            <p className="font-semibold">{AUDIT_LABELS[entry.action] || entry.action}</p>
+            <p className="text-sm text-gray-600 mt-1">{describe(entry)}</p>
             <p className="text-xs text-gray-400">
               {entry.actor_name} · {new Date(entry.created_at).toLocaleString('he-IL')}
             </p>

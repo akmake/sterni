@@ -7,6 +7,7 @@ import {
   MoreHorizontal, Paperclip, Pencil, Pin, Search, Send, Trash2, Users, X,
 } from 'lucide-react';
 import { companyApi, errorMessage } from './companyApi';
+import { PageHeader } from './CompanyUi';
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '✅', '🙏'];
 const ICONS = { group: Users, project: Folder };
@@ -642,7 +643,9 @@ export default function ChatPage({ membership, currentUserId }) {
   const people = (members.data?.data ?? []).filter((person) => person.status === 'active');
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm overflow-hidden flex h-[calc(100dvh-10.5rem)] sm:h-[calc(100dvh-8.5rem)]">
+    <section className="space-y-3">
+      <PageHeader title="שיחות" subtitle="ערוצים, שיחות אישיות ועדכוני פרויקטים." />
+      <div className="bg-white rounded-2xl shadow-sm border overflow-hidden flex h-[calc(100dvh-16rem)] sm:h-[calc(100dvh-14rem)]">
       <div className={`w-full sm:w-72 sm:border-l shrink-0 ${conversationId ? 'hidden sm:block' : ''}`}>
         <ConversationList orgId={orgId} conversations={conversations.data} selectedId={conversationId} people={people} />
       </div>
@@ -651,6 +654,7 @@ export default function ChatPage({ membership, currentUserId }) {
         {!selected && conversationId && <p className="p-4 text-sm text-gray-500">השיחה לא נמצאה, או שאין לך גישה אליה</p>}
         {!conversationId && <p className="p-4 text-sm text-gray-500">בחרו שיחה</p>}
       </div>
-    </div>
+      </div>
+    </section>
   );
 }

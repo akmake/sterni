@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Building2, Download, Handshake, Lock, Plus, UserPlus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { companyApi, errorMessage } from './companyApi';
+import { EmptyState, PageHeader } from './CompanyUi';
 
 const LEAD_STATUS = {
   new: 'חדש', assigned: 'משויך', accepted: 'באחריות', contacting: 'בטיפול', qualified: 'מוסמך',
@@ -381,27 +382,23 @@ export default function CrmPage({ membership }) {
 
   return (
     <section className="space-y-4">
-      <div className="flex items-start gap-3">
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">מכירות ולקוחות</h1>
-          <p className="text-sm text-gray-500">מהליד הראשון ועד פרויקט מאושר.</p>
-        </div>
-        {tab === 'leads' && ['owner', 'admin', 'manager'].includes(membership.role) && (
-          <a href={companyApi.leadsExportUrl(orgId)} className="border rounded-xl px-3 py-2 flex gap-1 items-center text-sm"><Download size={16} />CSV</a>
-        )}
-        {tab === 'leads' && membership.permissions.create_leads && (
-          <button onClick={() => setNewLead(true)} className="bg-blue-700 text-white rounded-xl px-4 py-2 flex gap-2"><Plus size={18} />ליד חדש</button>
-        )}
-      </div>
-      <div className="flex border-b">
+      <PageHeader
+        title="מכירות ולקוחות"
+        subtitle="מהליד הראשון ועד פרויקט מאושר."
+        action={tab === 'leads' && membership.permissions.create_leads ? <button onClick={() => setNewLead(true)}><Plus size={18} />ליד חדש</button> : null}
+      />
+      <div className="flex gap-2 overflow-x-auto">
         {[['leads', 'לידים'], ['deals', 'צינור עסקאות'], ['accounts', 'לקוחות']].map(([key, label]) => (
-          <button key={key} onClick={() => open({ tab: key })} className={'px-5 py-2 border-b-2 font-semibold ' + (tab === key ? 'border-blue-700 text-blue-700' : 'border-transparent text-gray-500')}>{label}</button>
+          <button key={key} onClick={() => open({ tab: key })} className={'px-4 py-2 rounded-full font-semibold whitespace-nowrap ' + (tab === key ? 'bg-[#111817] text-white' : 'bg-white border text-gray-500')}>{label}</button>
         ))}
+        {tab === 'leads' && ['owner', 'admin', 'manager'].includes(membership.role) && (
+          <a href={companyApi.leadsExportUrl(orgId)} className="border rounded-full px-4 py-2 flex gap-1 items-center text-sm"><Download size={16} />CSV</a>
+        )}
       </div>
 
       {tab === 'leads' && (
         <div className="grid sm:grid-cols-2 gap-3">
-          {leads.data?.length === 0 && <p className="text-gray-500">אין לידים עדיין</p>}
+          {leads.data?.length === 0 && <EmptyState title="אין לידים עדיין">לידים חדשים יופיעו כאן.</EmptyState>}
           {(leads.data ?? []).map((lead) => (
             <button key={lead.id} onClick={() => open({ lead: lead.id })} className="text-right bg-white border rounded-2xl p-4 flex gap-3">
               {lead.is_confidential ? <Lock className="text-blue-700" /> : <UserPlus className="text-blue-700" />}

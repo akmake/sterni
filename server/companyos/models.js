@@ -5,6 +5,7 @@ const ObjectId = Schema.Types.ObjectId;
 
 export const ROLES = ['owner', 'admin', 'manager', 'member', 'guest'];
 export const MEMBER_STATUSES = ['active', 'suspended', 'left'];
+export const AVAILABILITIES = ['active', 'away', 'dnd'];
 
 const organizationSchema = new Schema(
   {
@@ -21,6 +22,8 @@ const memberSchema = new Schema(
     userId: { type: ObjectId, ref: 'User', required: true },
     role: { type: String, enum: ROLES, required: true },
     status: { type: String, enum: MEMBER_STATUSES, default: 'active' },
+    availability: { type: String, enum: AVAILABILITIES, default: 'active' },
+    statusText: { type: String, default: '', maxlength: 80 },
   },
   { timestamps: true, versionKey: false, collection: 'company_members' }
 );
@@ -69,6 +72,7 @@ export const TASK_TYPES = ['task', 'feature', 'bug', 'tech_debt', 'incident', 's
 export const SEVERITIES = ['low', 'medium', 'high', 'critical'];
 export const REQUIREMENT_STATUSES = ['draft', 'approved', 'implemented', 'verified'];
 export const TEST_RESULTS = ['not_run', 'pass', 'fail'];
+export const RECURRENCES = ['daily', 'weekly', 'monthly'];
 
 const projectSchema = new Schema(
   {
@@ -110,6 +114,14 @@ const taskSchema = new Schema(
     blockedBy: [{ type: ObjectId, ref: 'CompanyTask' }],
     labels: [{ type: String, trim: true, maxlength: 50 }],
     version: { type: Number, default: 1 },
+    sourceMessageId: { type: ObjectId, ref: 'CompanyMessage', default: null },
+    parentId: { type: ObjectId, ref: 'CompanyTask', default: null },
+    milestoneId: { type: ObjectId, ref: 'CompanyMilestone', default: null },
+    cycleId: { type: ObjectId, ref: 'CompanyCycle', default: null },
+    acceptanceCriteria: { type: String, default: '', maxlength: 5000 },
+    checklist: [{ text: { type: String, maxlength: 300 }, done: { type: Boolean, default: false } }],
+    recurrence: { type: String, enum: [...RECURRENCES, null], default: null },
+    dueReminderSentAt: { type: Date, default: null },
     createdBy: { type: ObjectId, ref: 'User', required: true },
   },
   { timestamps: true, versionKey: false, collection: 'company_tasks' }
@@ -155,7 +167,8 @@ testCaseSchema.index({ organizationId: 1, projectId: 1 });
 const conversationSchema = new Schema(
   {
     organizationId: { type: ObjectId, ref: 'CompanyOrganization', required: true },
-    type: { type: String, enum: ['channel', 'dm'], required: true },
+    type: { type: String, enum: ['channel', 'dm', 'group', 'project'], required: true },
+    projectId: { type: ObjectId, ref: 'CompanyProject', default: undefined },
     visibility: { type: String, enum: ['public', 'private'], default: 'private' },
     name: { type: String, trim: true, maxlength: 80, default: null },
     dmKey: { type: String, default: undefined },
@@ -174,6 +187,10 @@ conversationSchema.index(
   { unique: true, partialFilterExpression: { dmKey: { $type: 'string' } } }
 );
 conversationSchema.index({ organizationId: 1, updatedAt: -1 });
+conversationSchema.index(
+  { projectId: 1 },
+  { unique: true, partialFilterExpression: { projectId: { $type: 'objectId' } } }
+);
 
 const conversationMemberSchema = new Schema(
   {
@@ -181,6 +198,7 @@ const conversationMemberSchema = new Schema(
     conversationId: { type: ObjectId, ref: 'CompanyConversation', required: true },
     userId: { type: ObjectId, ref: 'User', required: true },
     lastReadSeq: { type: Number, default: 0 },
+    muted: { type: Boolean, default: false },
   },
   { timestamps: true, versionKey: false, collection: 'company_conversation_members' }
 );
@@ -195,6 +213,13 @@ const messageSchema = new Schema(
     seq: { type: Number, required: true },
     body: { type: String, default: '', maxlength: 10000 },
     clientId: { type: String, default: undefined },
+    parentId: { type: ObjectId, ref: 'CompanyMessage', default: null },
+    replyCount: { type: Number, default: 0 },
+    mentions: [{ type: ObjectId, ref: 'User' }],
+    reactions: [{ _id: false, emoji: String, userId: { type: ObjectId, ref: 'User' } }],
+    attachments: [{ _id: false, fileId: ObjectId, name: String, mime: String, size: Number }],
+    pinnedAt: { type: Date, default: null },
+    pinnedBy: { type: ObjectId, ref: 'User', default: null },
     editedAt: { type: Date, default: null },
     deletedAt: { type: Date, default: null },
   },
@@ -207,12 +232,148 @@ messageSchema.index(
   { unique: true, partialFilterExpression: { clientId: { $type: 'string' } } }
 );
 
+messageSchema.index({ conversationId: 1, parentId: 1, seq: 1 });
+messageSchema.index({ conversationId: 1, pinnedAt: 1 });
+
+const savedMessageSchema = new Schema(
+  {
+    organizationId: { type: ObjectId, ref: 'CompanyOrganization', required: true },
+    userId: { type: ObjectId, ref: 'User', required: true },
+    messageId: { type: ObjectId, ref: 'CompanyMessage', required: true },
+    conversationId: { type: ObjectId, ref: 'CompanyConversation', required: true },
+    remindAt: { type: Date, default: null },
+  },
+  { timestamps: true, versionKey: false, collection: 'company_saved_messages' }
+);
+savedMessageSchema.index({ userId: 1, messageId: 1 }, { unique: true });
+savedMessageSchema.index({ remindAt: 1 });
+
+// Stored outside the public /uploads folder: reached only through the access-checked route.
+const fileSchema = new Schema(
+  {
+    organizationId: { type: ObjectId, ref: 'CompanyOrganization', required: true },
+    conversationId: { type: ObjectId, ref: 'CompanyConversation', required: true },
+    uploadedBy: { type: ObjectId, ref: 'User', required: true },
+    name: { type: String, required: true },
+    mime: { type: String, required: true },
+    size: { type: Number, required: true },
+    storedName: { type: String, required: true },
+    attached: { type: Boolean, default: false },
+  },
+  { timestamps: true, versionKey: false, collection: 'company_files' }
+);
+
+const notificationSchema = new Schema(
+  {
+    organizationId: { type: ObjectId, ref: 'CompanyOrganization', required: true },
+    userId: { type: ObjectId, ref: 'User', required: true },
+    type: { type: String, required: true },
+    title: { type: String, required: true },
+    body: { type: String, default: '' },
+    resourceType: { type: String, default: null },
+    resourceId: { type: String, default: null },
+    readAt: { type: Date, default: null },
+  },
+  { timestamps: { createdAt: true, updatedAt: false }, versionKey: false, collection: 'company_notifications' }
+);
+notificationSchema.index({ userId: 1, organizationId: 1, _id: -1 });
+
+export const CompanySavedMessage =
+  mongoose.models.CompanySavedMessage || mongoose.model('CompanySavedMessage', savedMessageSchema);
+export const CompanyFile =
+  mongoose.models.CompanyFile || mongoose.model('CompanyFile', fileSchema);
+export const CompanyNotification =
+  mongoose.models.CompanyNotification || mongoose.model('CompanyNotification', notificationSchema);
+
 export const CompanyConversation =
   mongoose.models.CompanyConversation || mongoose.model('CompanyConversation', conversationSchema);
 export const CompanyConversationMember =
   mongoose.models.CompanyConversationMember || mongoose.model('CompanyConversationMember', conversationMemberSchema);
 export const CompanyMessage =
   mongoose.models.CompanyMessage || mongoose.model('CompanyMessage', messageSchema);
+
+const milestoneSchema = new Schema(
+  {
+    organizationId: { type: ObjectId, ref: 'CompanyOrganization', required: true },
+    projectId: { type: ObjectId, ref: 'CompanyProject', required: true },
+    name: { type: String, required: true, trim: true, maxlength: 200 },
+    status: { type: String, enum: ['open', 'done'], default: 'open' },
+    dueAt: { type: Date, default: null },
+  },
+  { timestamps: true, versionKey: false, collection: 'company_milestones' }
+);
+milestoneSchema.index({ projectId: 1 });
+
+const cycleSchema = new Schema(
+  {
+    organizationId: { type: ObjectId, ref: 'CompanyOrganization', required: true },
+    projectId: { type: ObjectId, ref: 'CompanyProject', required: true },
+    name: { type: String, required: true, trim: true, maxlength: 200 },
+    status: { type: String, enum: ['planned', 'active', 'done'], default: 'planned' },
+    startAt: { type: Date, default: null },
+    endAt: { type: Date, default: null },
+  },
+  { timestamps: true, versionKey: false, collection: 'company_cycles' }
+);
+cycleSchema.index({ projectId: 1 });
+
+const taskCommentSchema = new Schema(
+  {
+    organizationId: { type: ObjectId, ref: 'CompanyOrganization', required: true },
+    taskId: { type: ObjectId, ref: 'CompanyTask', required: true },
+    projectId: { type: ObjectId, ref: 'CompanyProject', required: true },
+    authorId: { type: ObjectId, ref: 'User', required: true },
+    body: { type: String, required: true, maxlength: 5000 },
+  },
+  { timestamps: true, versionKey: false, collection: 'company_task_comments' }
+);
+taskCommentSchema.index({ taskId: 1, _id: 1 });
+
+const timeEntrySchema = new Schema(
+  {
+    organizationId: { type: ObjectId, ref: 'CompanyOrganization', required: true },
+    taskId: { type: ObjectId, ref: 'CompanyTask', required: true },
+    projectId: { type: ObjectId, ref: 'CompanyProject', required: true },
+    userId: { type: ObjectId, ref: 'User', required: true },
+    minutes: { type: Number, required: true },
+    date: { type: Date, required: true },
+    note: { type: String, default: '', maxlength: 500 },
+  },
+  { timestamps: true, versionKey: false, collection: 'company_time_entries' }
+);
+timeEntrySchema.index({ taskId: 1 });
+timeEntrySchema.index({ projectId: 1, userId: 1 });
+
+const projectTemplateSchema = new Schema(
+  {
+    organizationId: { type: ObjectId, ref: 'CompanyOrganization', required: true },
+    name: { type: String, required: true, trim: true, maxlength: 200 },
+    description: { type: String, default: '' },
+    tasks: [
+      {
+        _id: false,
+        title: String,
+        description: String,
+        priority: String,
+        type: String,
+        offsetDays: { type: Number, default: null },
+      },
+    ],
+    createdBy: { type: ObjectId, ref: 'User', required: true },
+  },
+  { timestamps: true, versionKey: false, collection: 'company_project_templates' }
+);
+
+export const CompanyMilestone =
+  mongoose.models.CompanyMilestone || mongoose.model('CompanyMilestone', milestoneSchema);
+export const CompanyCycle =
+  mongoose.models.CompanyCycle || mongoose.model('CompanyCycle', cycleSchema);
+export const CompanyTaskComment =
+  mongoose.models.CompanyTaskComment || mongoose.model('CompanyTaskComment', taskCommentSchema);
+export const CompanyTimeEntry =
+  mongoose.models.CompanyTimeEntry || mongoose.model('CompanyTimeEntry', timeEntrySchema);
+export const CompanyProjectTemplate =
+  mongoose.models.CompanyProjectTemplate || mongoose.model('CompanyProjectTemplate', projectTemplateSchema);
 
 export const CompanyProject =
   mongoose.models.CompanyProject || mongoose.model('CompanyProject', projectSchema);

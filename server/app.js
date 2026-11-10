@@ -38,6 +38,8 @@ import hotelOrderRoutes from './routes/hotelOrderRoutes.js';
 import hotelZiporiDataRoutes from './routes/hotelZiporiDataRoutes.js';
 import companyOsRoutes from './companyos/routes.js';
 import { setupCompanySocket } from './companyos/realtime.js';
+import { startReminderWorker } from './companyos/chatExtrasController.js';
+import { startDueReminderWorker } from './companyos/workExtrasController.js';
 // zipori DB לא בשימוש יותר — כל נתוני המלונות במסד הראשי
 import familyRoutes from './routes/familyRoutes.js';
 import shoppingRoutes from './routes/shoppingRoutes.js';
@@ -129,6 +131,8 @@ app.set('io', io);
 setupSocketIO(io);
 await setupGameSocketIO(io);
 setupCompanySocket(io);
+startReminderWorker();
+startDueReminderWorker();
 
 // --- Trust Proxy (׳§׳¨׳™׳˜׳™ ׳׳–׳™׳”׳•׳™ IP ׳׳׳™׳×׳™ ׳׳׳—׳•׳¨׳™ Nginx/Cloudflare) ---
 app.set('trust proxy', 1);

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { CheckSquare, ClipboardList, Folder, Home, MessageCircle, Settings, Users } from 'lucide-react';
+import { Bell, CheckSquare, ClipboardList, Folder, Home, MessageCircle, Settings, Users } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { companyApi, errorMessage } from './companyApi';
 import CenteredCard from './CenteredCard';
@@ -11,6 +11,7 @@ import JoinPage from './JoinPage';
 import TeamPage from './TeamPage';
 import MyWorkPage from './MyWorkPage';
 import HomePage from './HomePage';
+import InboxPage from './InboxPage';
 import ChatPage from './ChatPage';
 import { useRealtime } from './useRealtime';
 import ProjectsPage from './ProjectsPage';
@@ -222,7 +223,12 @@ function ActiveWorkspace({ me, membership, onSignOut }) {
     queryKey: ['company', organization.id, 'conversations'],
     queryFn: () => companyApi.conversations(organization.id),
   });
-  const unread = (conversations.data ?? []).reduce((sum, item) => sum + item.unread_count, 0);
+  const unread = (conversations.data ?? []).reduce((sum, item) => sum + (item.muted ? 0 : item.unread_count), 0);
+  const inbox = useQuery({
+    queryKey: ['company', organization.id, 'notifications'],
+    queryFn: () => companyApi.notifications(organization.id),
+  });
+  const inboxUnread = inbox.data?.meta.unread ?? 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -230,7 +236,15 @@ function ActiveWorkspace({ me, membership, onSignOut }) {
       <header className="bg-blue-800 text-white sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <span className="font-bold truncate">{organization.name}</span>
-          <span className="text-sm text-blue-100 truncate">{me.user.name}</span>
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-sm text-blue-100 truncate">{me.user.name}</span>
+            <Link to="/company/inbox" className="relative shrink-0" aria-label="דואר נכנס">
+              <Bell size={20} />
+              {inboxUnread > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-600 text-[10px] rounded-full min-w-4 px-1 text-center">{inboxUnread}</span>
+              )}
+            </Link>
+          </div>
         </div>
       </header>
       <div className="hidden sm:block bg-white border-b sticky top-12 z-10">
@@ -244,6 +258,7 @@ function ActiveWorkspace({ me, membership, onSignOut }) {
           <Route path="home" element={<HomePage membership={membership} userName={me.user.name} />} />
           <Route path="chat" element={<ChatPage membership={membership} currentUserId={me.user.id} />} />
           <Route path="chat/:conversationId" element={<ChatPage membership={membership} currentUserId={me.user.id} />} />
+          <Route path="inbox" element={<InboxPage membership={membership} />} />
           <Route path="my-work" element={<MyWorkPage membership={membership} />} />
           <Route path="projects" element={<ProjectsPage membership={membership} />} />
           <Route path="projects/:projectId" element={<ProjectPage membership={membership} />} />

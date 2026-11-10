@@ -97,6 +97,13 @@ export const errorResponder = (err, req, res, next) => {
       request_id: req.requestId,
     });
   }
+  if (err.name === 'MulterError') {
+    const tooLarge = err.code === 'LIMIT_FILE_SIZE';
+    return res.status(tooLarge ? 413 : 400).json({
+      error: { code: tooLarge ? 'FILE_TOO_LARGE' : 'UPLOAD_ERROR', message: tooLarge ? 'הקובץ גדול מדי (עד 25MB)' : 'העלאת הקובץ נכשלה' },
+      request_id: req.requestId,
+    });
+  }
   // CSRF rejections keep their existing handling in the global error handler.
   if (err.code === 'EBADCSRFTOKEN') return next(err);
 

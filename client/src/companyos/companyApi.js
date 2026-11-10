@@ -57,8 +57,35 @@ export const companyApi = {
     api.post(`/v1/orgs/${orgId}/conversations/dm`, { user_id: userId }).then(data),
   messages: (orgId, id, beforeSeq) =>
     api.get(`/v1/orgs/${orgId}/conversations/${id}/messages`, { params: { before_seq: beforeSeq } }).then((r) => r.data),
-  sendMessage: (orgId, id, body, clientId) =>
-    api.post(`/v1/orgs/${orgId}/conversations/${id}/messages`, { body, client_id: clientId }).then(data),
+  sendMessage: (orgId, id, message) =>
+    api.post(`/v1/orgs/${orgId}/conversations/${id}/messages`, message).then(data),
+  createGroup: (orgId, userIds) => api.post(`/v1/orgs/${orgId}/conversations/group`, { user_ids: userIds }).then(data),
+  openProjectConversation: (orgId, projectId) =>
+    api.post(`/v1/orgs/${orgId}/projects/${projectId}/conversation`, {}).then(data),
+  replies: (orgId, id, messageId) =>
+    api.get(`/v1/orgs/${orgId}/conversations/${id}/messages/${messageId}/replies`).then(data),
+  toggleReaction: (orgId, id, messageId, emoji) =>
+    api.post(`/v1/orgs/${orgId}/conversations/${id}/messages/${messageId}/reactions`, { emoji }).then(data),
+  togglePin: (orgId, id, messageId) =>
+    api.post(`/v1/orgs/${orgId}/conversations/${id}/messages/${messageId}/pin`, {}).then(data),
+  pins: (orgId, id) => api.get(`/v1/orgs/${orgId}/conversations/${id}/pins`).then(data),
+  saveMessage: (orgId, id, messageId, remindAt) =>
+    api.post(`/v1/orgs/${orgId}/conversations/${id}/messages/${messageId}/save`, { remind_at: remindAt }).then(data),
+  savedMessages: (orgId) => api.get(`/v1/orgs/${orgId}/saved-messages`).then(data),
+  markUnread: (orgId, id, seq) => api.post(`/v1/orgs/${orgId}/conversations/${id}/unread`, { seq }).then(data),
+  setMuted: (orgId, id, muted) => api.patch(`/v1/orgs/${orgId}/conversations/${id}/settings`, { muted }).then(data),
+  searchMessages: (orgId, q) => api.get(`/v1/orgs/${orgId}/messages/search`, { params: { q } }).then(data),
+  taskFromMessage: (orgId, id, messageId, projectId) =>
+    api.post(`/v1/orgs/${orgId}/conversations/${id}/messages/${messageId}/task`, { project_id: projectId }).then(data),
+  uploadFile: (orgId, id, file) => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.post(`/v1/orgs/${orgId}/conversations/${id}/files`, form).then(data);
+  },
+  fileUrl: (orgId, fileId) => `/api/v1/orgs/${orgId}/files/${fileId}`,
+  notifications: (orgId) => api.get(`/v1/orgs/${orgId}/notifications`).then((r) => r.data),
+  markNotificationsRead: (orgId, ids) => api.post(`/v1/orgs/${orgId}/notifications/read`, { ids }).then(data),
+  updatePresence: (orgId, body) => api.patch(`/v1/orgs/${orgId}/presence`, body).then(data),
   editMessage: (orgId, id, messageId, body) =>
     api.patch(`/v1/orgs/${orgId}/conversations/${id}/messages/${messageId}`, { body }).then(data),
   deleteMessage: (orgId, id, messageId) =>
@@ -81,6 +108,8 @@ export const ROLE_LABELS = {
   member: 'חבר צוות',
   guest: 'אורח',
 };
+
+export const AVAILABILITY_LABELS = { active: 'זמין', away: 'לא בעמדה', dnd: 'נא לא להפריע' };
 
 export const STATUS_LABELS = {
   active: 'פעיל',

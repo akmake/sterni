@@ -1,16 +1,26 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { ROLE_LABELS, STATUS_LABELS, companyApi, errorMessage } from './companyApi';
+import { AVAILABILITY_LABELS, ROLE_LABELS, STATUS_LABELS, companyApi, errorMessage } from './companyApi';
 
 function MemberRow({ member, assignableRoles, onChange, busy }) {
   return (
     <li className="p-3 flex flex-wrap items-center gap-2">
       <div className="flex-1 min-w-[10rem]">
         <p className="font-semibold">
+          <span
+            className={`inline-block w-2 h-2 rounded-full ml-1 ${member.online ? 'bg-green-500' : 'bg-gray-300'}`}
+            title={member.online ? 'מחובר' : 'לא מחובר'}
+          />
           {member.name} {member.is_self && <span className="text-xs text-gray-500">(אתה)</span>}
         </p>
         <p className="text-xs text-gray-500" dir="ltr" style={{ textAlign: 'right' }}>{member.email}</p>
+        {(member.availability !== 'active' || member.status_text) && (
+          <p className="text-xs text-gray-500">
+            {member.availability !== 'active' && AVAILABILITY_LABELS[member.availability]}
+            {member.status_text && ` ${member.status_text}`}
+          </p>
+        )}
       </div>
 
       {member.status !== 'active' && (

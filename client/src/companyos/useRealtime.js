@@ -50,6 +50,8 @@ export function useRealtime(orgId) {
     socket.on('message_new', refreshChat);
     socket.on('message_updated', refreshChat);
     socket.on('conversations_changed', refreshChat);
+    socket.on('notification_new', () => refresh(['notifications']));
+    socket.on('presence_changed', () => refresh(['members']));
 
     return () => {
       clearTimeout(retryTimer);

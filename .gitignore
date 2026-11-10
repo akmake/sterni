@@ -45,3 +45,6 @@ mongo-data/
 *.sln
 *.sw?
 .DS_Store
+
+# Company OS private uploads
+server/data/company-files/

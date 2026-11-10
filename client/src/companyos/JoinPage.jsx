@@ -23,8 +23,9 @@ export default function JoinPage() {
     mutationFn: (body) => companyApi.acceptInvite(token, body),
     onSuccess: (result) => {
       login(result.user);
-      queryClient.removeQueries({ queryKey: ['company'] });
+      // Leave first: clearing while this page is mounted refetches the used, now invalid link.
       navigate('/company/', { replace: true });
+      queryClient.removeQueries({ queryKey: ['company'] });
     },
   });
 

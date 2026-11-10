@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import TaskDialog from './TaskDialog';
@@ -278,6 +278,7 @@ const TABS = { tasks: 'משימות', requirements: 'דרישות', tests: 'בד
 
 export default function ProjectPage({ membership }) {
   const orgId = membership.organization.id;
+  const queryClient = useQueryClient();
   const { projectId } = useParams();
   const [tab, setTab] = useState('tasks');
 
@@ -287,7 +288,16 @@ export default function ProjectPage({ membership }) {
     retry: false,
   });
 
+  const navigate = useNavigate();
   const changeStatus = useCompanyMutation(orgId, (status) => companyApi.updateProject(orgId, projectId, { status }));
+  const openChat = useMutation({
+    mutationFn: () => companyApi.openProjectConversation(orgId, projectId),
+    onSuccess: async (conversation) => {
+      await queryClient.invalidateQueries({ queryKey: ['company', orgId, 'conversations'] });
+      navigate(`/company/chat/${conversation.id}`);
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  });
 
   if (project.isPending) return <p className="text-sm text-gray-500">טוען…</p>;
   if (project.isError) {
@@ -329,6 +339,9 @@ export default function ProjectPage({ membership }) {
             {label}
           </button>
         ))}
+        <button onClick={() => openChat.mutate()} disabled={openChat.isPending} className="px-3 py-1 rounded-lg text-sm whitespace-nowrap bg-blue-100 text-blue-800">
+          שיחת פרויקט
+        </button>
       </div>
 
       {tab === 'tasks' && <TasksTab orgId={orgId} projectId={projectId} canWrite={permissions.write} />}

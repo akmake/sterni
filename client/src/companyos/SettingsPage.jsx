@@ -2,12 +2,19 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { ROLE_LABELS, companyApi, errorMessage } from './companyApi';
+import { AVAILABILITY_LABELS, ROLE_LABELS, companyApi, errorMessage } from './companyApi';
 
 export default function SettingsPage({ membership, user, onSignOut }) {
   const { organization, permissions, role } = membership;
   const queryClient = useQueryClient();
   const [name, setName] = useState(organization.name);
+
+  const [statusText, setStatusText] = useState('');
+  const presence = useMutation({
+    mutationFn: (body) => companyApi.updatePresence(organization.id, body),
+    onSuccess: () => toast.success('עודכן'),
+    onError: (error) => toast.error(errorMessage(error)),
+  });
 
   const save = useMutation({
     mutationFn: () => companyApi.updateOrganization(organization.id, name),
@@ -24,6 +31,34 @@ export default function SettingsPage({ membership, user, onSignOut }) {
         <p className="font-semibold">{user.name}</p>
         <p className="text-sm text-gray-500" dir="ltr" style={{ textAlign: 'right' }}>{user.email}</p>
         <p className="text-sm text-gray-600 mt-1">{ROLE_LABELS[role]}</p>
+      </section>
+
+      <section className="bg-white rounded-xl shadow-sm p-4 space-y-2">
+        <label className="block text-sm font-semibold" htmlFor="availability">זמינות</label>
+        <select
+          id="availability"
+          className="w-full border rounded-lg px-3 py-2"
+          defaultValue="active"
+          onChange={(event) => presence.mutate({ availability: event.target.value })}
+        >
+          {Object.entries(AVAILABILITY_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+        </select>
+        <form
+          className="flex gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            presence.mutate({ status_text: statusText });
+          }}
+        >
+          <input
+            className="flex-1 min-w-0 border rounded-lg px-3 py-2"
+            placeholder="סטטוס אישי"
+            maxLength={80}
+            value={statusText}
+            onChange={(event) => setStatusText(event.target.value)}
+          />
+          <button className="border rounded-lg px-3">עדכון</button>
+        </form>
       </section>
 
       {permissions.manage_organization && (

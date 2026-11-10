@@ -1,5 +1,5 @@
 import { ApiError, isObjectId, recordAudit, sendData } from './access.js';
-import { unreadTotal } from './chatController.js';
+import { notify, unreadTotal } from './chatController.js';
 import {
   CompanyMember,
   CompanyProject,
@@ -15,9 +15,12 @@ import {
   TASK_STATUSES,
   TASK_TYPES,
   TEST_RESULTS,
+  RECURRENCES,
+  CompanyCycle,
+  CompanyMilestone,
 } from './models.js';
 
-const OPEN_TASK_FILTER = { $nin: ['done', 'cancelled'] };
+export const OPEN_TASK_FILTER = { $nin: ['done', 'cancelled'] };
 const SEVERE = ['high', 'critical'];
 const DEFAULT_PAGE = 50;
 const MAX_PAGE = 100;
@@ -68,12 +71,12 @@ const orgScope = (req) => ({ organizationId: req.organization._id });
 
 // Null means "every project": only the organization owner has that reach. An
 // admin works by membership, so a management title alone doesn't open content.
-const accessibleProjectIds = async (req) => {
+export const accessibleProjectIds = async (req) => {
   if (req.membership.role === 'owner') return null;
   return CompanyProjectMember.find({ ...orgScope(req), userId: req.user._id }).distinct('projectId');
 };
 
-const loadProject = async (req, projectId) => {
+export const loadProject = async (req, projectId) => {
   const missing = notFound('הפרויקט לא נמצא');
   if (!isObjectId(projectId)) throw missing;
 
@@ -87,7 +90,7 @@ const loadProject = async (req, projectId) => {
   return { project, role: member.role };
 };
 
-const requireWrite = (access) => {
+export const requireWrite = (access) => {
   if (access.role === 'viewer') throw denied();
 };
 
@@ -140,6 +143,13 @@ const serializeTasks = async (tasks, canWriteProject) => {
     blocked_by: task.blockedBy,
     is_blocked: task.blockedBy.some((id) => open.has(String(id))),
     version: task.version,
+    source_message_id: task.sourceMessageId,
+    parent_id: task.parentId,
+    milestone_id: task.milestoneId,
+    cycle_id: task.cycleId,
+    acceptance_criteria: task.acceptanceCriteria,
+    checklist: task.checklist.map((item) => ({ id: item._id, text: item.text, done: item.done })),
+    recurrence: task.recurrence,
     can_edit: canWriteProject(task),
     created_at: task.createdAt,
     updated_at: task.updatedAt,
@@ -481,6 +491,60 @@ const applyCommonTaskFields = (body, target) => {
     if (!Array.isArray(body.labels)) throw invalid('תגיות לא תקינות');
     target.labels = body.labels.map(text).filter(Boolean);
   }
+  if (has(body, 'acceptance_criteria')) target.acceptanceCriteria = text(body.acceptance_criteria);
+  if (has(body, 'recurrence')) {
+    target.recurrence = body.recurrence === null || body.recurrence === '' ? null : oneOf(body.recurrence, RECURRENCES, 'חזרה');
+  }
+  if (has(body, 'checklist')) {
+    if (!Array.isArray(body.checklist)) throw invalid('צ׳קליסט לא תקין');
+    target.checklist = body.checklist
+      .filter((item) => text(item?.text))
+      .map((item) => ({ text: text(item.text), done: Boolean(item.done) }));
+  }
+};
+
+// Links must stay inside the task's own project; "" clears them.
+const applyProjectLinks = async (body, target, projectId, currentTaskId = null) => {
+  const resolve = async (key, Model, field, label) => {
+    if (!has(body, key)) return;
+    if (!body[key]) {
+      target[field] = null;
+      return;
+    }
+    if (!isObjectId(body[key]) || !(await Model.exists({ _id: body[key], projectId }))) throw invalid(`${label} לא נמצאה בפרויקט`);
+    target[field] = body[key];
+  };
+  await resolve('milestone_id', CompanyMilestone, 'milestoneId', 'אבן הדרך');
+  await resolve('cycle_id', CompanyCycle, 'cycleId', 'ה-Sprint');
+  if (has(body, 'parent_id')) {
+    if (!body.parent_id) {
+      target.parentId = null;
+    } else {
+      if (String(body.parent_id) === String(currentTaskId)) throw invalid('משימה לא יכולה להיות תת-משימה של עצמה');
+      const parent = isObjectId(body.parent_id) ? await CompanyTask.findOne({ _id: body.parent_id, projectId }) : null;
+      if (!parent) throw invalid('משימת האב לא נמצאה בפרויקט');
+      if (parent.parentId) throw invalid('אפשר רמה אחת של תת-משימות');
+      target.parentId = parent._id;
+    }
+  }
+};
+
+const shiftByRecurrence = (date, recurrence) => {
+  const next = new Date(date);
+  if (recurrence === 'daily') next.setDate(next.getDate() + 1);
+  if (recurrence === 'weekly') next.setDate(next.getDate() + 7);
+  if (recurrence === 'monthly') next.setMonth(next.getMonth() + 1);
+  return next;
+};
+
+const notifyAssigned = async (req, task) => {
+  if (!task.assigneeId || task.assigneeId.equals(req.user._id)) return;
+  await notify(req.organization._id, task.assigneeId, {
+    type: 'task_assigned',
+    title: `הוקצתה לך משימה: ${task.title}`,
+    resourceType: 'project',
+    resourceId: String(task.projectId),
+  });
 };
 
 export const createTask = async (req, res) => {
@@ -496,6 +560,8 @@ export const createTask = async (req, res) => {
     fields.assigneeId = req.body.assignee_id;
   }
 
+  await applyProjectLinks(req.body, fields, access.project._id);
+
   const task = await CompanyTask.create({
     ...orgScope(req),
     ...fields,
@@ -504,6 +570,7 @@ export const createTask = async (req, res) => {
     createdBy: req.user._id,
   });
   await audit(req, 'task.created', 'task', task._id, { title: task.title, project_id: String(access.project._id) });
+  await notifyAssigned(req, task);
 
   const loaded = await populateTask(CompanyTask.findById(task._id));
   const [serialized] = await serializeTasks([loaded], () => true);
@@ -561,9 +628,18 @@ export const updateTask = async (req, res) => {
     await assertNoDependencyCycle(task, blockerIds);
     updates.blockedBy = blockerIds;
   }
+  await applyProjectLinks(body, updates, task.projectId, task._id);
+  if (has(updates, 'dueAt') && String(updates.dueAt) !== String(task.dueAt)) updates.dueReminderSentAt = null;
 
   const finalStatus = updates.status ?? task.status;
   if (finalStatus === 'done') {
+    const checklist = updates.checklist ?? task.checklist;
+    if (checklist.some((item) => !item.done)) {
+      throw new ApiError(409, 'CHECKLIST_INCOMPLETE', 'יש פריטים פתוחים בצ׳קליסט');
+    }
+    if (await CompanyTask.exists({ parentId: task._id, status: OPEN_TASK_FILTER })) {
+      throw new ApiError(409, 'OPEN_SUBTASKS', 'יש תת-משימות פתוחות');
+    }
     const blockers = updates.blockedBy ?? task.blockedBy;
     if (await CompanyTask.exists({ _id: { $in: blockers }, status: OPEN_TASK_FILTER })) {
       throw new ApiError(409, 'BLOCKED_BY_OPEN_TASKS', 'יש משימות חוסמות פתוחות. יש לסגור אותן קודם');
@@ -597,6 +673,33 @@ export const updateTask = async (req, res) => {
   track('due_at', task.dueAt?.toISOString(), updated.dueAt?.toISOString());
   if (Object.keys(tracked).length > 0) {
     await audit(req, 'task.updated', 'task', task._id, { title: updated.title, changes: tracked });
+  }
+  if (tracked.assignee) await notifyAssigned(req, updated);
+
+  // The finished task hands its schedule to the next one, so a re-close can't spawn twice.
+  if (updated.status === 'done' && task.status !== 'done' && updated.recurrence) {
+    const handedOver = await CompanyTask.findOneAndUpdate(
+      { _id: updated._id, recurrence: updated.recurrence },
+      { $set: { recurrence: null } }
+    );
+    if (handedOver) {
+      await CompanyTask.create({
+        organizationId: updated.organizationId,
+        projectId: updated.projectId,
+        title: updated.title,
+        description: updated.description,
+        priority: updated.priority,
+        type: updated.type,
+        assigneeId: updated.assigneeId,
+        labels: updated.labels,
+        acceptanceCriteria: updated.acceptanceCriteria,
+        checklist: updated.checklist.map((item) => ({ text: item.text, done: false })),
+        recurrence: updated.recurrence,
+        milestoneId: updated.milestoneId,
+        dueAt: shiftByRecurrence(updated.dueAt ?? new Date(), updated.recurrence),
+        createdBy: req.user._id,
+      });
+    }
   }
 
   const loaded = await populateTask(CompanyTask.findById(task._id));

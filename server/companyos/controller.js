@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import User from '../models/userModel.js';
 import { createAndSendTokens } from '../utils/tokenHandler.js';
-import { dropUser } from './realtime.js';
+import { dropUser, isOnline } from './realtime.js';
 import {
   ApiError,
   canManageMember,
@@ -149,6 +149,9 @@ export const listMembers = async (req, res) => {
         email: m.userId.email,
         role: m.role,
         status: m.status,
+        availability: m.availability,
+        status_text: m.statusText,
+        online: isOnline(m.userId._id),
         is_self: actorIsSelf(m),
         can_manage:
           req.permissions.manage_members && !actorIsSelf(m) && canManageMember(req.membership.role, m.role),

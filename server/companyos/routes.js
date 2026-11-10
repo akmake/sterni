@@ -12,6 +12,8 @@ import {
 import * as company from './controller.js';
 import * as work from './workController.js';
 import * as chat from './chatController.js';
+import * as extras from './chatExtrasController.js';
+import * as planning from './workExtrasController.js';
 import { notifyWorkChanged } from './realtime.js';
 
 const router = express.Router();
@@ -51,8 +53,51 @@ org.patch('/conversations/:conversationId/messages/:messageId', wrap(chat.editMe
 org.delete('/conversations/:conversationId/messages/:messageId', wrap(chat.deleteMessage));
 org.post('/conversations/:conversationId/read', wrap(chat.markConversationRead));
 
+org.post('/conversations/group', wrap(extras.createGroup));
+org.get('/messages/search', wrap(extras.searchMessages));
+org.get('/saved-messages', wrap(extras.listSaved));
+org.post('/projects/:projectId/conversation', wrap(extras.openProjectConversation));
+org.patch('/conversations/:conversationId/settings', wrap(extras.updateConversationSettings));
+org.post('/conversations/:conversationId/unread', wrap(extras.markUnread));
+org.get('/conversations/:conversationId/pins', wrap(extras.listPins));
+org.post('/conversations/:conversationId/files', extras.uploadMiddleware, wrap(extras.uploadFile));
+org.get('/conversations/:conversationId/messages/:messageId/replies', wrap(extras.listReplies));
+org.post('/conversations/:conversationId/messages/:messageId/reactions', wrap(extras.toggleReaction));
+org.post('/conversations/:conversationId/messages/:messageId/pin', wrap(extras.togglePin));
+org.post('/conversations/:conversationId/messages/:messageId/save', wrap(extras.saveMessage));
+org.delete('/conversations/:conversationId/messages/:messageId/save', wrap(extras.unsaveMessage));
+org.post('/conversations/:conversationId/messages/:messageId/task', wrap(extras.createTaskFromMessage));
+org.get('/files/:fileId', wrap(extras.downloadFile));
+org.get('/notifications', wrap(extras.listNotifications));
+org.post('/notifications/read', wrap(extras.markNotificationsRead));
+org.patch('/presence', wrap(extras.updatePresence));
+
 org.get('/home', wrap(work.getHome));
 org.use(['/projects', '/tasks'], notifyWorkChanged);
+
+org.get('/workload', wrap(planning.getWorkload));
+org.get('/project-templates', wrap(planning.listTemplates));
+org.delete('/project-templates/:templateId', requirePermission('create_projects'), wrap(planning.deleteTemplate));
+org.post('/projects/from-template', requirePermission('create_projects'), wrap(planning.createProjectFromTemplate));
+org.post('/projects/:projectId/save-as-template', requirePermission('create_projects'), wrap(planning.saveAsTemplate));
+org.get('/projects/:projectId/time-summary', wrap(planning.projectTimeSummary));
+
+org.get('/projects/:projectId/milestones', wrap(planning.milestones.list));
+org.post('/projects/:projectId/milestones', wrap(planning.milestones.create));
+org.patch('/projects/:projectId/milestones/:itemId', wrap(planning.milestones.update));
+org.delete('/projects/:projectId/milestones/:itemId', wrap(planning.milestones.remove));
+org.get('/projects/:projectId/cycles', wrap(planning.cycles.list));
+org.post('/projects/:projectId/cycles', wrap(planning.cycles.create));
+org.patch('/projects/:projectId/cycles/:itemId', wrap(planning.cycles.update));
+org.delete('/projects/:projectId/cycles/:itemId', wrap(planning.cycles.remove));
+
+org.patch('/tasks/bulk', wrap(planning.bulkUpdateTasks));
+org.get('/tasks/:taskId/comments', wrap(planning.listComments));
+org.post('/tasks/:taskId/comments', wrap(planning.addComment));
+org.delete('/tasks/:taskId/comments/:commentId', wrap(planning.deleteComment));
+org.get('/tasks/:taskId/time', wrap(planning.listTimeEntries));
+org.post('/tasks/:taskId/time', wrap(planning.addTimeEntry));
+org.delete('/tasks/:taskId/time/:entryId', wrap(planning.deleteTimeEntry));
 
 // Project-level access is decided inside each handler, per project.
 org.get('/projects', wrap(work.listProjects));

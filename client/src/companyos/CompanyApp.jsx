@@ -22,6 +22,7 @@ import SettingsPage from './SettingsPage';
 import SearchPage from './SearchPage';
 import DocumentsPage from './DocumentsPage';
 import CrmPage from './CrmPage';
+import './CompanyTheme.css';
 
 // Gives this area its own home-screen identity, separate from the main site's PWA.
 function useInstallIdentity() {
@@ -47,8 +48,9 @@ function useInstallIdentity() {
 
     applyTag('link[rel="manifest"]', 'link', { rel: 'manifest' }, 'href', '/company-manifest.webmanifest');
     applyTag('link[rel="apple-touch-icon"]', 'link', { rel: 'apple-touch-icon' }, 'href', '/company-apple-touch-icon.png');
-    applyTag('meta[name="theme-color"]', 'meta', { name: 'theme-color' }, 'content', '#1A56DB');
+    applyTag('meta[name="theme-color"]', 'meta', { name: 'theme-color' }, 'content', '#F2F4F7');
     applyTag('meta[name="apple-mobile-web-app-capable"]', 'meta', { name: 'apple-mobile-web-app-capable' }, 'content', 'yes');
+    applyTag('meta[name="mobile-web-app-capable"]', 'meta', { name: 'mobile-web-app-capable' }, 'content', 'yes');
     applyTag('meta[name="apple-mobile-web-app-title"]', 'meta', { name: 'apple-mobile-web-app-title' }, 'content', 'Company OS');
 
     return () => {
@@ -154,7 +156,7 @@ function NavItems({ permissions, unread }) {
         className={({ isActive }) =>
           `${item.desktopOnly ? 'hidden sm:flex' : 'flex'} relative flex-1 sm:flex-none flex-col sm:flex-row items-center gap-0.5 sm:gap-2 ` +
           `px-1 sm:px-3 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-sm font-semibold whitespace-nowrap ` +
-          (isActive ? 'text-blue-700 sm:bg-blue-700 sm:text-white' : 'text-gray-500 sm:text-gray-700 sm:hover:bg-gray-100')
+          (isActive ? 'text-white bg-[#111817]' : 'text-gray-500 sm:text-gray-700 sm:hover:bg-white')
         }
       >
         <Icon size={20} aria-hidden="true" className="sm:w-4 sm:h-4" />
@@ -246,11 +248,11 @@ function ActiveWorkspace({ me, membership, onSignOut }) {
   return (
     <div className="min-h-screen bg-gray-50">
       <IosInstallHint />
-      <header className="bg-blue-800 text-white sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          <span className="font-bold truncate">{organization.name}</span>
+      <header className="company-shell-header sticky top-0 z-10">
+        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
+          <span className="font-extrabold text-lg tracking-tight truncate">{organization.name}</span>
           <div className="flex items-center gap-3 min-w-0">
-            <span className="text-sm text-blue-100 truncate">{me.user.name}</span>
+            <span className="text-sm text-gray-500 truncate">{me.user.name}</span>
             <Link to="/company/search" className="shrink-0" aria-label="חיפוש"><Search size={20} /></Link>
             <Link to="/company/documents" className="shrink-0" aria-label="מסמכים"><FileText size={20} /></Link>
             <Link to="/company/inbox" className="relative shrink-0" aria-label="דואר נכנס">
@@ -262,12 +264,12 @@ function ActiveWorkspace({ me, membership, onSignOut }) {
           </div>
         </div>
       </header>
-      <div className="hidden sm:block bg-white border-b sticky top-12 z-10">
+      <div className="company-desktop-nav hidden sm:block sticky top-[60px] z-10">
         <nav className="max-w-5xl mx-auto px-4 py-2 flex gap-1">
           <NavItems permissions={permissions} unread={unread} />
         </nav>
       </div>
-      <main className="max-w-5xl mx-auto p-3 sm:p-4 pb-20 sm:pb-4">
+      <main className="max-w-5xl mx-auto p-4 sm:p-6 pb-28 sm:pb-8">
         <Routes>
           <Route index element={<Navigate to="/company/home" replace />} />
           <Route path="home" element={<HomePage membership={membership} userName={me.user.name} />} />
@@ -286,7 +288,7 @@ function ActiveWorkspace({ me, membership, onSignOut }) {
           <Route path="*" element={<Navigate to="/company/home" replace />} />
         </Routes>
       </main>
-      <nav className="sm:hidden fixed bottom-0 inset-x-0 z-10 bg-white border-t flex px-1 py-1">
+      <nav className="company-mobile-nav sm:hidden fixed z-10 bg-white flex px-1 py-1.5">
         <NavItems permissions={permissions} unread={unread} />
       </nav>
     </div>
@@ -306,7 +308,7 @@ export default function CompanyApp() {
   useInstallIdentity();
 
   return (
-    <div dir="rtl" className="min-h-screen bg-gray-50 text-gray-800">
+    <div dir="rtl" className="company-os min-h-screen bg-gray-50 text-gray-800">
       <Routes>
         <Route path="login" element={<CompanyLoginPage />} />
         <Route path="join/:token" element={<JoinPage />} />

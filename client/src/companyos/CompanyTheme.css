@@ -1,0 +1,73 @@
+.company-os {
+  --cos-bg: #f2f4f7;
+  --cos-surface: #ffffff;
+  --cos-ink: #111817;
+  --cos-muted: #5e6966;
+  --cos-line: #dfe5e3;
+  --cos-mint: #d7f5ee;
+  --cos-mint-strong: #147d6f;
+  min-height: 100vh;
+  background: var(--cos-bg);
+  color: var(--cos-ink);
+  font-family: Aptos, "Segoe UI", "Noto Sans Hebrew", sans-serif;
+}
+
+.company-os .bg-gray-50 { background-color: var(--cos-bg) !important; }
+.company-os .bg-white { background-color: var(--cos-surface) !important; }
+.company-os .bg-blue-700,
+.company-os .bg-blue-800 { background-color: var(--cos-ink) !important; }
+.company-os .bg-blue-50 { background-color: var(--cos-mint) !important; }
+.company-os .text-blue-700,
+.company-os .text-blue-800,
+.company-os .text-blue-900 { color: var(--cos-mint-strong) !important; }
+.company-os .text-blue-100 { color: #dce5e2 !important; }
+.company-os .border-blue-200 { border-color: #a9d9ce !important; }
+.company-os .bg-green-50 { background-color: var(--cos-mint) !important; }
+.company-os .border-green-200 { border-color: #a9d9ce !important; }
+
+.company-os .rounded-lg { border-radius: 14px !important; }
+.company-os .rounded-xl { border-radius: 20px !important; }
+.company-os .rounded-2xl { border-radius: 26px !important; }
+.company-os .shadow,
+.company-os .shadow-sm { box-shadow: 0 8px 30px rgba(17, 24, 23, 0.06) !important; }
+
+.company-os input,
+.company-os select,
+.company-os textarea {
+  min-height: 46px;
+  border-color: var(--cos-line);
+  background: #fff;
+  color: var(--cos-ink);
+  outline: none;
+}
+.company-os input:focus,
+.company-os select:focus,
+.company-os textarea:focus {
+  border-color: var(--cos-ink);
+  box-shadow: 0 0 0 3px rgba(17, 24, 23, 0.1);
+}
+.company-os button,
+.company-os a { transition: transform 150ms ease, background-color 150ms ease, color 150ms ease; }
+.company-os button:active,
+.company-os a:active { transform: scale(0.985); }
+.company-os :focus-visible { outline: 3px solid rgba(20, 125, 111, 0.35); outline-offset: 2px; }
+
+.company-shell-header {
+  background: rgba(242, 244, 247, 0.94);
+  color: var(--cos-ink);
+  border-bottom: 1px solid rgba(223, 229, 227, 0.8);
+  backdrop-filter: blur(18px);
+}
+.company-desktop-nav {
+  background: rgba(242, 244, 247, 0.94);
+  border-bottom: 0;
+  backdrop-filter: blur(18px);
+}
+.company-mobile-nav {
+  inset-inline: 12px;
+  bottom: 10px;
+  border: 1px solid var(--cos-line);
+  border-radius: 24px;
+  box-shadow: 0 10px 32px rgba(17, 24, 23, 0.12);
+  overflow: hidden;
+}

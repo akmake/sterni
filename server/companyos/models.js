@@ -67,7 +67,9 @@ const mfaSchema = new Schema(
 const inviteSchema = new Schema(
   {
     organizationId: { type: ObjectId, ref: 'CompanyOrganization', required: true },
-    email: { type: String, required: true, lowercase: true, trim: true },
+    // Link invites are intentionally not tied to an address. Legacy targeted
+    // invites keep their address until they are accepted.
+    email: { type: String, default: null, lowercase: true, trim: true },
     role: { type: String, enum: ROLES, required: true },
     // Only the hash is stored: a database leak must not expose usable links.
     tokenHash: { type: String, required: true, unique: true },

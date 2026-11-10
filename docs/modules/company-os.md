@@ -146,6 +146,17 @@ socket.io ב-namespace ‏`/company`, בהזדהות עוגיית `jwt`. איר�
 
 `npm run test:companyos` בתיקיית `server`. משתמש ב-`MONGO_URL` אם הוגדר, אחרת מרים `mongod` זמני. החבילה `knowledge-crm.test.mjs` מכסה E05/E06, כולל AC-11–16, בידוד ארגונים וחיפוש חסוי.
 
+### חיזוק E05/E06 (CRM ומסמכים)
+
+- הרשאות CRM מרוכזות ב-`crmAccess.js`, ומשמשות גם את ה-API וגם את החיפוש. `member` רואה רק רשומות שלו. רשומה חסויה נפתחת רק למי שמופיע בה, גם לא ל-`owner`. החיסיון עובר מליד לעסקה וללקוח בזמן ההמרה.
+- סכומים מחושבים באגורות. הצעה חדשה מבטלת אישורים קודמים. מעל `settings.quoteApprovalLimit` נדרשים שני שלבי אישור: מנהל ואז בעלים.
+- רק הצעה מאושרת נשלחת ללקוח (`mark-sent`). קבלת הלקוח מתועדת (`record-acceptance`).
+- סגירה כזכייה והחלטת אישור הן אטומיות. אישור הקמה יוצר פרויקט, אבן דרך, משימות פתיחה (או מתבנית) וערוץ פרויקט, ומעביר לפרויקט את קישורי המסמכים של העסקה.
+- נתיבים חדשים: `PATCH /leads/:id` (עם `version`), `GET /leads/export` (CSV מסונן הרשאות), `/crm/:type/:id/activities`, `/pipeline`, `/approvals`, `/accounts` ו-`/accounts/:id`, `/accounts/:id/contacts`, `POST /deals`, `/deals/:id/stage`, `/deals/:id/close-lost`.
+- קליטת לידים חיצונית: `POST /api/company-webhooks/leads` עם `X-Company-Token`, שנוצר ב-`POST /crm/webhook-token`. הנתיב יושב לפני csurf.
+- מסמכים: טיוטה פתוחה רק לכותב ולמנהלים, וכל השאר רואים את הגרסה המפורסמת. `visibility: restricted` מגביל לאנשים שנבחרו. נוספו סוג, תגיות, החלטה, תבניות, מסמך אב, ארכיון, שחזור (כגרסה חדשה), קישור לרשומות וקבצים.
+- החיפוש כולל את גוף המסמך, מסנן הודעות לפי גישה נוכחית, ומדפדף עם `offset` ו-`next_offset`.
+
 ## התקנה כאפליקציה
 
 `CompanyApp.jsx` מחליף בזמן ריצה את ה-manifest ואת האייקון של הדף ל-`company-manifest.webmanifest`, עם scope נפרד ב-`/company/`.

@@ -82,6 +82,7 @@ async function main() {
   const root = await mk('root', 'admin');
   const plain = await mk('plain');
   const existing = await mk('existing');
+  const linkExisting = await mk('linkexisting');
   const outsider = await mk('outsider');
 
   // Bootstrap
@@ -112,6 +113,25 @@ async function main() {
   check('single use', (await call('POST', `/invites/${token}/accept`, { body: { name: 'Z', password: 'longenough1' } })).status, 404);
   const newAdmin = await User.findOne({ email: 'newadmin@t.co' });
   check('new user is not a site admin', newAdmin.role, 'user');
+
+  // Link invite: the manager chooses only a role; the recipient supplies identity.
+  const openInvite = await call('POST', `/orgs/${orgId}/invites`, { as: root, body: { role: 'member' } });
+  check('create open invite', openInvite.status, 201);
+  check('open invite has no email', openInvite.json.data.email, null);
+  const openToken = openInvite.json.data.token;
+  check('open preview asks email', (await call('GET', `/invites/${openToken}`)).json.data.requires_email, true);
+  const openAccepted = await call('POST', `/invites/${openToken}/accept`, {
+    body: { name: 'Link User', email: 'link@t.co', password: 'longenough1' },
+  });
+  check('accept open invite', openAccepted.status, 200);
+  check('open invite stores claimant', (await CompanyInvite.findById(openInvite.json.data.id)).email, 'link@t.co');
+  check('open invite creates member', await User.countDocuments({ email: 'link@t.co' }), 1);
+
+  const existingOpen = (await call('POST', `/orgs/${orgId}/invites`, { as: root, body: { role: 'guest' } })).json.data;
+  check('open existing needs login', (await call('POST', `/invites/${existingOpen.token}/accept`, { body: { email: 'linkexisting@t.co' } })).status, 403);
+  check('open existing accepts session', (await call('POST', `/invites/${existingOpen.token}/accept`, { as: linkExisting, body: {} })).status, 200);
+  const memberOpen = (await call('POST', `/orgs/${orgId}/invites`, { as: root, body: { role: 'member' } })).json.data;
+  check('open link cannot change current member role', (await call('POST', `/invites/${memberOpen.token}/accept`, { as: root, body: {} })).status, 409);
 
   // Invites: existing account must prove identity
   const memberToken = (await call('POST', `/orgs/${orgId}/invites`, { as: root, body: { email: 'existing@t.co', role: 'member' } })).json.data.token;

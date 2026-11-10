@@ -3,13 +3,14 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/authStore';
 import CenteredCard from './CenteredCard';
-import { ROLE_LABELS, companyApi, errorMessage } from './companyApi';
+import { ROLE_LABELS, companyApi, errorCode, errorMessage } from './companyApi';
 
 export default function JoinPage() {
   const { token } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user, login } = useAuthStore();
+  const [emailInput, setEmailInput] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
 
@@ -44,8 +45,9 @@ export default function JoinPage() {
     );
   }
 
-  const { organization_name: organizationName, email, role, account_exists: accountExists } = invite.data;
-  const isRightAccount = user?.email?.toLowerCase() === email;
+  const { organization_name: organizationName, email, role, account_exists: accountExists, requires_email: requiresEmail } = invite.data;
+  const isRightAccount = Boolean(email) && user?.email?.toLowerCase() === email;
+  const loginRequired = accept.isError && errorCode(accept.error) === 'LOGIN_REQUIRED';
   const acceptError = accept.isError && (
     <p className="text-sm text-red-600 text-center">{errorMessage(accept.error)}</p>
   );
@@ -54,6 +56,25 @@ export default function JoinPage() {
       הוזמנת להצטרף ל-{organizationName} בתפקיד {ROLE_LABELS[role]}.
     </p>
   );
+
+  if (requiresEmail && user) {
+    return (
+      <CenteredCard title="הצטרפות">
+        {intro}
+        <p className="text-sm text-center text-gray-600">
+          ההצטרפות תתבצע עם החשבון <span dir="ltr">{user.email}</span>.
+        </p>
+        {acceptError}
+        <button
+          onClick={() => accept.mutate({})}
+          disabled={accept.isPending}
+          className="w-full bg-blue-700 text-white rounded-lg py-2 font-semibold disabled:opacity-50"
+        >
+          {accept.isPending ? 'מצטרף…' : 'אישור והצטרפות'}
+        </button>
+      </CenteredCard>
+    );
+  }
 
   if (accountExists && !isRightAccount) {
     return (
@@ -95,10 +116,20 @@ export default function JoinPage() {
         className="space-y-3"
         onSubmit={(event) => {
           event.preventDefault();
-          accept.mutate({ name, password });
+          accept.mutate({ name, email: requiresEmail ? emailInput : email, password });
         }}
       >
-        <input className="w-full border rounded-lg px-3 py-2 bg-gray-100" dir="ltr" value={email} readOnly />
+        <input
+          className={`w-full border rounded-lg px-3 py-2 ${requiresEmail ? '' : 'bg-gray-100'}`}
+          type="email"
+          dir="ltr"
+          placeholder="אימייל"
+          autoComplete="email"
+          value={requiresEmail ? emailInput : email}
+          onChange={(event) => setEmailInput(event.target.value)}
+          readOnly={!requiresEmail}
+          required
+        />
         <input
           className="w-full border rounded-lg px-3 py-2"
           placeholder="שם מלא"
@@ -117,7 +148,17 @@ export default function JoinPage() {
           onChange={(event) => setPassword(event.target.value)}
           required
         />
-        {acceptError}
+        {loginRequired ? (
+          <div className="space-y-2 text-center">
+            <p className="text-sm text-gray-600">כבר קיים חשבון עם האימייל הזה. התחבר כדי להצטרף איתו.</p>
+            <Link
+              to={`/company/login?next=${encodeURIComponent(`/company/join/${token}`)}`}
+              className="block border rounded-lg py-2 font-semibold"
+            >
+              התחברות לחשבון הקיים
+            </Link>
+          </div>
+        ) : acceptError}
         <button
           disabled={accept.isPending}
           className="w-full bg-blue-700 text-white rounded-lg py-2 font-semibold disabled:opacity-50"

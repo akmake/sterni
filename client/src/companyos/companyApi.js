@@ -13,8 +13,8 @@ export const companyApi = {
     api.patch(`/v1/orgs/${orgId}/members/${memberId}`, changes).then(data),
 
   invites: (orgId) => api.get(`/v1/orgs/${orgId}/invites`).then((r) => r.data),
-  createInvite: (orgId, email, role) =>
-    api.post(`/v1/orgs/${orgId}/invites`, { email, role }).then(data),
+  createInvite: (orgId, role) =>
+    api.post(`/v1/orgs/${orgId}/invites`, { role }).then(data),
   revokeInvite: (orgId, inviteId) => api.delete(`/v1/orgs/${orgId}/invites/${inviteId}`).then(data),
 
   audit: (orgId, cursor) =>

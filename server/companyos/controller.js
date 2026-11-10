@@ -280,36 +280,38 @@ export const listInvites = async (req, res) => {
 export const createInvite = async (req, res) => {
   const email = cleanName(req.body.email).toLowerCase();
   const { role } = req.body;
-  if (!EMAIL_PATTERN.test(email)) throw new ApiError(400, 'VALIDATION_ERROR', 'כתובת אימייל לא תקינה');
+  if (email && !EMAIL_PATTERN.test(email)) throw new ApiError(400, 'VALIDATION_ERROR', 'כתובת אימייל לא תקינה');
   if (!invitableRoles(req.membership.role).includes(role)) {
     throw new ApiError(403, 'ACCESS_DENIED', 'אין לך הרשאה להזמין בתפקיד זה');
   }
 
-  const existingUser = await User.findOne({ email }).select('_id');
-  if (existingUser) {
-    const existingMember = await CompanyMember.findOne({
-      organizationId: req.organization._id,
-      userId: existingUser._id,
-    });
-    if (existingMember?.status === 'active') {
-      throw new ApiError(409, 'ALREADY_MEMBER', 'המשתמש כבר חבר בארגון');
+  if (email) {
+    const existingUser = await User.findOne({ email }).select('_id');
+    if (existingUser) {
+      const existingMember = await CompanyMember.findOne({
+        organizationId: req.organization._id,
+        userId: existingUser._id,
+      });
+      if (existingMember?.status === 'active') {
+        throw new ApiError(409, 'ALREADY_MEMBER', 'המשתמש כבר חבר בארגון');
+      }
+      // An invite must not quietly undo a decision to suspend someone.
+      if (existingMember?.status === 'suspended') {
+        throw new ApiError(409, 'MEMBER_SUSPENDED', 'המשתמש מושעה. יש להחזיר אותו לפעילות ברשימת הצוות');
+      }
     }
-    // An invite must not quietly undo a decision to suspend someone.
-    if (existingMember?.status === 'suspended') {
-      throw new ApiError(409, 'MEMBER_SUSPENDED', 'המשתמש מושעה. יש להחזיר אותו לפעילות ברשימת הצוות');
-    }
-  }
 
-  // A new invite replaces any earlier link for the same address.
-  await CompanyInvite.updateMany(
-    { organizationId: req.organization._id, email, status: 'pending' },
-    { status: 'revoked' }
-  );
+    // A targeted invite replaces any earlier link for the same address.
+    await CompanyInvite.updateMany(
+      { organizationId: req.organization._id, email, status: 'pending' },
+      { status: 'revoked' }
+    );
+  }
 
   const token = crypto.randomBytes(32).toString('base64url');
   const invite = await CompanyInvite.create({
     organizationId: req.organization._id,
-    email,
+    email: email || null,
     role,
     tokenHash: hashToken(token),
     expiresAt: new Date(Date.now() + INVITE_TTL_MS),
@@ -320,7 +322,7 @@ export const createInvite = async (req, res) => {
     action: 'invite.created',
     resourceType: 'invite',
     resourceId: invite._id,
-    metadata: { email, role },
+    metadata: { email: email || null, role, invite_type: email ? 'targeted' : 'link' },
   });
 
   // The only moment the token exists in the clear.
@@ -369,7 +371,8 @@ export const getInvite = async (req, res) => {
     organization_name: organization.name,
     email: invite.email,
     role: invite.role,
-    account_exists: Boolean(await User.exists({ email: invite.email })),
+    account_exists: invite.email ? Boolean(await User.exists({ email: invite.email })) : false,
+    requires_email: !invite.email,
   });
 };
 
@@ -383,17 +386,39 @@ const sessionUserId = (req) => {
 
 export const acceptInvite = async (req, res) => {
   const invite = await findValidInvite(req.params.token);
-  let user = await User.findOne({ email: invite.email });
-  const isNewAccount = !user;
+  const signedInUserId = sessionUserId(req);
+  const requestedEmail = cleanName(req.body.email).toLowerCase();
+  const claimEmail = invite.email || requestedEmail;
+  let user = invite.email
+    ? await User.findOne({ email: invite.email })
+    : signedInUserId
+      ? await User.findById(signedInUserId)
+      : claimEmail
+        ? await User.findOne({ email: claimEmail })
+        : null;
+  let isNewAccount = false;
   let passwordHash;
   let name;
 
   if (user) {
     // Holding the link is not enough to attach somebody else's existing account.
-    if (sessionUserId(req) !== String(user._id)) {
-      throw new ApiError(403, 'LOGIN_REQUIRED', `יש להתחבר עם ${invite.email} כדי לקבל את ההזמנה`);
+    if (signedInUserId !== String(user._id)) {
+      throw new ApiError(403, 'LOGIN_REQUIRED', `כבר קיים חשבון עם ${user.email}. יש להתחבר אליו כדי לקבל את ההזמנה`);
+    }
+    const existingMember = await CompanyMember.findOne({
+      organizationId: invite.organizationId,
+      userId: user._id,
+    });
+    if (existingMember?.status === 'active') {
+      throw new ApiError(409, 'ALREADY_MEMBER', 'המשתמש כבר חבר בארגון');
+    }
+    if (existingMember?.status === 'suspended') {
+      throw new ApiError(409, 'MEMBER_SUSPENDED', 'המשתמש מושעה. מנהל הארגון צריך להחזיר אותו לפעילות');
     }
   } else {
+    if (!EMAIL_PATTERN.test(claimEmail)) {
+      throw new ApiError(400, 'VALIDATION_ERROR', 'כתובת אימייל לא תקינה');
+    }
     name = cleanName(req.body.name);
     const { password } = req.body;
     if (!name) throw new ApiError(400, 'VALIDATION_ERROR', 'שם הוא שדה חובה');
@@ -401,18 +426,19 @@ export const acceptInvite = async (req, res) => {
       throw new ApiError(400, 'VALIDATION_ERROR', `הסיסמה חייבת להכיל לפחות ${MIN_PASSWORD_LENGTH} תווים`);
     }
     passwordHash = await bcrypt.hash(password, 12);
+    isNewAccount = true;
   }
 
   // Atomic claim: of two simultaneous requests, only one can use the link.
   const claimed = await CompanyInvite.findOneAndUpdate(
     { _id: invite._id, status: 'pending', expiresAt: { $gt: new Date() } },
-    { status: 'accepted', acceptedAt: new Date() },
+    { status: 'accepted', acceptedAt: new Date(), email: user?.email || claimEmail },
     { new: true }
   );
   if (!claimed) throw new ApiError(404, 'INVITE_INVALID', 'הקישור כבר נוצל');
 
   if (isNewAccount) {
-    user = await User.create({ name, email: invite.email, passwordHash, role: 'user' });
+    user = await User.create({ name, email: claimEmail, passwordHash, role: 'user' });
   }
 
   await CompanyMember.findOneAndUpdate(
@@ -426,7 +452,7 @@ export const acceptInvite = async (req, res) => {
     action: 'invite.accepted',
     resourceType: 'invite',
     resourceId: invite._id,
-    metadata: { email: invite.email, role: invite.role, new_account: isNewAccount },
+    metadata: { email: user.email, role: invite.role, new_account: isNewAccount },
   });
 
   if (isNewAccount) createAndSendTokens(user, res);

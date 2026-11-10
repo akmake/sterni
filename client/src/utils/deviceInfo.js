@@ -228,19 +228,8 @@ const collectSync = () => {
 const resolveAsync = async (info) => {
   const tasks = [];
 
-  // ★ Fetch real public IP from external API
-  tasks.push(
-    fetch('https://api.ipify.org?format=json', { cache: 'no-store' })
-      .then(r => r.json())
-      .then(d => { if (d?.ip) info.publicIP = d.ip; })
-      .catch(() => {
-        // Fallback: try alternative API
-        return fetch('https://ipinfo.io/json')
-          .then(r => r.json())
-          .then(d => { if (d?.ip) info.publicIP = d.ip; })
-          .catch(() => {});
-      })
-  );
+  // The server already records the request IP. Asking third-party services from
+  // the browser leaks a visit and is intentionally blocked by our CSP.
 
   if (navigator.getBattery) {
     tasks.push(

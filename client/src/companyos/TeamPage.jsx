@@ -97,7 +97,6 @@ function MemberRow({ member, assignableRoles, onChange, busy }) {
 
 function InvitesSection({ orgId }) {
   const queryClient = useQueryClient();
-  const [email, setEmail] = useState('');
   const [role, setRole] = useState('member');
   const [createdLink, setCreatedLink] = useState(null);
 
@@ -109,10 +108,9 @@ function InvitesSection({ orgId }) {
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['company', orgId, 'invites'] });
 
   const create = useMutation({
-    mutationFn: () => companyApi.createInvite(orgId, email, role),
+    mutationFn: () => companyApi.createInvite(orgId, role),
     onSuccess: (invite) => {
-      setCreatedLink({ email: invite.email, url: `${window.location.origin}/company/join/${invite.token}` });
-      setEmail('');
+      setCreatedLink({ role: invite.role, url: `${window.location.origin}/company/join/${invite.token}` });
       refresh();
     },
     onError: (error) => toast.error(errorMessage(error)),
@@ -137,7 +135,10 @@ function InvitesSection({ orgId }) {
 
   return (
     <section className="space-y-3">
-      <h2 className="font-bold">הזמנת עובד</h2>
+      <div>
+        <h2 className="font-bold">קישור הצטרפות</h2>
+        <p className="text-sm text-gray-500 mt-1">בוחרים תפקיד, יוצרים קישור ושולחים אותו. העובד ימלא את הפרטים בעצמו.</p>
+      </div>
       <form
         className="bg-white rounded-xl shadow-sm p-3 flex flex-wrap gap-2"
         onSubmit={(event) => {
@@ -145,17 +146,8 @@ function InvitesSection({ orgId }) {
           create.mutate();
         }}
       >
-        <input
-          className="flex-1 min-w-[12rem] border rounded-lg px-3 py-2"
-          type="email"
-          dir="ltr"
-          placeholder="אימייל"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          required
-        />
         <select
-          className="border rounded-lg px-2 py-2"
+          className="flex-1 min-w-[12rem] border rounded-lg px-3 py-2"
           value={role}
           aria-label="תפקיד"
           onChange={(event) => setRole(event.target.value)}
@@ -175,7 +167,7 @@ function InvitesSection({ orgId }) {
       {createdLink && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-3 space-y-2">
           <p className="text-sm">
-            קישור להזמנת <span dir="ltr">{createdLink.email}</span>. הוא יוצג רק עכשיו, בתוקף ל-7 ימים ולשימוש חד-פעמי.
+            הקישור מוכן לתפקיד {ROLE_LABELS[createdLink.role]}. הוא מוצג רק עכשיו, בתוקף ל-7 ימים ולשימוש חד-פעמי.
           </p>
           <input
             readOnly
@@ -194,7 +186,7 @@ function InvitesSection({ orgId }) {
         <ul className="bg-white rounded-xl shadow-sm divide-y">
           {invites.data.data.map((invite) => (
             <li key={invite.id} className="p-3 flex items-center gap-2">
-              <span className="flex-1 text-sm truncate" dir="ltr" style={{ textAlign: 'right' }}>{invite.email}</span>
+              <span className="flex-1 text-sm truncate">קישור פתוח</span>
               <span className="text-xs text-gray-500">{ROLE_LABELS[invite.role]}</span>
               <button
                 disabled={revoke.isPending}

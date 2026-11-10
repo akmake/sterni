@@ -104,6 +104,44 @@ export const companyApi = {
   notifications: (orgId) => api.get(`/v1/orgs/${orgId}/notifications`).then((r) => r.data),
   markNotificationsRead: (orgId, ids) => api.post(`/v1/orgs/${orgId}/notifications/read`, { ids }).then(data),
   updatePresence: (orgId, body) => api.patch(`/v1/orgs/${orgId}/presence`, body).then(data),
+  search: (orgId, q, type) =>
+    api.get('/v1/orgs/' + orgId + '/search', { params: { q, type: type === 'all' ? undefined : type } }).then(data),
+  documents: (orgId) => api.get('/v1/orgs/' + orgId + '/documents').then((r) => r.data),
+  document: (orgId, id) => api.get('/v1/orgs/' + orgId + '/documents/' + id).then(data),
+  createDocument: (orgId, body) => api.post('/v1/orgs/' + orgId + '/documents', body).then(data),
+  createDocumentRevision: (orgId, id, body) =>
+    api.post('/v1/orgs/' + orgId + '/documents/' + id + '/revisions', body).then(data),
+  submitDocument: (orgId, id) =>
+    api.post('/v1/orgs/' + orgId + '/documents/' + id + '/submit-for-approval', {}).then(data),
+  publishDocument: (orgId, id) =>
+    api.post('/v1/orgs/' + orgId + '/documents/' + id + '/publish', {}).then(data),
+  decideApproval: (orgId, id, decision, reason) =>
+    api.post('/v1/orgs/' + orgId + '/approvals/' + id + '/decide', { decision, reason }).then(data),
+
+  leads: (orgId) => api.get('/v1/orgs/' + orgId + '/leads').then((r) => r.data),
+  createLead: (orgId, body) => api.post('/v1/orgs/' + orgId + '/leads', body).then(data),
+  assignLead: (orgId, id, userId) =>
+    api.post('/v1/orgs/' + orgId + '/leads/' + id + '/assign', { user_id: userId }).then(data),
+  decideLeadAssignment: (orgId, id, decision, reason) =>
+    api.post('/v1/orgs/' + orgId + '/leads/' + id + '/assignment-decision', { decision, reason }).then(data),
+  transitionLead: (orgId, id, status, reason) =>
+    api.post('/v1/orgs/' + orgId + '/leads/' + id + '/transition', { status, reason }).then(data),
+  convertLead: (orgId, id, accountId) =>
+    api.post('/v1/orgs/' + orgId + '/leads/' + id + '/convert', { account_id: accountId || '' }, {
+      headers: { 'Idempotency-Key': crypto.randomUUID() },
+    }).then(data),
+  accounts: (orgId) => api.get('/v1/orgs/' + orgId + '/accounts').then((r) => r.data),
+  deals: (orgId) => api.get('/v1/orgs/' + orgId + '/deals').then((r) => r.data),
+  quotes: (orgId, dealId) => api.get('/v1/orgs/' + orgId + '/deals/' + dealId + '/quotes').then((r) => r.data),
+  createQuote: (orgId, dealId, body) =>
+    api.post('/v1/orgs/' + orgId + '/deals/' + dealId + '/quotes', body).then(data),
+  submitQuote: (orgId, id) =>
+    api.post('/v1/orgs/' + orgId + '/quotes/' + id + '/submit-for-approval', {}).then(data),
+  closeWon: (orgId, dealId) =>
+    api.post('/v1/orgs/' + orgId + '/deals/' + dealId + '/close-won', {}, {
+      headers: { 'Idempotency-Key': crypto.randomUUID() },
+    }).then(data),
+
   editMessage: (orgId, id, messageId, body) =>
     api.patch(`/v1/orgs/${orgId}/conversations/${id}/messages/${messageId}`, { body }).then(data),
   deleteMessage: (orgId, id, messageId) =>

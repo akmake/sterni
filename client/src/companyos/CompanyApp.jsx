@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Bell, CheckSquare, ClipboardList, Folder, Home, MessageCircle, Settings, Users } from 'lucide-react';
+import { Bell, CheckSquare, ClipboardList, FileText, Folder, Handshake, Home, MessageCircle, Search, Settings, Users } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { companyApi, errorMessage } from './companyApi';
 import CenteredCard from './CenteredCard';
@@ -19,6 +19,9 @@ import ProjectsPage from './ProjectsPage';
 import ProjectPage from './ProjectPage';
 import AuditPage from './AuditPage';
 import SettingsPage from './SettingsPage';
+import SearchPage from './SearchPage';
+import DocumentsPage from './DocumentsPage';
+import CrmPage from './CrmPage';
 
 // Gives this area its own home-screen identity, separate from the main site's PWA.
 function useInstallIdentity() {
@@ -130,12 +133,15 @@ function SetupOrganization({ onCreated }) {
 
 const NAV_ITEMS = [
   { to: '/company/home', label: 'בית', icon: Home },
+  { to: '/company/search', label: 'חיפוש', icon: Search, desktopOnly: true },
   { to: '/company/chat', label: 'שיחות', icon: MessageCircle, badge: 'unread' },
   { to: '/company/my-work', label: 'העבודה שלי', icon: CheckSquare },
   { to: '/company/projects', label: 'פרויקטים', icon: Folder },
+  { to: '/company/documents', label: 'מסמכים', icon: FileText, desktopOnly: true },
+  { to: '/company/crm', label: 'CRM', icon: Handshake },
   { to: '/company/team', label: 'צוות', icon: Users, permission: 'view_members', desktopOnly: true },
   { to: '/company/audit', label: 'יומן פעולות', icon: ClipboardList, permission: 'view_audit', desktopOnly: true },
-  { to: '/company/settings', label: 'הגדרות', icon: Settings },
+  { to: '/company/settings', label: 'הגדרות', icon: Settings, desktopOnly: true },
 ];
 
 function NavItems({ permissions, unread }) {
@@ -245,6 +251,8 @@ function ActiveWorkspace({ me, membership, onSignOut }) {
           <span className="font-bold truncate">{organization.name}</span>
           <div className="flex items-center gap-3 min-w-0">
             <span className="text-sm text-blue-100 truncate">{me.user.name}</span>
+            <Link to="/company/search" className="shrink-0" aria-label="חיפוש"><Search size={20} /></Link>
+            <Link to="/company/documents" className="shrink-0" aria-label="מסמכים"><FileText size={20} /></Link>
             <Link to="/company/inbox" className="relative shrink-0" aria-label="דואר נכנס">
               <Bell size={20} />
               {inboxUnread > 0 && (
@@ -269,6 +277,9 @@ function ActiveWorkspace({ me, membership, onSignOut }) {
           <Route path="my-work" element={<MyWorkPage membership={membership} currentUserId={me.user.id} />} />
           <Route path="projects" element={<ProjectsPage membership={membership} />} />
           <Route path="projects/:projectId" element={<ProjectPage membership={membership} currentUserId={me.user.id} />} />
+          <Route path="search" element={<SearchPage membership={membership} />} />
+          <Route path="documents" element={<DocumentsPage membership={membership} />} />
+          <Route path="crm" element={<CrmPage membership={membership} />} />
           <Route path="team" element={<TeamPage membership={membership} />} />
           <Route path="audit" element={<AuditPage membership={membership} />} />
           <Route path="settings" element={<SettingsPage membership={membership} user={me.user} mfa={me.mfa} onSignOut={onSignOut} />} />

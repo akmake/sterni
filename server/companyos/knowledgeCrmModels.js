@@ -29,7 +29,7 @@ revisionSchema.index({ documentId: 1, revisionNo: 1 }, { unique: true });
 
 const approvalSchema = new Schema({
   organizationId: { type: ObjectId, ref: 'CompanyOrganization', required: true },
-  resourceType: { type: String, enum: ['document', 'quote'], required: true },
+  resourceType: { type: String, enum: ['document', 'quote', 'project_creation'], required: true },
   resourceId: { type: ObjectId, required: true },
   revisionId: { type: ObjectId, required: true },
   assigneeId: { type: ObjectId, ref: 'User', required: true },

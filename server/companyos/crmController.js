@@ -57,17 +57,23 @@ const serializeLead = async (req, lead) => ({
   created_at: lead.createdAt,
 });
 
-const serializeDeal = (req, deal) => ({
-  id: deal._id, title: deal.title, account_id: deal.accountId?._id || deal.accountId,
-  account_name: deal.accountId?.name, stage_id: deal.stageId, stage_name: deal.stageName,
-  owner_id: deal.ownerId?._id || deal.ownerId, owner_name: deal.ownerId?.name,
-  currency: deal.currency, forecast_value: deal.forecastValue, status: deal.status,
-  approved_quote_id: deal.approvedQuoteId, project_id: deal.projectId,
-  can_edit: canManage(req) || String(deal.ownerId?._id || deal.ownerId) === String(req.user._id),
-  can_close_won: Boolean(deal.approvedQuoteId) && deal.status === 'open' &&
-    (canManage(req) || String(deal.ownerId?._id || deal.ownerId) === String(req.user._id)),
-  created_at: deal.createdAt,
-});
+const serializeDeal = async (req, deal) => {
+  const projectApproval = await CompanyApproval.findOne({
+    ...scope(req), resourceType: 'project_creation', resourceId: deal._id,
+  }).populate('assigneeId', 'name').sort({ createdAt: -1 });
+  return {
+    id: deal._id, title: deal.title, account_id: deal.accountId?._id || deal.accountId,
+    account_name: deal.accountId?.name, stage_id: deal.stageId, stage_name: deal.stageName,
+    owner_id: deal.ownerId?._id || deal.ownerId, owner_name: deal.ownerId?.name,
+    currency: deal.currency, forecast_value: deal.forecastValue, status: deal.status,
+    approved_quote_id: deal.approvedQuoteId, project_id: deal.projectId,
+    project_approval: projectApproval ? serializeApproval(req, projectApproval) : null,
+    can_edit: canManage(req) || String(deal.ownerId?._id || deal.ownerId) === String(req.user._id),
+    can_close_won: Boolean(deal.approvedQuoteId) && deal.status === 'open' &&
+      (canManage(req) || String(deal.ownerId?._id || deal.ownerId) === String(req.user._id)),
+    created_at: deal.createdAt,
+  };
+};
 
 const serializeQuote = async (req, quote) => {
   const approvals = await CompanyApproval.find({
@@ -199,12 +205,29 @@ export const convertLead = async (req, res) => {
   if (!actorAllowed) throw denied();
   if (lead.status === 'converted' && lead.convertedDealId) {
     const existing = await CompanyDeal.findById(lead.convertedDealId).populate('accountId', 'name').populate('ownerId', 'name');
-    return sendData(req, res, serializeDeal(req, existing));
+    return sendData(req, res, await serializeDeal(req, existing));
   }
   if (lead.status !== 'qualified') throw new ApiError(409, 'INVALID_STATE', 'רק ליד מוסמך ניתן להמרה');
   const key = clean(req.get('Idempotency-Key'));
   if (!key) throw invalid('נדרש Idempotency-Key');
+  const claim = await CompanyLead.updateOne(
+    { _id: lead._id, ...scope(req), status: 'qualified', conversionKey: null },
+    { $set: { conversionKey: key } }
+  );
+  if (claim.modifiedCount !== 1) {
+    const current = await CompanyLead.findById(lead._id);
+    if (current?.status === 'converted' && current.convertedDealId) {
+      const existing = await CompanyDeal.findById(current.convertedDealId)
+        .populate('accountId', 'name').populate('ownerId', 'name');
+      return sendData(req, res, await serializeDeal(req, existing));
+    }
+    throw new ApiError(409, 'CONVERSION_IN_PROGRESS', 'המרת הליד כבר מתבצעת');
+  }
   let account = null;
+  let createdAccount = false;
+  let contact = null;
+  let deal = null;
+  try {
   if (req.body.account_id) {
     account = await CompanyAccount.findOne({ _id: req.body.account_id, ...scope(req) });
     if (!account) throw invalid('הלקוח לא נמצא');
@@ -214,12 +237,13 @@ export const convertLead = async (req, res) => {
       ...scope(req), name: lead.companyName || lead.personName || lead.title,
       email: lead.email, phone: lead.phone, createdBy: req.user._id,
     });
+    createdAccount = true;
   }
-  const contact = await CompanyContact.create({
+  contact = await CompanyContact.create({
     ...scope(req), accountId: account._id, name: lead.personName || lead.title,
     email: lead.email, phone: lead.phone, createdBy: req.user._id,
   });
-  const deal = await CompanyDeal.create({
+  deal = await CompanyDeal.create({
     ...scope(req), accountId: account._id, contactId: contact._id, originLeadId: lead._id,
     title: lead.title, ownerId: lead.assignedTo?._id || lead.assignedTo || req.user._id,
   });
@@ -237,7 +261,17 @@ export const convertLead = async (req, res) => {
     resourceType: 'lead', resourceId: lead._id,
     metadata: { account_id: String(account._id), contact_id: String(contact._id), deal_id: String(deal._id) },
   });
-  sendData(req, res, serializeDeal(req, deal), 201);
+  sendData(req, res, await serializeDeal(req, deal), 201);
+  } catch (error) {
+    if (deal) await CompanyDeal.deleteOne({ _id: deal._id });
+    if (contact) await CompanyContact.deleteOne({ _id: contact._id });
+    if (createdAccount && account) await CompanyAccount.deleteOne({ _id: account._id });
+    await CompanyLead.updateOne(
+      { _id: lead._id, conversionKey: key, status: 'qualified' },
+      { $set: { conversionKey: null } }
+    );
+    throw error;
+  }
 };
 
 export const listAccounts = async (req, res) => {
@@ -256,7 +290,7 @@ export const listDeals = async (req, res) => {
   if (req.query.stage_id) filter.stageId = req.query.stage_id;
   const deals = await CompanyDeal.find(filter).populate('accountId', 'name').populate('ownerId', 'name')
     .sort({ updatedAt: -1 }).limit(200);
-  sendData(req, res, deals.map((deal) => serializeDeal(req, deal)));
+  sendData(req, res, await Promise.all(deals.map((deal) => serializeDeal(req, deal))));
 };
 
 export const listQuotes = async (req, res) => {
@@ -361,7 +395,7 @@ export const decideApproval = async (req, res) => {
     revision.status = decision;
     document.status = decision;
     await Promise.all([approval.save(), revision.save(), document.save()]);
-  } else {
+  } else if (approval.resourceType === 'quote') {
     const quote = await CompanyQuote.findOne({ _id: approval.resourceId, ...scope(req) });
     if (!quote || !quote._id.equals(approval.revisionId)) throw new ApiError(409, 'REVISION_CHANGED', 'גרסת ההצעה השתנתה');
     approval.status = decision;
@@ -372,6 +406,34 @@ export const decideApproval = async (req, res) => {
     if (decision === 'approved') {
       await CompanyDeal.updateOne({ _id: quote.dealId, ...scope(req) }, { $set: { approvedQuoteId: quote._id } });
     }
+  } else {
+    const deal = await CompanyDeal.findOne({ _id: approval.resourceId, ...scope(req) });
+    if (!deal || !deal._id.equals(approval.revisionId) || deal.status !== 'won') {
+      throw new ApiError(409, 'DEAL_CHANGED', 'מצב העסקה השתנה');
+    }
+    approval.status = decision;
+    approval.reason = reason;
+    approval.decidedAt = new Date();
+    if (decision === 'approved') {
+      let project = await CompanyProject.findOne({ ...scope(req), originDealId: deal._id });
+      if (!project) {
+        try {
+          project = await CompanyProject.create({
+            ...scope(req), name: deal.title, description: 'נוצר מעסקה מאושרת',
+            status: 'planned', ownerId: deal.ownerId, originDealId: deal._id,
+          });
+          await CompanyProjectMember.create({
+            ...scope(req), projectId: project._id, userId: deal.ownerId, role: 'manager',
+          });
+        } catch (error) {
+          if (error?.code !== 11000) throw error;
+          project = await CompanyProject.findOne({ ...scope(req), originDealId: deal._id });
+        }
+      }
+      deal.projectId = project._id;
+      await deal.save();
+    }
+    await approval.save();
   }
   await approval.populate('assigneeId', 'name');
   await recordAudit(req, {
@@ -387,29 +449,22 @@ export const closeWon = async (req, res) => {
     .populate('accountId', 'name').populate('ownerId', 'name');
   if (!deal) throw notFound('העסקה');
   if (!(canManage(req) || String(deal.ownerId?._id || deal.ownerId) === String(req.user._id))) throw denied();
-  if (deal.status === 'won' && deal.projectId) return sendData(req, res, serializeDeal(req, deal));
+  if (deal.status === 'won') return sendData(req, res, await serializeDeal(req, deal));
   if (!deal.approvedQuoteId || !(await CompanyQuote.exists({ _id: deal.approvedQuoteId, status: 'approved' }))) {
     throw new ApiError(409, 'APPROVED_QUOTE_REQUIRED', 'נדרשת הצעת מחיר מאושרת');
   }
   const key = clean(req.get('Idempotency-Key'));
   if (!key) throw invalid('נדרש Idempotency-Key');
-  let project = await CompanyProject.findOne({ ...scope(req), originDealId: deal._id });
-  if (!project) {
-    project = await CompanyProject.create({
-      ...scope(req), name: deal.title, description: 'נוצר מעסקה מאושרת',
-      status: 'planned', ownerId: deal.ownerId?._id || deal.ownerId, originDealId: deal._id,
-    });
-    await CompanyProjectMember.create({
-      ...scope(req), projectId: project._id, userId: deal.ownerId?._id || deal.ownerId, role: 'manager',
-    });
-  }
+  const approval = await CompanyApproval.create({
+    ...scope(req), resourceType: 'project_creation', resourceId: deal._id,
+    revisionId: deal._id, assigneeId: await chooseApprover(req),
+  });
   deal.status = 'won';
-  deal.projectId = project._id;
   await deal.save();
   await recordAudit(req, {
     organizationId: req.organization._id, action: 'deal.won',
     resourceType: 'deal', resourceId: deal._id,
-    metadata: { project_id: String(project._id), idempotency_key: key },
+    metadata: { project_request_id: String(approval._id), idempotency_key: key },
   });
-  sendData(req, res, serializeDeal(req, deal));
+  sendData(req, res, await serializeDeal(req, deal));
 };

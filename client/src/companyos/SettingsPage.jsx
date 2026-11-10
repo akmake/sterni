@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import { MfaSettings } from './MfaScreens';
+import PushSettings from './PushSettings';
 import { AVAILABILITY_LABELS, ROLE_LABELS, companyApi, errorMessage } from './companyApi';
 
-export default function SettingsPage({ membership, user, onSignOut }) {
+export default function SettingsPage({ membership, user, mfa, onSignOut }) {
   const { organization, permissions, role } = membership;
   const queryClient = useQueryClient();
   const [name, setName] = useState(organization.name);
@@ -85,6 +87,12 @@ export default function SettingsPage({ membership, user, onSignOut }) {
           </button>
         </form>
       )}
+
+      <section className="bg-white rounded-xl shadow-sm p-4">
+        <PushSettings />
+      </section>
+
+      <MfaSettings status={mfa} membership={membership} />
 
       {/* On phones these two aren't in the bottom bar. */}
       <div className="sm:hidden bg-white rounded-xl shadow-sm divide-y">

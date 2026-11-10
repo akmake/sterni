@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import { X } from 'lucide-react';
+import TaskExtras from './TaskExtras';
 import {
   PRIORITY_LABELS,
+  RECURRENCE_LABELS,
   SEVERITY_LABELS,
   TASK_STATUS_LABELS,
   TASK_TYPE_LABELS,
@@ -25,7 +28,7 @@ const Select = ({ label, value, onChange, options, disabled }) => (
 );
 
 // `task` is null when creating a new task in `projectId`.
-export default function TaskDialog({ orgId, projectId, task, onClose }) {
+export default function TaskDialog({ orgId, projectId, task, currentUserId, onClose }) {
   const queryClient = useQueryClient();
   const isNew = !task;
   const readOnly = task ? !task.can_edit : false;
@@ -41,6 +44,12 @@ export default function TaskDialog({ orgId, projectId, task, onClose }) {
     assignee_id: task?.assignee_id ?? '',
     due_at: task?.due_at ? task.due_at.slice(0, 10) : '',
     blocked_by: (task?.blocked_by ?? []).map(String),
+    acceptance_criteria: task?.acceptance_criteria ?? '',
+    recurrence: task?.recurrence ?? '',
+    milestone_id: task?.milestone_id ?? '',
+    cycle_id: task?.cycle_id ?? '',
+    parent_id: task?.parent_id ?? '',
+    checklist: (task?.checklist ?? []).map(({ text, done }) => ({ text, done })),
   });
   const set = (key) => (value) => setForm((current) => ({ ...current, [key]: value }));
 
@@ -53,6 +62,16 @@ export default function TaskDialog({ orgId, projectId, task, onClose }) {
     queryFn: () => companyApi.tasks(orgId, { project_id: projectId, limit: 100 }),
     enabled: !isNew,
   });
+
+  const milestones = useQuery({
+    queryKey: ['company', orgId, 'project', projectId, 'milestones'],
+    queryFn: () => companyApi.planItems(orgId, projectId, 'milestones'),
+  });
+  const cycles = useQuery({
+    queryKey: ['company', orgId, 'project', projectId, 'cycles'],
+    queryFn: () => companyApi.planItems(orgId, projectId, 'cycles'),
+  });
+  const [newItem, setNewItem] = useState('');
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['company', orgId] });
 
@@ -86,6 +105,19 @@ export default function TaskDialog({ orgId, projectId, task, onClose }) {
     assigneeOptions[form.assignee_id] = task?.assignee_name ?? 'אחראי נוכחי';
   }
   const otherTasks = (siblings.data?.data ?? []).filter((other) => other.id !== task?.id);
+  const optionsFrom = (items, empty) => ({ '': empty, ...Object.fromEntries((items ?? []).map((item) => [item.id, item.name])) });
+  const parentOptions = {
+    '': 'ללא משימת אב',
+    ...Object.fromEntries(otherTasks.filter((other) => !other.parent_id).map((other) => [other.id, other.title])),
+  };
+
+  const addChecklistItem = () => {
+    if (!newItem.trim()) return;
+    set('checklist')([...form.checklist, { text: newItem.trim(), done: false }]);
+    setNewItem('');
+  };
+  const updateChecklist = (index, done) =>
+    set('checklist')(form.checklist.map((item, i) => (i === index ? { ...item, done } : item)));
 
   const toggleBlocker = (id) =>
     set('blocked_by')(form.blocked_by.includes(id) ? form.blocked_by.filter((x) => x !== id) : [...form.blocked_by, id]);
@@ -116,6 +148,42 @@ export default function TaskDialog({ orgId, projectId, task, onClose }) {
           </label>
         </div>
 
+        <div className="grid grid-cols-2 gap-2">
+          <Select label="אבן דרך" value={form.milestone_id} disabled={readOnly} onChange={set('milestone_id')} options={optionsFrom(milestones.data, 'ללא')} />
+          <Select label="Sprint" value={form.cycle_id} disabled={readOnly} onChange={set('cycle_id')} options={optionsFrom(cycles.data, 'ללא')} />
+          <Select label="חזרה" value={form.recurrence} disabled={readOnly} onChange={set('recurrence')} options={RECURRENCE_LABELS} />
+          {!isNew && <Select label="משימת אב" value={form.parent_id} disabled={readOnly} onChange={set('parent_id')} options={parentOptions} />}
+        </div>
+
+        <textarea className={field} rows={2} placeholder="קריטריוני קבלה" value={form.acceptance_criteria} disabled={readOnly} onChange={(e) => set('acceptance_criteria')(e.target.value)} />
+
+        <fieldset className="text-sm space-y-1">
+          <legend className="text-xs text-gray-600">צ׳קליסט</legend>
+          {form.checklist.map((item, index) => (
+            <label key={`${item.text}-${index}`} className="flex items-center gap-2">
+              <input type="checkbox" disabled={readOnly} checked={item.done} onChange={(e) => updateChecklist(index, e.target.checked)} />
+              <span className="flex-1 truncate">{item.text}</span>
+              {!readOnly && (
+                <button type="button" aria-label={`הסרת ${item.text}`} onClick={() => set('checklist')(form.checklist.filter((_, i) => i !== index))}><X size={12} /></button>
+              )}
+            </label>
+          ))}
+          {!readOnly && (
+            <input
+              className={field}
+              placeholder="פריט חדש ואז Enter"
+              value={newItem}
+              onChange={(e) => setNewItem(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addChecklistItem();
+                }
+              }}
+            />
+          )}
+        </fieldset>
+
         {!isNew && (
           <textarea className={field} rows={2} placeholder="תיעוד פתרון (חובה לסגירת באג חמור)" value={form.resolution} disabled={readOnly} onChange={(e) => set('resolution')(e.target.value)} />
         )}
@@ -133,6 +201,8 @@ export default function TaskDialog({ orgId, projectId, task, onClose }) {
             </div>
           </fieldset>
         )}
+
+        {!isNew && <TaskExtras orgId={orgId} task={task} currentUserId={currentUserId} />}
 
         <div className="flex gap-2 justify-end">
           <button type="button" onClick={onClose} className="px-4 py-2 border rounded-lg text-sm">סגירה</button>

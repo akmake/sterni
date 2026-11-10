@@ -14,6 +14,9 @@ import * as work from './workController.js';
 import * as chat from './chatController.js';
 import * as extras from './chatExtrasController.js';
 import * as planning from './workExtrasController.js';
+import * as teams from './teamController.js';
+import * as mfa from './mfaController.js';
+import * as push from './push.js';
 import { notifyWorkChanged } from './realtime.js';
 
 const router = express.Router();
@@ -26,6 +29,14 @@ router.post('/invites/:token/accept', authLimiter, wrap(company.acceptInvite));
 router.use(requireAuth);
 
 router.get('/me', wrap(company.getMe));
+router.get('/push', wrap(push.getPushConfig));
+router.post('/push/subscribe', wrap(push.subscribe));
+router.post('/push/unsubscribe', wrap(push.unsubscribe));
+router.get('/mfa', wrap(mfa.getMfaStatus));
+router.post('/mfa/setup', authLimiter, wrap(mfa.startSetup));
+router.post('/mfa/enable', authLimiter, wrap(mfa.enable));
+router.post('/mfa/verify', authLimiter, wrap(mfa.verify));
+router.post('/mfa/disable', authLimiter, wrap(mfa.disable));
 router.post('/orgs', requireAdmin, wrap(company.createOrganization));
 
 const org = express.Router({ mergeParams: true });
@@ -41,6 +52,13 @@ org.post('/invites', requirePermission('manage_members'), wrap(company.createInv
 org.delete('/invites/:inviteId', requirePermission('manage_members'), wrap(company.revokeInvite));
 
 org.get('/audit', requirePermission('view_audit'), wrap(company.listAudit));
+
+org.get('/teams', requirePermission('view_members'), wrap(teams.listTeams));
+org.post('/teams', requirePermission('manage_members'), wrap(teams.createTeam));
+org.patch('/teams/:teamId', requirePermission('manage_members'), wrap(teams.renameTeam));
+org.delete('/teams/:teamId', requirePermission('manage_members'), wrap(teams.deleteTeam));
+org.post('/teams/:teamId/members', requirePermission('manage_members'), wrap(teams.addTeamMember));
+org.delete('/teams/:teamId/members/:userId', requirePermission('manage_members'), wrap(teams.removeTeamMember));
 
 org.get('/conversations', wrap(chat.listConversations));
 org.post('/conversations', wrap(chat.createChannel));

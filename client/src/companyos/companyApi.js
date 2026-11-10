@@ -39,6 +39,24 @@ export const companyApi = {
   createTask: (orgId, body) => api.post(`/v1/orgs/${orgId}/tasks`, body).then(data),
   updateTask: (orgId, id, body) => api.patch(`/v1/orgs/${orgId}/tasks/${id}`, body).then(data),
 
+  bulkUpdateTasks: (orgId, body) => api.patch(`/v1/orgs/${orgId}/tasks/bulk`, body).then(data),
+  taskComments: (orgId, id) => api.get(`/v1/orgs/${orgId}/tasks/${id}/comments`).then(data),
+  addTaskComment: (orgId, id, body) => api.post(`/v1/orgs/${orgId}/tasks/${id}/comments`, { body }).then(data),
+  deleteTaskComment: (orgId, id, commentId) => api.delete(`/v1/orgs/${orgId}/tasks/${id}/comments/${commentId}`).then(data),
+  taskTime: (orgId, id) => api.get(`/v1/orgs/${orgId}/tasks/${id}/time`).then((r) => r.data),
+  addTaskTime: (orgId, id, minutes) => api.post(`/v1/orgs/${orgId}/tasks/${id}/time`, { minutes }).then(data),
+  deleteTaskTime: (orgId, id, entryId) => api.delete(`/v1/orgs/${orgId}/tasks/${id}/time/${entryId}`).then(data),
+  timeSummary: (orgId, id) => api.get(`/v1/orgs/${orgId}/projects/${id}/time-summary`).then(data),
+  planItems: (orgId, id, kind) => api.get(`/v1/orgs/${orgId}/projects/${id}/${kind}`).then(data),
+  createPlanItem: (orgId, id, kind, body) => api.post(`/v1/orgs/${orgId}/projects/${id}/${kind}`, body).then(data),
+  updatePlanItem: (orgId, id, kind, itemId, body) => api.patch(`/v1/orgs/${orgId}/projects/${id}/${kind}/${itemId}`, body).then(data),
+  deletePlanItem: (orgId, id, kind, itemId) => api.delete(`/v1/orgs/${orgId}/projects/${id}/${kind}/${itemId}`).then(data),
+  templates: (orgId) => api.get(`/v1/orgs/${orgId}/project-templates`).then(data),
+  saveAsTemplate: (orgId, id, name) => api.post(`/v1/orgs/${orgId}/projects/${id}/save-as-template`, { name }).then(data),
+  projectFromTemplate: (orgId, templateId, name) =>
+    api.post(`/v1/orgs/${orgId}/projects/from-template`, { template_id: templateId, name }).then(data),
+  workload: (orgId) => api.get(`/v1/orgs/${orgId}/workload`).then(data),
+
   requirements: (orgId, id) => api.get(`/v1/orgs/${orgId}/projects/${id}/requirements`).then(data),
   createRequirement: (orgId, id, body) => api.post(`/v1/orgs/${orgId}/projects/${id}/requirements`, body).then(data),
   updateRequirement: (orgId, id, requirementId, body) =>
@@ -92,6 +110,21 @@ export const companyApi = {
     api.delete(`/v1/orgs/${orgId}/conversations/${id}/messages/${messageId}`).then(data),
   markRead: (orgId, id, seq) => api.post(`/v1/orgs/${orgId}/conversations/${id}/read`, { seq }).then(data),
 
+  pushConfig: () => api.get('/v1/push').then(data),
+  pushSubscribe: (subscription) => api.post('/v1/push/subscribe', subscription).then(data),
+  pushUnsubscribe: (endpoint) => api.post('/v1/push/unsubscribe', { endpoint }).then(data),
+  mfaSetup: () => api.post('/v1/mfa/setup', {}).then(data),
+  mfaEnable: (code) => api.post('/v1/mfa/enable', { code }).then(data),
+  mfaVerify: (code) => api.post('/v1/mfa/verify', { code }).then(data),
+  mfaDisable: (code) => api.post('/v1/mfa/disable', { code }).then(data),
+  updateOrganizationSettings: (orgId, body) => api.patch(`/v1/orgs/${orgId}`, body).then(data),
+
+  teams: (orgId) => api.get(`/v1/orgs/${orgId}/teams`).then(data),
+  createTeam: (orgId, name) => api.post(`/v1/orgs/${orgId}/teams`, { name }).then(data),
+  deleteTeam: (orgId, id) => api.delete(`/v1/orgs/${orgId}/teams/${id}`).then(data),
+  addTeamMember: (orgId, id, userId) => api.post(`/v1/orgs/${orgId}/teams/${id}/members`, { user_id: userId }).then(data),
+  removeTeamMember: (orgId, id, userId) => api.delete(`/v1/orgs/${orgId}/teams/${id}/members/${userId}`).then(data),
+
   login: (email, password) => api.post('/auth/login', { email, password }).then((r) => r.data),
   logout: () => api.post('/auth/logout'),
 };
@@ -127,12 +160,22 @@ export const AUDIT_LABELS = {
   'conversation.created': 'ערוץ נוצר',
   'conversation.member_added': 'חבר נוסף לערוץ',
   'project.created': 'פרויקט נוצר',
+  'auth.login': 'כניסה למערכת',
+  'auth.login_failed': 'ניסיון כניסה שנכשל',
+  'member.role_expired': 'הרשאה זמנית הסתיימה',
+  'organization.mfa_policy_changed': 'מדיניות אימות דו-שלבי השתנתה',
+  'team.created': 'צוות נוצר',
+  'team.deleted': 'צוות נמחק',
+  'team.member_added': 'חבר נוסף לצוות',
+  'team.member_removed': 'חבר הוסר מצוות',
   'project.status_changed': 'סטטוס פרויקט השתנה',
   'project.member_added': 'חבר נוסף לפרויקט',
   'project.member_updated': 'תפקיד בפרויקט השתנה',
   'project.member_removed': 'חבר הוסר מפרויקט',
   'task.created': 'משימה נוצרה',
   'task.updated': 'משימה עודכנה',
+  'task.bulk_updated': 'עדכון מרובה של משימות',
+  'template.created': 'תבנית נוצרה',
   'requirement.created': 'דרישה נוצרה',
   'test.created': 'בדיקה נוצרה',
   'test.result_recorded': 'תוצאת בדיקה נרשמה',
@@ -182,5 +225,7 @@ export const REQUIREMENT_STATUS_LABELS = {
   implemented: 'מומשה',
   verified: 'אומתה',
 };
+
+export const RECURRENCE_LABELS = { '': 'ללא חזרה', daily: 'יומית', weekly: 'שבועית', monthly: 'חודשית' };
 
 export const TEST_RESULT_LABELS = { not_run: 'לא הורצה', pass: 'עברה', fail: 'נכשלה' };

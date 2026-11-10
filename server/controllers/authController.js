@@ -2,6 +2,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import User from '../models/userModel.js';
 import { createAndSendTokens } from '../utils/tokenHandler.js';
+import { recordLogin } from '../companyos/loginAudit.js';
 
 export const registerUser = async (req, res) => {
   const { name, email, password, role } = req.body;
@@ -58,9 +59,11 @@ export const loginUser = async (req, res) => {
 
     if (!(await bcrypt.compare(password, user.passwordHash))) {
       await user.incrementLoginAttempts();
+      recordLogin(user, req, false);
       return res.status(401).json({ message: 'סיסמה שגויה' });
     }
     await user.resetLoginAttempts();
+    recordLogin(user, req, true);
     const userPayload = { _id: user._id, name: user.name, email: user.email, role: user.role, tzitzitAccess: user.tzitzitAccess || false, householdAccess: user.householdAccess || false, preferredView: user.preferredView || 'management' };
     createAndSendTokens(user, res);
     return res.status(200).json({ message: "התחברת בהצלחה", user: userPayload });

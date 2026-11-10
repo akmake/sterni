@@ -4,6 +4,8 @@ import jwt from 'jsonwebtoken';
 import User from '../models/userModel.js';
 import { createAndSendTokens } from '../utils/tokenHandler.js';
 import { dropUser, isOnline } from './realtime.js';
+import { visibleColleagueIds } from './teamController.js';
+import { isMfaVerified } from './mfaCore.js';
 import {
   ApiError,
   canManageMember,
@@ -20,6 +22,7 @@ import {
   CompanyConversationMember,
   CompanyInvite,
   CompanyMember,
+  CompanyMfa,
   CompanyOrganization,
   MEMBER_STATUSES,
 } from './models.js';
@@ -52,13 +55,19 @@ export const getMe = async (req, res) => {
   const memberships = await CompanyMember.find({ userId: user._id, status: 'active' })
     .populate('organizationId');
 
+  const mfa = await CompanyMfa.findOne({ userId: user._id }).select('enabled');
+
   sendData(req, res, {
     user: { id: user._id, name: user.name, email: user.email },
+    mfa: { enabled: Boolean(mfa?.enabled), verified: await isMfaVerified(req) },
     can_create_organization: user.role === 'admin' && (await CompanyOrganization.countDocuments()) === 0,
     memberships: memberships
       .filter((m) => m.organizationId)
       .map((m) => ({
-        organization: serializeOrganization(m.organizationId),
+        organization: {
+          ...serializeOrganization(m.organizationId),
+          require_mfa: Boolean(m.organizationId.settings?.requireMfa),
+        },
         role: m.role,
         permissions: permissionsFor(m.role),
       })),
@@ -107,6 +116,25 @@ export const createOrganization = async (req, res) => {
 };
 
 export const updateOrganization = async (req, res) => {
+  if (typeof req.body.require_mfa === 'boolean') {
+    if (req.membership.role !== 'owner') throw new ApiError(403, 'ACCESS_DENIED', 'רק בעלים יכול לשנות הגדרה זו');
+    // Without this an owner could lock themselves out of their own organization.
+    if (req.body.require_mfa && !(await CompanyMfa.exists({ userId: req.user._id, enabled: true }))) {
+      throw new ApiError(409, 'MFA_SETUP_REQUIRED', 'יש להפעיל אימות דו-שלבי לעצמך לפני שמחייבים את המנהלים');
+    }
+    req.organization.settings = { ...req.organization.settings, requireMfa: req.body.require_mfa };
+    req.organization.markModified('settings');
+    await req.organization.save();
+    await recordAudit(req, {
+      organizationId: req.organization._id,
+      action: 'organization.mfa_policy_changed',
+      resourceType: 'organization',
+      resourceId: req.organization._id,
+      metadata: { require_mfa: req.body.require_mfa },
+    });
+    if (req.body.name === undefined) return sendData(req, res, serializeOrganization(req.organization));
+  }
+
   const name = cleanName(req.body.name);
   if (!name) throw new ApiError(400, 'VALIDATION_ERROR', 'שם הארגון הוא שדה חובה');
 
@@ -130,6 +158,8 @@ export const listMembers = async (req, res) => {
   const filter = { organizationId: req.organization._id };
   // Only managers see people who were suspended or left.
   if (!req.permissions.manage_members) filter.status = 'active';
+  const visible = await visibleColleagueIds(req);
+  if (visible) filter.userId = { $in: visible };
 
   const members = await CompanyMember.find(filter)
     .populate('userId', 'name email')
@@ -148,6 +178,7 @@ export const listMembers = async (req, res) => {
         name: m.userId.name,
         email: m.userId.email,
         role: m.role,
+        role_expires_at: m.roleExpiresAt,
         status: m.status,
         availability: m.availability,
         status_text: m.statusText,
@@ -190,7 +221,21 @@ export const updateMember = async (req, res) => {
     throw new ApiError(403, 'ACCESS_DENIED', 'אין לך הרשאה להעניק תפקיד זה');
   }
 
+  let expiresAt = null;
+  if (req.body.expires_at) {
+    expiresAt = new Date(req.body.expires_at);
+    if (role === undefined || Number.isNaN(expiresAt.getTime()) || expiresAt <= new Date()) {
+      throw new ApiError(400, 'VALIDATION_ERROR', 'תוקף ההרשאה לא תקין');
+    }
+    if (role === 'owner') throw new ApiError(400, 'VALIDATION_ERROR', 'בעלות לא ניתנת לזמן מוגבל');
+  }
+
   const before = { role: member.role, status: member.status };
+  if (role !== undefined) {
+    // A second temporary grant still falls back to the original role.
+    member.roleAfterExpiry = expiresAt ? member.roleAfterExpiry ?? member.role : null;
+    member.roleExpiresAt = expiresAt;
+  }
   if (role !== undefined) member.role = role;
   if (status !== undefined) member.status = status;
   await member.save();
@@ -209,7 +254,7 @@ export const updateMember = async (req, res) => {
     action: 'member.updated',
     resourceType: 'member',
     resourceId: member._id,
-    metadata: { user_id: String(member.userId), before, after: { role: member.role, status: member.status } },
+    metadata: { user_id: String(member.userId), before, after: { role: member.role, status: member.status }, expires_at: expiresAt },
   });
 
   // Open connections must lose what this change took away right now, not at next login.

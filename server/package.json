@@ -5,7 +5,8 @@
   "main": "app.js",
   "scripts": {
     "dev": "nodemon app.js",
-    "start": "node app.js"
+    "start": "node app.js",
+    "test:companyos": "node tests/companyos/run.mjs"
   },
   "dependencies": {
     "@hebcal/core": "^6.9.3",
@@ -47,6 +48,7 @@
     "sqlite3": "^5.1.7",
     "tz-lookup": "^6.1.25",
     "ua-parser-js": "^2.0.9",
+    "web-push": "^3.6.7",
     "yahoo-finance2": "^2.13.3"
   },
   "devDependencies": {

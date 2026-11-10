@@ -34,7 +34,8 @@ export default defineConfig({
       },
       // --- התיקון לשגיאה: הגדלת המגבלה ל-4MB ---
       workbox: {
-        maximumFileSizeToCacheInBytes: 4000000
+        maximumFileSizeToCacheInBytes: 4000000,
+        importScripts: ['company-push.js']
       }
     })
   ],

@@ -22,6 +22,8 @@ const memberSchema = new Schema(
     userId: { type: ObjectId, ref: 'User', required: true },
     role: { type: String, enum: ROLES, required: true },
     status: { type: String, enum: MEMBER_STATUSES, default: 'active' },
+    roleExpiresAt: { type: Date, default: null },
+    roleAfterExpiry: { type: String, enum: [...ROLES, null], default: null },
     availability: { type: String, enum: AVAILABILITIES, default: 'active' },
     statusText: { type: String, default: '', maxlength: 80 },
   },
@@ -29,6 +31,38 @@ const memberSchema = new Schema(
 );
 memberSchema.index({ organizationId: 1, userId: 1 }, { unique: true });
 memberSchema.index({ userId: 1, status: 1 });
+
+const teamSchema = new Schema(
+  {
+    organizationId: { type: ObjectId, ref: 'CompanyOrganization', required: true },
+    name: { type: String, required: true, trim: true, maxlength: 80 },
+  },
+  { timestamps: true, versionKey: false, collection: 'company_teams' }
+);
+teamSchema.index({ organizationId: 1 });
+
+const teamMemberSchema = new Schema(
+  {
+    organizationId: { type: ObjectId, ref: 'CompanyOrganization', required: true },
+    teamId: { type: ObjectId, ref: 'CompanyTeam', required: true },
+    userId: { type: ObjectId, ref: 'User', required: true },
+    isLead: { type: Boolean, default: false },
+  },
+  { timestamps: true, versionKey: false, collection: 'company_team_members' }
+);
+teamMemberSchema.index({ teamId: 1, userId: 1 }, { unique: true });
+teamMemberSchema.index({ organizationId: 1, userId: 1 });
+
+const mfaSchema = new Schema(
+  {
+    userId: { type: ObjectId, ref: 'User', required: true, unique: true },
+    secretEnc: { type: String, required: true },
+    enabled: { type: Boolean, default: false },
+    recoveryHashes: [{ type: String }],
+    lastStep: { type: Number, default: -1 },
+  },
+  { timestamps: true, versionKey: false, collection: 'company_mfa' }
+);
 
 const inviteSchema = new Schema(
   {
@@ -92,6 +126,7 @@ const projectMemberSchema = new Schema(
     projectId: { type: ObjectId, ref: 'CompanyProject', required: true },
     userId: { type: ObjectId, ref: 'User', required: true },
     role: { type: String, enum: PROJECT_ROLES, required: true },
+    expiresAt: { type: Date, default: null },
   },
   { timestamps: true, versionKey: false, collection: 'company_project_members' }
 );
@@ -355,7 +390,8 @@ const projectTemplateSchema = new Schema(
         title: String,
         description: String,
         priority: String,
-        type: String,
+        // Spelled out: a bare `type: String` here would declare the whole subdocument as a string.
+        type: { type: String },
         offsetDays: { type: Number, default: null },
       },
     ],
@@ -385,6 +421,24 @@ export const CompanyRequirement =
   mongoose.models.CompanyRequirement || mongoose.model('CompanyRequirement', requirementSchema);
 export const CompanyTestCase =
   mongoose.models.CompanyTestCase || mongoose.model('CompanyTestCase', testCaseSchema);
+
+const pushSubscriptionSchema = new Schema(
+  {
+    userId: { type: ObjectId, ref: 'User', required: true },
+    endpoint: { type: String, required: true, unique: true },
+    keys: { p256dh: String, auth: String },
+  },
+  { timestamps: true, versionKey: false, collection: 'company_push_subscriptions' }
+);
+pushSubscriptionSchema.index({ userId: 1 });
+
+export const CompanyPushSubscription =
+  mongoose.models.CompanyPushSubscription || mongoose.model('CompanyPushSubscription', pushSubscriptionSchema);
+
+export const CompanyTeam = mongoose.models.CompanyTeam || mongoose.model('CompanyTeam', teamSchema);
+export const CompanyTeamMember =
+  mongoose.models.CompanyTeamMember || mongoose.model('CompanyTeamMember', teamMemberSchema);
+export const CompanyMfa = mongoose.models.CompanyMfa || mongoose.model('CompanyMfa', mfaSchema);
 
 export const CompanyOrganization =
   mongoose.models.CompanyOrganization || mongoose.model('CompanyOrganization', organizationSchema);

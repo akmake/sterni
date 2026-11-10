@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import TaskDialog from './TaskDialog';
+import { CalendarView, TaskList, TimelineView, ViewSwitcher } from './TaskViews';
 import {
   PROJECT_ROLE_LABELS,
   PROJECT_STATUS_LABELS,
@@ -27,8 +28,18 @@ const useCompanyMutation = (orgId, mutationFn, onDone) => {
 
 const input = 'border rounded-lg px-3 py-2 text-sm';
 
-function TasksTab({ orgId, projectId, canWrite }) {
+const TASK_VIEWS = { board: 'לוח', list: 'רשימה', calendar: 'לוח שנה', timeline: 'Timeline' };
+
+function TasksTab({ orgId, projectId, canWrite, currentUserId }) {
   const [dialog, setDialog] = useState(null);
+  const [view, setView] = useState('board');
+  const [dragOver, setDragOver] = useState(null);
+  const queryClient = useQueryClient();
+  const move = useMutation({
+    mutationFn: ({ task, status }) => companyApi.updateTask(orgId, task.id, { status, version: task.version }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['company', orgId] }),
+    onError: (error) => toast.error(errorMessage(error)),
+  });
   const params = { project_id: projectId, limit: 100 };
   const tasks = useQuery({
     queryKey: ['company', orgId, 'tasks', params],
@@ -40,19 +51,47 @@ function TasksTab({ orgId, projectId, canWrite }) {
 
   return (
     <div className="space-y-3">
-      {canWrite && (
-        <button onClick={() => setDialog({ task: null })} className="bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-semibold">
-          משימה חדשה
-        </button>
-      )}
-      <div className="flex gap-3 overflow-x-auto pb-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        {canWrite ? (
+          <button onClick={() => setDialog({ task: null })} className="bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-semibold">
+            משימה חדשה
+          </button>
+        ) : <span />}
+        <ViewSwitcher views={TASK_VIEWS} value={view} onChange={setView} />
+      </div>
+      {view === 'list' && <TaskList tasks={tasks.data.data} onOpen={(task) => setDialog({ task })} />}
+      {view === 'calendar' && <CalendarView tasks={tasks.data.data} onOpen={(task) => setDialog({ task })} />}
+      {view === 'timeline' && <TimelineView tasks={tasks.data.data} onOpen={(task) => setDialog({ task })} />}
+      {view === 'board' && <div className="flex gap-3 overflow-x-auto pb-2">
         {Object.entries(TASK_STATUS_LABELS).map(([status, label]) => {
           const column = tasks.data.data.filter((task) => task.status === status);
           return (
-            <div key={status} className="w-56 shrink-0 bg-gray-100 rounded-xl p-2 space-y-2">
+            <div
+              key={status}
+              className={`w-56 shrink-0 rounded-xl p-2 space-y-2 ${dragOver === status ? 'bg-blue-100' : 'bg-gray-100'}`}
+              onDragOver={(event) => {
+                if (canWrite) {
+                  event.preventDefault();
+                  setDragOver(status);
+                }
+              }}
+              onDragLeave={() => setDragOver(null)}
+              onDrop={(event) => {
+                event.preventDefault();
+                setDragOver(null);
+                const task = tasks.data.data.find((item) => String(item.id) === event.dataTransfer.getData('text/plain'));
+                if (task && task.status !== status) move.mutate({ task, status });
+              }}
+            >
               <h3 className="text-xs font-bold text-gray-600">{label} ({column.length})</h3>
               {column.map((task) => (
-                <button key={task.id} onClick={() => setDialog({ task })} className="block w-full text-right bg-white rounded-lg shadow-sm p-2">
+                <button
+                  key={task.id}
+                  draggable={canWrite}
+                  onDragStart={(event) => event.dataTransfer.setData('text/plain', String(task.id))}
+                  onClick={() => setDialog({ task })}
+                  className="block w-full text-right bg-white rounded-lg shadow-sm p-2"
+                >
                   <p className="text-sm font-semibold">{task.title}</p>
                   <p className="text-xs text-gray-500">{task.assignee_name || 'ללא אחראי'}</p>
                   {task.is_blocked && <p className="text-xs text-red-600">חסומה</p>}
@@ -61,8 +100,8 @@ function TasksTab({ orgId, projectId, canWrite }) {
             </div>
           );
         })}
-      </div>
-      {dialog && <TaskDialog orgId={orgId} projectId={projectId} task={dialog.task} onClose={() => setDialog(null)} />}
+      </div>}
+      {dialog && <TaskDialog orgId={orgId} projectId={projectId} task={dialog.task} currentUserId={currentUserId} onClose={() => setDialog(null)} />}
     </div>
   );
 }
@@ -274,9 +313,95 @@ function MembersTab({ orgId, projectId, canManage, canListOrg }) {
   );
 }
 
-const TABS = { tasks: 'משימות', requirements: 'דרישות', tests: 'בדיקות', members: 'חברים' };
+function PlanSection({ orgId, projectId, kind, title, canManage, statuses, withStart }) {
+  const [name, setName] = useState('');
+  const [start, setStart] = useState('');
+  const [due, setDue] = useState('');
+  const items = useQuery({
+    queryKey: ['company', orgId, 'project', projectId, kind],
+    queryFn: () => companyApi.planItems(orgId, projectId, kind),
+  });
+  const body = withStart ? { name, start_at: start, end_at: due } : { name, due_at: due };
+  const create = useCompanyMutation(orgId, () => companyApi.createPlanItem(orgId, projectId, kind, body), () => {
+    setName('');
+    setStart('');
+    setDue('');
+  });
+  const update = useCompanyMutation(orgId, ({ id, status }) => companyApi.updatePlanItem(orgId, projectId, kind, id, { status }));
+  const remove = useCompanyMutation(orgId, (id) => companyApi.deletePlanItem(orgId, projectId, kind, id));
 
-export default function ProjectPage({ membership }) {
+  return (
+    <section className="space-y-2">
+      <h3 className="font-bold text-sm">{title}</h3>
+      {canManage && (
+        <form className="flex flex-wrap gap-2" onSubmit={(event) => { event.preventDefault(); create.mutate(); }}>
+          <input className={`${input} flex-1 min-w-[8rem]`} placeholder="שם" value={name} onChange={(e) => setName(e.target.value)} required />
+          {withStart && <input type="date" className={input} aria-label="התחלה" value={start} onChange={(e) => setStart(e.target.value)} />}
+          <input type="date" className={input} aria-label="סיום" value={due} onChange={(e) => setDue(e.target.value)} />
+          <button disabled={create.isPending} className="bg-blue-700 text-white rounded-lg px-4 text-sm font-semibold">הוספה</button>
+        </form>
+      )}
+      {items.data?.length === 0 && <p className="text-sm text-gray-500">אין עדיין</p>}
+      <ul className="bg-white rounded-xl shadow-sm divide-y">
+        {(items.data ?? []).map((item) => (
+          <li key={item.id} className="p-3 flex items-center gap-2">
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm truncate">{item.name}</p>
+              <p className="text-xs text-gray-500">
+                {item.completed_tasks}/{item.task_count} משימות
+                {item.due_at && ` · ${new Date(item.due_at).toLocaleDateString('he-IL')}`}
+              </p>
+            </div>
+            {canManage && (
+              <>
+                <select className="border rounded-lg px-2 py-1 text-xs" value={item.status} aria-label={`סטטוס ${item.name}`} onChange={(e) => update.mutate({ id: item.id, status: e.target.value })}>
+                  {Object.entries(statuses).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                </select>
+                <button className="text-xs text-red-700 underline" onClick={() => remove.mutate(item.id)}>מחיקה</button>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function PlanTab({ orgId, projectId, canManage, canSaveTemplate }) {
+  const [templateName, setTemplateName] = useState('');
+  const summary = useQuery({
+    queryKey: ['company', orgId, 'project', projectId, 'time-summary'],
+    queryFn: () => companyApi.timeSummary(orgId, projectId),
+  });
+  const save = useCompanyMutation(orgId, () => companyApi.saveAsTemplate(orgId, projectId, templateName), () => {
+    setTemplateName('');
+    toast.success('התבנית נשמרה');
+  });
+  const hours = (minutes) => (minutes / 60).toFixed(1);
+
+  return (
+    <div className="space-y-5">
+      <PlanSection orgId={orgId} projectId={projectId} kind="milestones" title="אבני דרך" canManage={canManage} statuses={{ open: 'פתוחה', done: 'הושלמה' }} />
+      <PlanSection orgId={orgId} projectId={projectId} kind="cycles" title="Sprints" canManage={canManage} withStart statuses={{ planned: 'מתוכנן', active: 'פעיל', done: 'הסתיים' }} />
+      <section className="space-y-1">
+        <h3 className="font-bold text-sm">שעות עבודה ({hours(summary.data?.total_minutes ?? 0)})</h3>
+        {(summary.data?.people ?? []).map((person) => (
+          <p key={person.user_id} className="text-sm">{person.name}: {hours(person.minutes)}</p>
+        ))}
+      </section>
+      {canSaveTemplate && canManage && (
+        <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); save.mutate(); }}>
+          <input className={`${input} flex-1`} placeholder="שמירת הפרויקט כתבנית: שם" value={templateName} onChange={(e) => setTemplateName(e.target.value)} required />
+          <button disabled={save.isPending} className="border rounded-lg px-4 text-sm">שמירה</button>
+        </form>
+      )}
+    </div>
+  );
+}
+
+const TABS = { tasks: 'משימות', plan: 'תכנון', requirements: 'דרישות', tests: 'בדיקות', members: 'חברים' };
+
+export default function ProjectPage({ membership, currentUserId }) {
   const orgId = membership.organization.id;
   const queryClient = useQueryClient();
   const { projectId } = useParams();
@@ -344,7 +469,10 @@ export default function ProjectPage({ membership }) {
         </button>
       </div>
 
-      {tab === 'tasks' && <TasksTab orgId={orgId} projectId={projectId} canWrite={permissions.write} />}
+      {tab === 'tasks' && <TasksTab orgId={orgId} projectId={projectId} canWrite={permissions.write} currentUserId={currentUserId} />}
+      {tab === 'plan' && (
+        <PlanTab orgId={orgId} projectId={projectId} canManage={permissions.edit_project} canSaveTemplate={membership.permissions.create_projects} />
+      )}
       {tab === 'requirements' && <RequirementsTab orgId={orgId} projectId={projectId} canWrite={permissions.write} />}
       {tab === 'tests' && <TestsTab orgId={orgId} projectId={projectId} canWrite={permissions.write} />}
       {tab === 'members' && (

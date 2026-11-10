@@ -12,6 +12,7 @@ import TeamPage from './TeamPage';
 import MyWorkPage from './MyWorkPage';
 import HomePage from './HomePage';
 import InboxPage from './InboxPage';
+import { MfaSetupScreen, MfaVerifyScreen } from './MfaScreens';
 import ChatPage from './ChatPage';
 import { useRealtime } from './useRealtime';
 import ProjectsPage from './ProjectsPage';
@@ -212,6 +213,12 @@ function Workspace() {
     );
   }
 
+  // The server enforces this on every request; these screens only guide the user through it.
+  if (me.data.mfa.enabled && !me.data.mfa.verified) return <MfaVerifyScreen onSignOut={signOut} />;
+  if (!me.data.mfa.enabled && membership.organization.require_mfa && ['owner', 'admin'].includes(membership.role)) {
+    return <MfaSetupScreen onSignOut={signOut} />;
+  }
+
   return <ActiveWorkspace me={me.data} membership={membership} onSignOut={signOut} />;
 }
 
@@ -259,12 +266,12 @@ function ActiveWorkspace({ me, membership, onSignOut }) {
           <Route path="chat" element={<ChatPage membership={membership} currentUserId={me.user.id} />} />
           <Route path="chat/:conversationId" element={<ChatPage membership={membership} currentUserId={me.user.id} />} />
           <Route path="inbox" element={<InboxPage membership={membership} />} />
-          <Route path="my-work" element={<MyWorkPage membership={membership} />} />
+          <Route path="my-work" element={<MyWorkPage membership={membership} currentUserId={me.user.id} />} />
           <Route path="projects" element={<ProjectsPage membership={membership} />} />
-          <Route path="projects/:projectId" element={<ProjectPage membership={membership} />} />
+          <Route path="projects/:projectId" element={<ProjectPage membership={membership} currentUserId={me.user.id} />} />
           <Route path="team" element={<TeamPage membership={membership} />} />
           <Route path="audit" element={<AuditPage membership={membership} />} />
-          <Route path="settings" element={<SettingsPage membership={membership} user={me.user} onSignOut={onSignOut} />} />
+          <Route path="settings" element={<SettingsPage membership={membership} user={me.user} mfa={me.mfa} onSignOut={onSignOut} />} />
           <Route path="*" element={<Navigate to="/company/home" replace />} />
         </Routes>
       </main>

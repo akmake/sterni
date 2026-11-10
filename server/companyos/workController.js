@@ -71,9 +71,11 @@ const orgScope = (req) => ({ organizationId: req.organization._id });
 
 // Null means "every project": only the organization owner has that reach. An
 // admin works by membership, so a management title alone doesn't open content.
+const NOT_EXPIRED = () => ({ $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }] });
+
 export const accessibleProjectIds = async (req) => {
   if (req.membership.role === 'owner') return null;
-  return CompanyProjectMember.find({ ...orgScope(req), userId: req.user._id }).distinct('projectId');
+  return CompanyProjectMember.find({ ...orgScope(req), userId: req.user._id, ...NOT_EXPIRED() }).distinct('projectId');
 };
 
 export const loadProject = async (req, projectId) => {
@@ -85,7 +87,7 @@ export const loadProject = async (req, projectId) => {
 
   if (req.membership.role === 'owner') return { project, role: 'manager' };
 
-  const member = await CompanyProjectMember.findOne({ projectId: project._id, userId: req.user._id });
+  const member = await CompanyProjectMember.findOne({ projectId: project._id, userId: req.user._id, ...NOT_EXPIRED() });
   if (!member) throw missing;
   return { project, role: member.role };
 };
@@ -326,6 +328,7 @@ const serializeProjectMember = (member) => ({
   name: member.userId?.name ?? null,
   email: member.userId?.email ?? null,
   role: member.role,
+  expires_at: member.expiresAt,
 });
 
 export const listProjectMembers = async (req, res) => {
@@ -340,6 +343,13 @@ const assertRoleAllowedFor = (orgRole, projectRole) => {
   if (orgRole === 'guest' && projectRole !== 'viewer') {
     throw denied('אורח יכול להיות בפרויקט בצפייה בלבד');
   }
+};
+
+const parseExpiry = (value) => {
+  if (!value) return null;
+  const date = parseDate(value);
+  if (date <= new Date()) throw invalid('תוקף ההרשאה חייב להיות בעתיד');
+  return date;
 };
 
 export const addProjectMember = async (req, res) => {
@@ -361,6 +371,7 @@ export const addProjectMember = async (req, res) => {
     projectId: access.project._id,
     userId,
     role,
+    expiresAt: parseExpiry(req.body.expires_at),
   });
   await audit(req, 'project.member_added', 'project', access.project._id, { user_id: String(userId), role });
 

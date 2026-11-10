@@ -8,14 +8,21 @@ export default function ProjectsPage({ membership }) {
   const orgId = membership.organization.id;
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
+  const [templateId, setTemplateId] = useState('');
 
   const projects = useQuery({
     queryKey: ['company', orgId, 'projects'],
     queryFn: () => companyApi.projects(orgId),
   });
 
+  const templates = useQuery({
+    queryKey: ['company', orgId, 'projects', 'templates'],
+    queryFn: () => companyApi.templates(orgId),
+    enabled: membership.permissions.create_projects,
+  });
+
   const create = useMutation({
-    mutationFn: () => companyApi.createProject(orgId, { name }),
+    mutationFn: () => (templateId ? companyApi.projectFromTemplate(orgId, templateId, name) : companyApi.createProject(orgId, { name })),
     onSuccess: () => {
       setName('');
       queryClient.invalidateQueries({ queryKey: ['company', orgId, 'projects'] });
@@ -29,19 +36,25 @@ export default function ProjectsPage({ membership }) {
 
       {membership.permissions.create_projects && (
         <form
-          className="bg-white rounded-xl shadow-sm p-3 flex gap-2"
+          className="bg-white rounded-xl shadow-sm p-3 flex flex-wrap gap-2"
           onSubmit={(event) => {
             event.preventDefault();
             create.mutate();
           }}
         >
           <input
-            className="flex-1 border rounded-lg px-3 py-2"
+            className="flex-1 min-w-[10rem] border rounded-lg px-3 py-2"
             placeholder="שם פרויקט חדש"
             value={name}
             onChange={(event) => setName(event.target.value)}
             required
           />
+          {templates.data?.length > 0 && (
+            <select className="border rounded-lg px-2" aria-label="תבנית" value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
+              <option value="">ללא תבנית</option>
+              {templates.data.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
+            </select>
+          )}
           <button disabled={create.isPending} className="bg-blue-700 text-white rounded-lg px-4 font-semibold disabled:opacity-50">
             יצירה
           </button>

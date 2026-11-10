@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import mongoose from 'mongoose';
+import { mfaBlock } from './mfaCore.js';
 import { CompanyAuditLog, CompanyMember, CompanyOrganization } from './models.js';
 
 export class ApiError extends Error {
@@ -47,6 +48,25 @@ export const permissionsFor = (role) => ({
   create_projects: ['owner', 'admin', 'manager'].includes(role),
 });
 
+// A temporary grant ends at its expiry on the next request, with no job to wait for.
+const applyExpiredRole = async (req, membership) => {
+  if (!membership.roleExpiresAt || membership.roleExpiresAt > new Date()) return;
+  const temporaryRole = membership.role;
+  membership.role = membership.roleAfterExpiry || 'member';
+  membership.roleExpiresAt = null;
+  membership.roleAfterExpiry = null;
+  await membership.save();
+  await CompanyAuditLog.create({
+    organizationId: membership.organizationId,
+    actorId: null,
+    action: 'member.role_expired',
+    resourceType: 'member',
+    resourceId: String(membership._id),
+    metadata: { user_id: String(membership.userId), before: temporaryRole, after: membership.role },
+    requestId: req.requestId,
+  });
+};
+
 // Membership is read from the database on every request, so a suspension or a
 // role change applies immediately, even to a session that is already open.
 export const requireOrgMember = wrap(async (req, res, next) => {
@@ -64,6 +84,11 @@ export const requireOrgMember = wrap(async (req, res, next) => {
 
   const organization = await CompanyOrganization.findById(orgId);
   if (!organization) throw notFound;
+
+  await applyExpiredRole(req, membership);
+
+  const blocked = await mfaBlock(req, membership, organization);
+  if (blocked) throw new ApiError(403, blocked, 'נדרש אימות דו-שלבי');
 
   req.membership = membership;
   req.organization = organization;

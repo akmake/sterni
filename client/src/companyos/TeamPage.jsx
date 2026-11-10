@@ -4,6 +4,10 @@ import toast from 'react-hot-toast';
 import { AVAILABILITY_LABELS, ROLE_LABELS, STATUS_LABELS, companyApi, errorMessage } from './companyApi';
 
 function MemberRow({ member, assignableRoles, onChange, busy }) {
+  const [temporary, setTemporary] = useState(false);
+  const [until, setUntil] = useState('');
+  const [tempRole, setTempRole] = useState('manager');
+
   return (
     <li className="p-3 flex flex-wrap items-center gap-2">
       <div className="flex-1 min-w-[10rem]">
@@ -60,6 +64,28 @@ function MemberRow({ member, assignableRoles, onChange, busy }) {
             >
               החזרה לפעילות
             </button>
+          )}
+          <button className="text-sm text-gray-600 underline" onClick={() => setTemporary((value) => !value)}>הרשאה זמנית</button>
+          {member.role_expires_at && (
+            <span className="text-xs text-amber-700 w-full">
+              זמני עד {new Date(member.role_expires_at).toLocaleDateString('he-IL')}
+            </span>
+          )}
+          {temporary && (
+            <form
+              className="w-full flex flex-wrap gap-2 items-center"
+              onSubmit={(event) => {
+                event.preventDefault();
+                onChange(member.id, { role: tempRole, expires_at: until });
+                setTemporary(false);
+              }}
+            >
+              <select className="border rounded-lg px-2 py-1 text-sm" aria-label="תפקיד זמני" value={tempRole} onChange={(e) => setTempRole(e.target.value)}>
+                {assignableRoles.filter((role) => role !== 'owner').map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}
+              </select>
+              <input type="date" required className="border rounded-lg px-2 py-1 text-sm" aria-label="בתוקף עד" value={until} onChange={(e) => setUntil(e.target.value)} />
+              <button className="text-sm text-blue-700 font-semibold">הענקה</button>
+            </form>
           )}
         </>
       ) : (
@@ -185,6 +211,101 @@ function InvitesSection({ orgId }) {
   );
 }
 
+function TeamsSection({ orgId, canManage, people }) {
+  const queryClient = useQueryClient();
+  const [name, setName] = useState('');
+  const key = ['company', orgId, 'teams'];
+  const teams = useQuery({ queryKey: key, queryFn: () => companyApi.teams(orgId) });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['company', orgId] });
+  const onError = (error) => toast.error(errorMessage(error));
+
+  const create = useMutation({
+    mutationFn: () => companyApi.createTeam(orgId, name),
+    onSuccess: () => {
+      setName('');
+      refresh();
+    },
+    onError,
+  });
+  const remove = useMutation({ mutationFn: (id) => companyApi.deleteTeam(orgId, id), onSuccess: refresh, onError });
+  const add = useMutation({ mutationFn: ({ id, userId }) => companyApi.addTeamMember(orgId, id, userId), onSuccess: refresh, onError });
+  const drop = useMutation({ mutationFn: ({ id, userId }) => companyApi.removeTeamMember(orgId, id, userId), onSuccess: refresh, onError });
+
+  return (
+    <section className="space-y-2">
+      <h2 className="font-bold">צוותים</h2>
+      {canManage && (
+        <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); create.mutate(); }}>
+          <input className="flex-1 border rounded-lg px-3 py-2" placeholder="צוות חדש" value={name} onChange={(e) => setName(e.target.value)} required />
+          <button disabled={create.isPending} className="bg-blue-700 text-white rounded-lg px-4 font-semibold">יצירה</button>
+        </form>
+      )}
+      {teams.data?.length === 0 && <p className="text-sm text-gray-500">אין צוותים עדיין</p>}
+      <ul className="bg-white rounded-xl shadow-sm divide-y">
+        {(teams.data ?? []).map((team) => {
+          const inTeam = new Set(team.members.map((m) => String(m.user_id)));
+          const candidates = people.filter((p) => p.status === 'active' && !inTeam.has(String(p.user_id)));
+          return (
+            <li key={team.id} className="p-3 space-y-1">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold">{team.name}</span>
+                {canManage && <button className="text-xs text-red-700 underline" onClick={() => remove.mutate(team.id)}>מחיקה</button>}
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {team.members.map((member) => (
+                  <span key={member.user_id} className="text-xs bg-gray-100 rounded-full px-2 py-0.5">
+                    {member.name}
+                    {canManage && (
+                      <button className="mr-1 text-gray-500" aria-label={`הסרת ${member.name}`} onClick={() => drop.mutate({ id: team.id, userId: member.user_id })}>✕</button>
+                    )}
+                  </span>
+                ))}
+              </div>
+              {canManage && candidates.length > 0 && (
+                <select
+                  className="border rounded-lg px-2 py-1 text-xs"
+                  value=""
+                  aria-label={`הוספה לצוות ${team.name}`}
+                  onChange={(e) => e.target.value && add.mutate({ id: team.id, userId: e.target.value })}
+                >
+                  <option value="">הוספת חבר…</option>
+                  {candidates.map((person) => <option key={person.user_id} value={person.user_id}>{person.name}</option>)}
+                </select>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+function WorkloadSection({ orgId }) {
+  const workload = useQuery({ queryKey: ['company', orgId, 'tasks', 'workload'], queryFn: () => companyApi.workload(orgId) });
+  if (!workload.data?.length) return null;
+  const max = Math.max(...workload.data.map((row) => row.open));
+  return (
+    <section className="space-y-2">
+      <h2 className="font-bold">עומסים</h2>
+      <ul className="bg-white rounded-xl shadow-sm divide-y">
+        {workload.data.map((row) => (
+          <li key={row.user_id} className="p-3">
+            <div className="flex justify-between text-sm">
+              <span className="font-semibold">{row.name}</span>
+              <span className="text-xs text-gray-500">
+                {row.open} פתוחות{row.overdue > 0 && <span className="text-red-600"> · {row.overdue} באיחור</span>}
+              </span>
+            </div>
+            <div className="h-1.5 bg-gray-200 rounded-full mt-1 overflow-hidden">
+              <div className="h-full bg-blue-700" style={{ width: `${(row.open / max) * 100}%` }} />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export default function TeamPage({ membership }) {
   const orgId = membership.organization.id;
   const queryClient = useQueryClient();
@@ -226,6 +347,10 @@ export default function TeamPage({ membership }) {
           </ul>
         )}
       </section>
+
+      <TeamsSection orgId={orgId} canManage={membership.permissions.manage_members} people={members.data?.data ?? []} />
+
+      <WorkloadSection orgId={orgId} />
 
       {membership.permissions.manage_members && <InvitesSection orgId={orgId} />}
     </div>

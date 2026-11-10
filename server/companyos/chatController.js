@@ -9,6 +9,7 @@ import {
   CompanyNotification,
   CompanyProjectMember,
 } from './models.js';
+import { pushToUsers } from './push.js';
 import { emitToTeam, emitToUsers } from './realtime.js';
 
 const MAX_BODY = 10000;
@@ -91,6 +92,8 @@ const userCanAccess = async (conversation, userId) => {
 export const notify = async (organizationId, userId, fields) => {
   const notification = await CompanyNotification.create({ organizationId, userId, ...fields });
   emitToUsers([String(userId)], 'notification_new');
+  const url = fields.resourceType === 'conversation' ? `/company/chat/${fields.resourceId}` : '/company/inbox';
+  pushToUsers(organizationId, [userId], { title: fields.title, body: fields.body ?? '', url });
   return notification;
 };
 
@@ -421,6 +424,20 @@ export const sendMessage = async (req, res) => {
 
   const payload = serializeMessage(message, author.name);
   await deliver(conversation, 'message_new', payload);
+
+  // Personal conversations alert offline members; channels stay quiet unless someone is mentioned.
+  if (conversation.type === 'dm' || conversation.type === 'group') {
+    const rows = await CompanyConversationMember.find({
+      conversationId: conversation._id,
+      userId: { $ne: req.user._id },
+      muted: { $ne: true },
+    }).select('userId');
+    pushToUsers(
+      conversation.organizationId,
+      rows.map((row) => row.userId).filter((id) => !mentions.includes(String(id))),
+      { title: author.name, body: preview.slice(0, PREVIEW_LENGTH), url: `/company/chat/${conversation._id}` }
+    );
+  }
   sendData(req, res, payload, 201);
 };
 

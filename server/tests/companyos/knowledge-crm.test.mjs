@@ -125,9 +125,29 @@ async function main() {
   check('create quote', quote.status, 201);
   const quoteId = quote.json.data.id;
   check('submit quote', (await call('POST', root + '/quotes/' + quoteId + '/submit-for-approval', seller, {})).status, 200);
-  const quoteList = await call('GET', root + '/deals/' + dealId + '/quotes', admin);
-  const quoteApproval = quoteList.json.data[0].approvals.find((item) => item.status === 'pending');
-  check('approve quote', (await call('POST', root + '/approvals/' + quoteApproval.id + '/decide', admin, {
+  const revised = await call('POST', root + '/deals/' + dealId + '/quotes', seller, {
+    currency: 'ILS', lines: [{ description: 'פיתוח מתוקן', quantity: 1, unit_price: 9000 }],
+  });
+  const afterRevisionQuotes = await call('GET', root + '/deals/' + dealId + '/quotes', admin);
+  const oldQuote = afterRevisionQuotes.json.data.find((item) => item.id === quoteId);
+  check('new quote revision supersedes old quote', oldQuote.status, 'superseded');
+  check('new quote revision supersedes old approval', oldQuote.approvals[0].status, 'superseded');
+  check('submit revised quote', (await call('POST', root + '/quotes/' + revised.json.data.id + '/submit-for-approval', seller, {})).status, 200);
+  const revisedList = await call('GET', root + '/deals/' + dealId + '/quotes', admin);
+  const rejectedApproval = revisedList.json.data[0].approvals.find((item) => item.status === 'pending');
+  check('quote rejection requires reason', (await call('POST', root + '/approvals/' + rejectedApproval.id + '/decide', admin, {
+    decision: 'rejected',
+  })).status, 400);
+  check('reject revised quote with reason', (await call('POST', root + '/approvals/' + rejectedApproval.id + '/decide', admin, {
+    decision: 'rejected', reason: 'נדרש תיקון',
+  })).status, 200);
+  const finalQuote = await call('POST', root + '/deals/' + dealId + '/quotes', seller, {
+    currency: 'ILS', lines: [{ description: 'פיתוח מאושר', quantity: 1, unit_price: 8500 }],
+  });
+  await call('POST', root + '/quotes/' + finalQuote.json.data.id + '/submit-for-approval', seller, {});
+  const finalList = await call('GET', root + '/deals/' + dealId + '/quotes', admin);
+  const quoteApproval = finalList.json.data[0].approvals.find((item) => item.status === 'pending');
+  check('approve final quote revision', (await call('POST', root + '/approvals/' + quoteApproval.id + '/decide', admin, {
     decision: 'approved',
   })).status, 200);
   const won = await call('POST', root + '/deals/' + dealId + '/close-won', seller, {}, { 'Idempotency-Key': 'won-1' });

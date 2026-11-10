@@ -138,3 +138,12 @@ Measured locally 2026-10-13: idle server ≈ 150–215 MB RSS (WhatsApp not conn
 | `googleapis` | ~100 MB if imported | Only `utils/googleSheets.js` imports it, and nothing imports that file — keep it that way |
 
 In-memory caches are capped: `articleFetcher` cache (`CACHE_MAX = 100`), `loggingMiddleware` `geoCache` (`GEO_CACHE_MAX = 5000`, one entry per unique IP). `alertThrottle` and `deviceInfoCache` already self-prune.
+
+### Production local-only database configuration — 2026-10-16
+
+At the owner's explicit request, server/.env now points MONGO_URI, LOCAL_MONGO_URI and
+ZIPORI_MONGO_URI to mongodb://127.0.0.1:27017/sterni. PM2 sterni-backend was restarted
+with the same variables using --update-env. The old environment file is backed up
+outside Git in ~/.config/sterni/env-backups/. No data was copied, deleted or restored.
+Verified: MongoDB Connected: 127.0.0.1, port 5000 listening, public homepage and
+/api/csrf-token both HTTP 200. Keep connection secrets outside Git.

@@ -17,6 +17,8 @@ import * as planning from './workExtrasController.js';
 import * as teams from './teamController.js';
 import * as mfa from './mfaController.js';
 import * as push from './push.js';
+import * as knowledge from './knowledgeController.js';
+import * as crm from './crmController.js';
 import { notifyWorkChanged } from './realtime.js';
 
 const router = express.Router();
@@ -52,6 +54,29 @@ org.post('/invites', requirePermission('manage_members'), wrap(company.createInv
 org.delete('/invites/:inviteId', requirePermission('manage_members'), wrap(company.revokeInvite));
 
 org.get('/audit', requirePermission('view_audit'), wrap(company.listAudit));
+
+org.get('/search', wrap(knowledge.search));
+org.get('/documents', wrap(knowledge.listDocuments));
+org.post('/documents', requirePermission('create_documents'), wrap(knowledge.createDocument));
+org.get('/documents/:documentId', wrap(knowledge.getDocument));
+org.post('/documents/:documentId/revisions', wrap(knowledge.createRevision));
+org.post('/documents/:documentId/submit-for-approval', wrap(knowledge.submitDocument));
+org.post('/documents/:documentId/publish', wrap(knowledge.publishDocument));
+
+org.get('/leads', wrap(crm.listLeads));
+org.post('/leads', requirePermission('create_leads'), wrap(crm.createLead));
+org.get('/leads/:leadId', wrap(crm.getLead));
+org.post('/leads/:leadId/assign', wrap(crm.assignLead));
+org.post('/leads/:leadId/assignment-decision', wrap(crm.decideAssignment));
+org.post('/leads/:leadId/transition', wrap(crm.transitionLead));
+org.post('/leads/:leadId/convert', wrap(crm.convertLead));
+org.get('/accounts', wrap(crm.listAccounts));
+org.get('/deals', wrap(crm.listDeals));
+org.get('/deals/:dealId/quotes', wrap(crm.listQuotes));
+org.post('/deals/:dealId/quotes', wrap(crm.createQuote));
+org.post('/quotes/:quoteId/submit-for-approval', wrap(crm.submitQuote));
+org.post('/approvals/:approvalId/decide', wrap(crm.decideApproval));
+org.post('/deals/:dealId/close-won', wrap(crm.closeWon));
 
 org.get('/teams', requirePermission('view_members'), wrap(teams.listTeams));
 org.post('/teams', requirePermission('manage_members'), wrap(teams.createTeam));

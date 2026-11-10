@@ -115,10 +115,15 @@ const projectSchema = new Schema(
     description: { type: String, default: '', maxlength: 5000 },
     status: { type: String, enum: PROJECT_STATUSES, default: 'planned' },
     ownerId: { type: ObjectId, ref: 'User', required: true },
+    originDealId: { type: ObjectId, default: undefined },
   },
   { timestamps: true, versionKey: false, collection: 'company_projects' }
 );
 projectSchema.index({ organizationId: 1, _id: -1 });
+projectSchema.index(
+  { organizationId: 1, originDealId: 1 },
+  { unique: true, partialFilterExpression: { originDealId: { $type: 'objectId' } } }
+);
 
 const projectMemberSchema = new Schema(
   {

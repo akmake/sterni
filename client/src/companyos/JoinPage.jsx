@@ -13,15 +13,20 @@ export default function JoinPage() {
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
 
+  const [accepted, setAccepted] = useState(false);
+
   const invite = useQuery({
     queryKey: ['company', 'invite', token],
     queryFn: () => companyApi.getInvite(token),
     retry: false,
+    // Once accepted the link is spent, so asking again would only return 404.
+    enabled: !accepted,
   });
 
   const accept = useMutation({
     mutationFn: (body) => companyApi.acceptInvite(token, body),
     onSuccess: (result) => {
+      setAccepted(true);
       login(result.user);
       // Leave first: clearing while this page is mounted refetches the used, now invalid link.
       navigate('/company/', { replace: true });

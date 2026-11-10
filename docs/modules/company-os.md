@@ -89,6 +89,26 @@
 
 socket.io ב-namespace ‏`/company`, בהזדהות עוגיית `jwt`. אירועים: `message_new`, `message_updated`, `conversations_changed`, `work_changed`. האירוע `work_changed` לא נושא תוכן: הלקוח טוען מחדש דרך ה-API. שינוי תפקיד או השעיה מנתקים מיד את החיבור הפתוח.
 
+### צוותים, אימות דו-שלבי, הרשאות זמניות
+
+- `/orgs/:orgId/teams` וחבריהם. `member` עם צוות רואה רק את חבריו ואת ההנהלה.
+- `/mfa`, `/mfa/setup`, `/mfa/enable`, `/mfa/verify`, `/mfa/disable`: קוד TOTP וקודי שחזור. אימות תקף ל-12 שעות בעוגיית `company_mfa`, ומסתיים גם בהחלפת סיסמה.
+- מי שהפעיל אימות דו-שלבי נחסם עם `403 MFA_REQUIRED` עד שיאמת. `require_mfa` בארגון מחייב `owner` ו-`admin`, ומחזיר `MFA_SETUP_REQUIRED` למי שלא הגדיר.
+- `PATCH /members/:id` עם `role` ו-`expires_at`: תפקיד זמני שחוזר לתפקיד הקודם בפקיעה. גם `expires_at` בחבר פרויקט.
+- `auth.login` ו-`auth.login_failed` נרשמים ביומן דרך `loginAudit.js`, שנקרא מ-`authController`.
+
+### התראות Push
+
+`/push`, `/push/subscribe`, `/push/unsubscribe`. פעיל רק כשמוגדרים במשתני הסביבה `COMPANY_VAPID_PUBLIC_KEY` ו-`COMPANY_VAPID_PRIVATE_KEY` (יצירה: `npx web-push generate-vapid-keys`). `client/public/company-push.js` נטען ל-service worker.
+
+### קבצים
+
+נשמרים ב-`server/data/company-files` (או `COMPANY_FILES_DIR`), מחוץ ל-`/uploads` הציבורי. **בפריסה בקונטיינר התיקייה חייבת להיות על volume קבוע.**
+
+### בדיקות
+
+`npm run test:companyos` בתיקיית `server`. משתמש ב-`MONGO_URL` אם הוגדר, אחרת מרים `mongod` זמני.
+
 ## התקנה כאפליקציה
 
 `CompanyApp.jsx` מחליף בזמן ריצה את ה-manifest ואת האייקון של הדף ל-`company-manifest.webmanifest`, עם scope נפרד ב-`/company/`.
@@ -101,12 +121,12 @@ socket.io ב-namespace ‏`/company`, בהזדהות עוגיית `jwt`. איר�
 
 ## עדיין לא נבנה בשלב 1
 
-צוותים, הרשאות מוגבלות בזמן, MFA, רישום כניסות ביומן, שליחת ההזמנה במייל (היום מעתיקים קישור).
+תבניות Onboarding ו-Offboarding, שליחת ההזמנה במייל (היום מעתיקים קישור).
 
 ## עדיין לא נבנה בעבודה
 
-אבני דרך, תגובות למשימות, תבניות פרויקט, משימות חוזרות, Sprint, תצוגות לוח שנה ו-timeline, מעקב זמנים, גרירה בלוח.
+תהליך סטטוסים מותאם לכל צוות.
 
 ## עדיין לא נבנה בשיחות
 
-שרשורים, קבצים מצורפים, אזכורים, תגובות אמוג'י, ערוצי פרויקט, התראות Push.
+Push לאנדרואיד (דורש פרויקט Firebase), סריקת קבצים לנוזקות, תצוגה מקדימה לקישורים, העדפות התראה לפי סוג.

@@ -46,6 +46,10 @@ export const permissionsFor = (role) => ({
   view_members: role !== 'guest',
   view_audit: role === 'owner' || role === 'admin',
   create_projects: ['owner', 'admin', 'manager'].includes(role),
+  create_documents: role !== 'guest',
+  create_leads: role !== 'guest',
+  manage_crm: ['owner', 'admin', 'manager'].includes(role),
+  approve_quotes: role === 'owner' || role === 'admin',
 });
 
 // A temporary grant ends at its expiry on the next request, with no job to wait for.

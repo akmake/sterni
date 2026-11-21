@@ -166,6 +166,7 @@ pages and their corrections; test both native migration and cached OCR reopening
 | `server/services/assignmentNotifier.js` | `server/app.js` (attach + worker), `socketService.js` (`user:<id>` room), `taskController.js`, `projectController.js`, `waViewRoutes.js`, `pushRoutes.js`, `models/UserPushSubscription.js`, `client/public/company-push.js` (SW handler, `payload.app === 'sterni'`), `TasksPage.jsx` / `ProjectsPage.jsx` / `WaViewerPage.jsx` (socket listeners), `docs/socket-events.md`, `docs/architecture.md` (VAPID env + worker) |
 | `client/public/company-push.js` | Shared SW push handler for **both** Company OS and the main app — changing it affects `server/companyos/push.js` notifications too |
 | `client/src/utils/push.js` / `components/PushOptIn.jsx` | `server/routes/pushRoutes.js`, `TasksPage.jsx`, `ProjectsPage.jsx`, `WaViewerPage.jsx` (compact) |
+| `server/utils/listenWithFallback.js` / `server/.dev-port` | `server/app.js` (listen), `client/vite.config.js` (`followDevPort` reads `.dev-port`), `docs/architecture.md` (Ports) |
 | `client/src/components/ui/ActionMenu.jsx` (⋮ menu) | `TasksPage.jsx`, `ProjectsPage.jsx`, `ProjectPage.jsx` — row actions live in this menu (no hover-only buttons; they're invisible on touch) |
 | `client/src/components/Layout.jsx` mobile top bar | `Navbar.jsx` (`mobileOnly` renders only the ☰ button), `MOBILE_TITLES` map in `Layout.jsx` — add a title when adding a main route |
 | `client/src/components/AssignmentAlerts.jsx` | `Layout.jsx` (mounted), `assignmentNotifier.js` (socket payload title/body/url) |

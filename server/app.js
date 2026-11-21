@@ -63,6 +63,7 @@ import whatsappRoutes from './routes/whatsappRoutes.js';
 import whatsappMonitorRoutes from './routes/whatsappMonitorRoutes.js';
 import waViewRoutes from './routes/waViewRoutes.js';
 import pushRoutes from './routes/pushRoutes.js';
+import listenWithFallback from './utils/listenWithFallback.js';
 import apiKeyAuth from './middlewares/apiKeyAuth.js';
 import { attachAssignmentIo, startAssignmentReminderWorker } from './services/assignmentNotifier.js';
 
@@ -259,7 +260,16 @@ if (process.env.WA_MONITOR_ENABLED !== 'false') {
     connectMonitor();
 }
 
-const PORT = process.env.PORT || 5000;
-httpServer.listen(PORT, () => console.log(`נ€ Server running on port ${PORT}`));
+const PORT = Number(process.env.PORT) || 5000;
+// פיתוח: פורט תפוס → עוברים לפנוי הבא וכותבים אותו ל-server/.dev-port (ה-proxy של Vite קורא משם).
+// פרודקשן: בלי fallback — nginx/PM2 מצפים בדיוק ל-PORT.
+const IS_PROD = process.env.NODE_ENV === 'production';
+listenWithFallback(httpServer, {
+  port: PORT,
+  allowFallback: !IS_PROD,
+  portFile: IS_PROD ? undefined : path.join(__dirname, '.dev-port'),
+})
+  .then((port) => console.log(`🚀 Server running on port ${port}${port !== PORT ? ` (${PORT} היה תפוס)` : ''}`))
+  .catch((err) => { console.error('❌ השרת לא הצליח להאזין:', err.message); process.exit(1); });
 
 export default app;

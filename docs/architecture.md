@@ -116,6 +116,8 @@ All routes funnel errors to the central handler `server/middlewares/errorHandler
 | Backend | http://localhost:5000 |
 | API prefix | `/api/` |
 
+**Busy ports in dev:** Vite already moves to 5174+. The server (`server/utils/listenWithFallback.js`) also moves to 5001+ when `PORT` is taken — **only when `NODE_ENV !== 'production'`** (production keeps the exact `PORT` nginx/PM2 expect and exits loudly if busy). The chosen port is written to `server/.dev-port` (gitignored); `client/vite.config.js` (`followDevPort`) reads it on every proxied request for `/api`, `/uploads`, `/socket.io`, so the client follows the server without a restart.
+
 ---
 
 ## Real-time (Socket.IO)

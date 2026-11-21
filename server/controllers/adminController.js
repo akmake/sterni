@@ -6,7 +6,7 @@ import bcrypt from 'bcrypt';
 // --- Get all users ---
 export const getAllUsers = catchAsync(async (req, res, next) => {
   const users = await User.find({})
-    .select('name email role tzitzitAccess householdAccess preferredView createdAt')
+    .select('name email role tzitzitAccess householdAccess preferredView taskTargetUser createdAt')
     .sort('-createdAt');
 
   res.status(200).json({
@@ -209,6 +209,37 @@ export const toggleTzitzitAccess = catchAsync(async (req, res, next) => {
     { tzitzitAccess: !!tzitzitAccess },
     { new: true }
   ).select('name email role tzitzitAccess householdAccess preferredView createdAt');
+
+  if (!user) {
+    return next(new AppError('משתמש לא נמצא', 404));
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: { user }
+  });
+});
+
+// --- Set task target: למי המשתמש יכול ליצור מטלות (null = ביטול) ---
+export const setTaskTargetUser = catchAsync(async (req, res, next) => {
+  const { taskTargetUser } = req.body;
+  const userId = req.params.id;
+
+  let target = null;
+  if (taskTargetUser) {
+    if (String(taskTargetUser) === String(userId)) {
+      return next(new AppError('אין צורך להגדיר יעד למשתמש עצמו', 400));
+    }
+    const exists = await User.exists({ _id: taskTargetUser });
+    if (!exists) return next(new AppError('משתמש היעד לא נמצא', 404));
+    target = taskTargetUser;
+  }
+
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { taskTargetUser: target },
+    { new: true }
+  ).select('name email role tzitzitAccess householdAccess preferredView taskTargetUser createdAt');
 
   if (!user) {
     return next(new AppError('משתמש לא נמצא', 404));

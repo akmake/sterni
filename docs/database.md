@@ -21,10 +21,10 @@
 
 | Model | File | Used by |
 |-------|------|---------|
-| User | `userModel.js` | auth, admin |
+| User | `userModel.js` | auth, admin. `role`: user/admin/wa-viewer. `taskTargetUser` (ObjectId→User, null) — the user this user may create tasks for (set by admin) |
 | Group | `Group.js` | groups module |
 | Project | `Project.js` | projects module |
-| Task | `Task.js` | tasks page |
+| Task | `Task.js` | tasks page. `userId` = owner (whose `/tasks` shows it), `createdBy` (ObjectId→User, null) — set when someone else created it (e.g. wa-viewer via `/api/wa-view/tasks`); populated with `name` in `getTasks` |
 | Hall | `Hall.js` | halls page |
 | Meal | `Meal.js` | kitchen module |
 | Payment | `Payment.js` | payments module |

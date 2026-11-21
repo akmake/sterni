@@ -39,7 +39,7 @@ Both cookies are HTTP-only → cannot be accessed by JavaScript → XSS-safe.
 |------|--------|
 | `user` | Regular app |
 | `admin` | Everything + admin pages |
-| `wa-viewer` | **Only** `/wa-view` (read-only WhatsApp chat of the tracked contact). Server blocks every other API; client `Layout.jsx` redirects every in-Layout route to `/wa-view`; `LoginPage` navigates there after login. Set via admin users page. |
+| `wa-viewer` | **Only** `/wa-view` (read-only WhatsApp chat of the tracked contact). Server blocks every other API; client `Layout.jsx` redirects every in-Layout route to `/wa-view`; `LoginPage` navigates there after login. Set via admin users page. If admin set `taskTargetUser`, can also create tasks for that user via `/api/wa-view/tasks` ("מטלה חדשה" button) — the only write it has. |
 
 ### `requireAdmin`
 - Checks `req.user?.role === 'admin'`

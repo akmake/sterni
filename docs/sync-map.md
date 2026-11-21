@@ -162,6 +162,7 @@ pages and their corrections; test both native migration and cached OCR reopening
 | `client/src/pages/WhatsAppMonitorPage.jsx` | `client/src/App.jsx` (route `admin/whatsapp-monitor`), `client/src/components/Navbar.jsx` (`waMonitorNav` sidebar shortcuts), `client/src/utils/socket.js` (listens `wa-monitor:*`), `WaMessageBubble.jsx` (`toBubbleMessage`) |
 | `client/src/pages/WaViewerPage.jsx` | `client/src/App.jsx` (route `/wa-view`, outside Layout), `Layout.jsx` + `LoginPage.jsx` (wa-viewer redirect), `WaMessageBubble.jsx` |
 | Role `wa-viewer` | `server/models/userModel.js` (enum), `server/controllers/adminController.js` (allowed roles), `server/middlewares/authMiddleware.js` + `requireAuth.js` (lockdown), `client/src/pages/AdminUsersPage.jsx` (role option), `Layout.jsx`, `LoginPage.jsx`, `docs/auth-flow.md` |
+| `User.taskTargetUser` / `Task.createdBy` (create tasks for another user) | `adminController.js` (`setTaskTargetUser`, `getAllUsers` select), `adminRoutes.js` (`/users/:id/task-target`), `waViewRoutes.js` (`/tasks`), `taskController.js` (`getTasks` populate), `AdminUsersPage.jsx` (column), `WaViewerPage.jsx` (`TasksPanel`), `TasksPage.jsx` ("מאת" badge), `docs/database.md` |
 
 > ⚠️ Separate Baileys connection from `whatsappService.js` — own auth folder `auth_info_monitor/` and media dir `storage/wa-monitor/` (both gitignored). Do NOT merge with the email-forwarding bot.
 

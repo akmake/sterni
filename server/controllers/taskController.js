@@ -13,7 +13,9 @@ export const getTasks = async (req, res) => {
     });
 
     // שלב ב': שליפת המשימות של המשתמש בלבד
-    const tasks = await Task.find({ userId }).sort({ isCompleted: 1, createdAt: -1 });
+    const tasks = await Task.find({ userId })
+      .populate('createdBy', 'name')
+      .sort({ isCompleted: 1, createdAt: -1 });
     res.json(tasks);
   } catch (error) {
     res.status(500).json({ error: error.message });

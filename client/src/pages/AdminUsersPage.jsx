@@ -128,6 +128,18 @@ export default function AdminUsersPage() {
     }
   };
 
+  // למי המשתמש יכול ליצור מטלות ('' = ביטול ההרשאה)
+  const handleSetTaskTarget = async (userId, targetId) => {
+    try {
+      await api.patch(`/admin/users/${userId}/task-target`, { taskTargetUser: targetId || null });
+      setUsers(users.map(u => u._id === userId ? { ...u, taskTargetUser: targetId || null } : u));
+      toast.success(targetId ? 'הרשאת יצירת מטלות עודכנה' : 'הרשאת יצירת מטלות בוטלה');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'שגיאה בעדכון ההרשאה');
+      console.error(error);
+    }
+  };
+
   const handleToggleHouseholdAccess = async (userId, currentValue) => {
     try {
       await api.patch(`/admin/users/${userId}/household-access`, { householdAccess: !currentValue });
@@ -179,6 +191,7 @@ export default function AdminUsersPage() {
                 <th className="px-4 py-3 text-right font-bold">תפקיד</th>
                 <th className="px-4 py-3 text-right font-bold">ציציות</th>
                 <th className="px-4 py-3 text-right font-bold">משק בית</th>
+                <th className="px-4 py-3 text-right font-bold" title="המשתמש יוכל ליצור מטלות שיופיעו במטלות של המשתמש שנבחר">יוצר מטלות עבור</th>
                 <th className="px-4 py-3 text-right font-bold">הצטרפות</th>
                 <th className="px-4 py-3 text-right font-bold">פעולות</th>
               </tr>
@@ -215,6 +228,7 @@ export default function AdminUsersPage() {
                           <option value="wa-viewer">צופה וואצפ</option>
                         </select>
                       </td>
+                      <td className="px-4 py-3">-</td>
                       <td className="px-4 py-3">-</td>
                       <td className="px-4 py-3">-</td>
                       <td className="px-4 py-3">-</td>
@@ -295,6 +309,18 @@ export default function AdminUsersPage() {
                             <Home size={14} />
                             {user.householdAccess ? 'מופעל' : 'כבוי'}
                           </button>
+                      </td>
+                      <td className="px-4 py-3">
+                        <select
+                          value={user.taskTargetUser || ''}
+                          onChange={(e) => handleSetTaskTarget(user._id, e.target.value)}
+                          className={`border rounded px-2 py-1 text-sm bg-white max-w-[160px] ${user.taskTargetUser ? 'border-green-400 text-green-800' : 'border-gray-300 text-gray-500'}`}
+                        >
+                          <option value="">— אין —</option>
+                          {users.filter(u => u._id !== user._id && u.role !== 'wa-viewer').map(u => (
+                            <option key={u._id} value={u._id}>{u.name}</option>
+                          ))}
+                        </select>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500">
                         {new Date(user.createdAt).toLocaleDateString('he-IL')}

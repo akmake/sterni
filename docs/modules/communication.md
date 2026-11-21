@@ -25,6 +25,7 @@
 - Models: `server/models/WhatsAppMessage.js`, `server/models/WhatsAppChat.js`, `server/models/WhatsAppMonitorSettings.js`
 - Viewer: `client/src/pages/WaViewerPage.jsx` — `/wa-view` (מחוץ ל-Layout), צפייה בלבד בשיחה עם איש הקשר שבמעקב; API `server/routes/waViewRoutes.js` (`/api/wa-view`). גישה: role `wa-viewer` (חסום מכל שאר המערכת) או admin. רכיב בועה משותף: `client/src/components/whatsapp/WaMessageBubble.jsx`
 - תפריט צד (admin): "מעקב וואצפ" + "צ'אט במעקב" כקישורים ישירים בשתי התצוגות (`waMonitorNav` ב-`Navbar.jsx`)
+- מטלות מהצופה: אדמין בוחר בעמודה "יוצר מטלות עבור" (ניהול משתמשים) משתמש יעד → `User.taskTargetUser`. בעמוד הצופה מופיע כפתור "מטלה חדשה" שיוצר מטלה ב-`/tasks` של היעד (`Task.createdBy` = הצופה, מוצג אצל היעד כ"מאת …")
 - Auth session: `server/auth_info_monitor/` (נפרד מ-`auth_info_baileys/`) — gitignored
 - Media: `server/storage/wa-monitor/` — מחוץ ל-`/uploads` הפומבי, מוגש רק דרך `GET /api/whatsapp-monitor/media/:messageId` (admin) — gitignored
 - מה עושה: ממשכפל את ההתכתבויות של **חשבון הוואצפ שלך** (שני הכיוונים: `emitOwnEvents: true`) + מושך היסטוריה (`syncFullHistory: true`), שומר ב-DB, ומציג פאנל בסגנון וואצפ ווב עם תמונות/וידאו/הקלטות ועדכון חי.

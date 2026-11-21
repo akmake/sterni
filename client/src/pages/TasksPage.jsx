@@ -173,6 +173,11 @@ const TasksPage = () => {
                       title="לחיצה כפולה לעריכה"
                     >
                       {task.text}
+                      {task.createdBy?.name && (
+                        <span className="mr-2 align-middle text-xs font-normal bg-green-100 text-green-800 rounded px-2 py-0.5">
+                          מאת {task.createdBy.name}
+                        </span>
+                      )}
                     </span>
                   )}
                 </div>

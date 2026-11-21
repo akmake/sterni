@@ -38,6 +38,13 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // אם מוגדר — המשתמש (בד"כ צופה וואצפ) יכול ליצור מטלות שיופיעו במטלות של המשתמש הזה.
+    // נקבע ע"י אדמין ב-PATCH /api/admin/users/:id/task-target. null = אין הרשאה.
+    taskTargetUser: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
     preferredView: {
       type: String,
       enum: ['management', 'household'],

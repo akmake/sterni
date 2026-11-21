@@ -2,6 +2,8 @@ import express from 'express';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import WhatsAppMessage from '../models/WhatsAppMessage.js';
 import WhatsAppChat from '../models/WhatsAppChat.js';
+import Task from '../models/Task.js';
+import User from '../models/userModel.js';
 import {
     getMonitorSettings,
     trackedChatFilter,
@@ -166,6 +168,48 @@ router.get('/media/:messageId', async (req, res) => {
         sendMediaFile(res, msg, req.query.download === '1');
     } catch (err) {
         res.status(500).json({ message: 'שגיאה בהגשת מדיה', error: err.message });
+    }
+});
+
+// ============================================================
+// ===  מטלות — יצירה עבור משתמש אחר (User.taskTargetUser)  ===
+// ============================================================
+
+const getTaskTarget = async (userId) => {
+    const me = await User.findById(userId).select('taskTargetUser').lean();
+    if (!me?.taskTargetUser) return null;
+    return User.findById(me.taskTargetUser).select('name').lean();
+};
+
+/** GET /api/wa-view/tasks — { enabled, targetName, tasks } — המטלות שאני יצרתי עבור היעד */
+router.get('/tasks', async (req, res) => {
+    try {
+        const target = await getTaskTarget(req.user._id);
+        if (!target) return res.json({ enabled: false, targetName: null, tasks: [] });
+        const tasks = await Task.find({ userId: target._id, createdBy: req.user._id })
+            .select('text isCompleted completedAt createdAt')
+            .sort({ createdAt: -1 })
+            .limit(100)
+            .lean();
+        res.json({ enabled: true, targetName: target.name, tasks });
+    } catch (err) {
+        res.status(500).json({ message: 'שגיאה בשליפת מטלות', error: err.message });
+    }
+});
+
+/** POST /api/wa-view/tasks { text } — יוצר מטלה שתופיע ב-/tasks של משתמש היעד */
+router.post('/tasks', async (req, res) => {
+    try {
+        const target = await getTaskTarget(req.user._id);
+        if (!target) return res.status(403).json({ message: 'אין לך הרשאה ליצור מטלות' });
+        const text = String(req.body?.text || '').trim();
+        if (!text) return res.status(400).json({ message: 'נדרש טקסט למטלה' });
+        if (text.length > 2000) return res.status(400).json({ message: 'המטלה ארוכה מדי (עד 2000 תווים)' });
+
+        const task = await Task.create({ text, userId: target._id, createdBy: req.user._id });
+        res.status(201).json({ _id: task._id, text: task.text, isCompleted: false, createdAt: task.createdAt });
+    } catch (err) {
+        res.status(500).json({ message: 'שגיאה ביצירת מטלה', error: err.message });
     }
 });
 

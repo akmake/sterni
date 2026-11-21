@@ -87,10 +87,14 @@ object SichaTextParser {
         '(' -> ')'; ')' -> '('; '[' -> ']'; ']' -> '['; '{' -> '}'; '}' -> '{'; else -> c
     }
 
-    fun bodySize(glyphs: List<SichaGlyph>): Float = glyphs.filter { it.y > 0f && it.size > 0 }
-        .groupingBy { kotlin.math.round(it.size * 2) / 2f }
-        .fold(0) { count, glyph -> count + glyph.text.count { !it.isWhitespace() } }
-        .maxByOrNull { it.value }?.key ?: 11f
+    fun bodySize(glyphs: List<SichaGlyph>): Float {
+        val nonWatermark = glyphs.filter { it.y > 0f && !it.font.contains("Arial", ignoreCase = true) && it.size in 5f..35f }
+        val mainGlyphs = nonWatermark.filter { it.size >= 9.5f }
+        val pool = if (mainGlyphs.isNotEmpty()) mainGlyphs else nonWatermark.ifEmpty { glyphs }
+        return pool.groupingBy { kotlin.math.round(it.size * 2) / 2f }
+            .fold(0) { count, glyph -> count + glyph.text.count { !it.isWhitespace() } }
+            .maxByOrNull { it.value }?.key ?: 11f
+    }
 
     fun parsePage(page: Int, glyphs: List<SichaGlyph>, width: Float, height: Float,
         regions: List<SichaCrop?>, bodySize: Float,
@@ -109,11 +113,12 @@ object SichaTextParser {
     private fun regionBlocks(page: Int, column: Int, glyphs: List<SichaGlyph>, width: Float,
         height: Float, crop: SichaCrop, body: Float, title: Boolean, inferredFonts: Set<String>): List<SichaTextBlock> {
         val filtered = glyphs.filter { g ->
+            if (g.font.contains("Arial", ignoreCase = true) || g.size > 35f) return@filter false
             val cx = (g.x + g.width / 2) / width
             // PDFTextStripper y is baseline measured from the top, not the glyph's top.
             val cy = (g.y - g.size * .35f) / height
             cx >= crop.left && cx <= crop.right && cy >= crop.top && cy <= crop.bottom &&
-                (title || g.size >= body * .80f) && g.text.isNotBlank()
+                (title || g.size >= body * .85f) && g.text.isNotBlank()
         }
         // Some CFF PDFs position quote glyphs 0.45em below the text baseline to compensate
         // for their font outlines. Punctuation must not create its own line or paragraph.
@@ -122,12 +127,12 @@ object SichaTextParser {
         val lines = mutableListOf<MutableList<SichaGlyph>>()
         for (g in filtered.filterNot { isPunctuation(it) }.sortedBy { it.y }) {
             val line = lines.lastOrNull()
-            if (line == null || abs(g.y - line.first().y) > body * .27f) lines += mutableListOf(g)
+            if (line == null || abs(g.y - line.first().y) > body * .32f) lines += mutableListOf(g)
             else line += g
         }
         for (g in filtered.filter { isPunctuation(it) }) {
             val nearest = lines.minByOrNull { abs(it.first().y - g.y) }
-            if (nearest != null && abs(nearest.first().y - g.y) <= maxOf(body, g.size) * .65f)
+            if (nearest != null && abs(nearest.first().y - g.y) <= maxOf(body, g.size) * .75f)
                 nearest += g
             else lines += mutableListOf(g)
         }
@@ -176,7 +181,9 @@ object SichaTextParser {
                 val g = rtl[i]
                 val text = logicalGlyph(g, inferredFonts)
                 val gap = lastLeft?.minus(g.x + g.width) ?: 0f
-                if (gap > minOf(1.5f, body * .14f)) append(runs, SichaTextRun(" ", g.font, g.size))
+                if (gap > minOf(1.5f, body * .14f) && text !in listOf(",", ".", ":", ";", ")", "]", "!", "?")) {
+                    append(runs, SichaTextRun(" ", g.font, g.size))
+                }
                 // Adjacent numeric/Latin glyphs are an LTR island inside the RTL line.
                 if (text.isNotEmpty() && text.all { it.isDigit() || it in 'A'..'Z' || it in 'a'..'z' }) {
                     val island = mutableListOf(g)
@@ -209,7 +216,7 @@ object SichaTextParser {
         // Remove spacing introduced by omitted superscript note markers, across style runs too.
         val out = runs.toMutableList()
         for (i in out.indices) {
-            var text = out[i].text.replace(Regex("\\s+([,.;:!?\\)])"), "$1").replace(Regex("\\(\\s+"), "(")
+            var text = out[i].text.replace(Regex("\\s+([,.;:!?\\)\\]])"), "$1").replace(Regex("([\\(\\[])\\s+"), "$1")
             if (i == 0) text = text.trimStart()
             if (i == out.lastIndex) text = text.trimEnd()
             if (i > 0 && text.firstOrNull() in listOf(',', '.', ';', ':', '!', '?', ')'))

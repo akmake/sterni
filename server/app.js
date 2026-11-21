@@ -24,6 +24,7 @@ import emailRoutes from './routes/emailRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import mealsRoutes from './routes/mealsRoutes.js';
 import { connectToWhatsApp } from './services/whatsappService.js';
+import { connectMonitor, attachMonitorIo } from './services/whatsappMonitorService.js';
 import quoteRouter from './routes/quoteRoutes.js';
 import quotePdfRoutes from './routes/quotePdfRoutes.js';
 import paymentRequestRoutes from './routes/paymentRequestRoutes.js';
@@ -59,6 +60,7 @@ import { setupSocketIO } from './services/socketService.js';
 import { setupGameSocketIO } from './services/gameSocketService.js';
 import gameRoutes from './routes/gameRoutes.js';
 import whatsappRoutes from './routes/whatsappRoutes.js';
+import whatsappMonitorRoutes from './routes/whatsappMonitorRoutes.js';
 
 import softwareRoutes from './routes/softwareRoutes.js';
 
@@ -131,6 +133,7 @@ const io = new Server(httpServer, {
 });
 app.set('io', io);
 setupSocketIO(io);
+attachMonitorIo(io);
 await setupGameSocketIO(io);
 setupCompanySocket(io);
 startReminderWorker();
@@ -226,6 +229,7 @@ app.use('/api/admin/commissions', adminCommissionRoutes);
 app.use('/api/admin/orders', adminCommissionOrdersStub);
 app.use('/api/admin', adminRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
+app.use('/api/whatsapp-monitor', whatsappMonitorRoutes);
 app.use('/api/hotel-orders', hotelOrderRoutes);
 app.use('/api/hotel-data', hotelZiporiDataRoutes);
 app.use('/api/v1', companyOsRoutes);
@@ -239,6 +243,10 @@ app.use(errorHandler);
 
 startEmailListener();
 connectToWhatsApp();
+// חיבור WhatsApp Monitor (נפרד) — אפשר לכבות עם WA_MONITOR_ENABLED=false
+if (process.env.WA_MONITOR_ENABLED !== 'false') {
+    connectMonitor();
+}
 
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => console.log(`נ€ Server running on port ${PORT}`));

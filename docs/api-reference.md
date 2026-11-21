@@ -38,6 +38,21 @@ Prefix `/api/logs/admin`. UI: `AdminLogsPage.jsx` (+ `pages/logs/` components).
 
 ---
 
+## WhatsApp Monitor (admin only — `requireAuth` + `requireAdmin`)
+Prefix `/api/whatsapp-monitor`. UI: `WhatsAppMonitorPage.jsx`. Separate Baileys connection (`whatsappMonitorService.js`).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/status` | Connection status `{ state, user, reconnectAttempts }` |
+| GET | `/qr` | `{ state, qr }` — QR data-URL to link your WhatsApp (null when connected) |
+| POST | `/connect` | Start the monitor connection (if not running) |
+| POST | `/logout` | Unlink + delete session (`auth_info_monitor/`) — new QR next time |
+| GET | `/chats` | Chat list (per-contact summary), sorted by `lastMessageAt`, limit 300 |
+| GET | `/chats/:jid/messages` | Messages for a chat (`?before=ISO&limit=50`), returned old→new, `{ messages, hasMore }` |
+| GET | `/media/:messageId` | Stream a message's media file (private, not via `/uploads`) |
+
+---
+
 ## Protected Routes
 
 ### Auth

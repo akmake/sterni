@@ -151,6 +151,19 @@ pages and their corrections; test both native migration and cached OCR reopening
 | `android/.../pdflibrary/MafteachBrowserScreen.kt`, `MafteachLinks.kt`, `MafteachPdfDownloader.kt` | `PdfStudyScreen.kt`, `PdfStudyViewModel.kt`, `SichaReader.kt`, `MafteachLinksTest.kt`, `MafteachIntegrationTest.kt`, `app/build.gradle.kts`, `docs/modules/android-mafteach-library.md`, `docs/modules/android-pdf-library.md`; source metadata, download cache ownership and OCR consent must remain consistent |
 | `android/.../pdflibrary/PdfStudyViewModel.kt` source import fields | `MafteachBrowserScreen.kt`, `MafteachPdfDownloader.kt`, shared OCR dialog in `PdfStudyScreen.kt`, `docs/modules/android-mafteach-library.md`; source files are local-only and removed only after the last reference |
 
+## WhatsApp Monitor Module
+
+| File changed | Must also check |
+|---|---|
+| `server/services/whatsappMonitorService.js` | `server/models/WhatsAppMessage.js`, `server/models/WhatsAppChat.js`, `server/routes/whatsappMonitorRoutes.js`, `docs/modules/communication.md`, `docs/socket-events.md` (emits `wa-monitor:message`/`wa-monitor:status`) |
+| `server/routes/whatsappMonitorRoutes.js` | `server/app.js` (registered at `/api/whatsapp-monitor`), `client/src/pages/WhatsAppMonitorPage.jsx`, `docs/api-reference.md` |
+| `server/models/WhatsAppMessage.js` / `WhatsAppChat.js` | `whatsappMonitorService.js` (writer), `whatsappMonitorRoutes.js` (reader), `docs/database.md` |
+| `client/src/pages/WhatsAppMonitorPage.jsx` | `client/src/App.jsx` (route `admin/whatsapp-monitor`), `client/src/components/Navbar.jsx` (admin nav item), `client/src/utils/socket.js` (listens `wa-monitor:*`) |
+
+> ⚠️ Separate Baileys connection from `whatsappService.js` — own auth folder `auth_info_monitor/` and media dir `storage/wa-monitor/` (both gitignored). Do NOT merge with the email-forwarding bot.
+
+---
+
 ## System-wide couplings
 
 | File changed | Must also check |

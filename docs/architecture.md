@@ -48,6 +48,7 @@ This records the live server configuration; environment values must not be commi
 | `TETHER_BOOTSTRAP_SECRET` | Required for the one-time `POST /api/tether/auth/bootstrap` superadmin creation (replaces the old hardcoded `tether-init-2025`). If unset, bootstrap is disabled. |
 | `TETHER_ENFORCE_DEVICE_AUTH` | `'true'` → reject `/api/tether/devices/:id/*` calls that lack a valid `X-Device-Token`. Default (unset) is **rollout mode**: missing token allowed (legacy devices), wrong token always rejected. Flip to `'true'` only after all field devices send the token. |
 | `SHIEOR_ENFORCE_AUTH` | Same rollout pattern for `GET/PUT /api/user/:userId` — `'true'` requires a valid `Authorization: Bearer <syncToken>`. |
+| `WA_MONITOR_ENABLED` | `'false'` → do **not** start the WhatsApp Monitor Baileys connection on boot (`server/app.js`). Any other value / unset = enabled. The monitor is a second, separate Baileys account (`auth_info_monitor/`) that mirrors your personal WhatsApp into the admin panel `/admin/whatsapp-monitor`. See `docs/modules/communication.md`. |
 
 > **Device token model:** `/api/tether/devices/join` returns a one-time `deviceToken`; `/api/user/register` and `/api/user/login` return a one-time `syncToken`. Only the SHA-256 hash is stored server-side (`TetherDevice.deviceSecretHash`, `UserData.syncTokenHash`, both `select:false`). The app persists the plaintext and sends it back on every device call. See "rollout flags" above for the 3-phase enable.
 

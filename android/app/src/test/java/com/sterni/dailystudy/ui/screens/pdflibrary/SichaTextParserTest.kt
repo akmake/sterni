@@ -13,6 +13,54 @@ import java.io.DataInputStream
 import java.io.File
 
 class SichaTextParserTest {
+    @Test fun testVayeitzeiExtraction() {
+        val file = File("""C:\Users\yosef dahan\Downloads\25 - 21 ויצא ב.pdf""")
+        if (!file.exists()) return
+        val glyphs = mutableListOf<SichaGlyph>()
+        val stripper = object : PDFTextStripper() {
+            override fun processTextPosition(p: TextPosition) {
+                glyphs += SichaGlyph(p.unicode, p.xDirAdj, p.yDirAdj, p.widthDirAdj, p.fontSizeInPt, p.font.name)
+            }
+            override fun writeString(text: String, positions: List<TextPosition>) = Unit
+        }
+        val allExtracted = StringBuilder()
+        PDDocument.load(file).use { pdf ->
+            for (index in 0 until pdf.numberOfPages) {
+                glyphs.clear()
+                stripper.startPage = index + 1; stripper.endPage = index + 1
+                stripper.getText(pdf)
+                val inferred = SichaTextParser.inferredLegacyFonts(glyphs.groupBy { it.font }
+                    .mapValues { (_, values) -> values.joinToString("") { it.text } })
+                val body = SichaTextParser.bodySize(glyphs)
+                val box = pdf.getPage(index).cropBox
+                val regions = if (index == 0) listOf(
+                    SichaCrop(0.48f, 0.11f, 0.95f, 0.43f),
+                    SichaCrop(0.05f, 0.11f, 0.48f, 0.30f),
+                    SichaCrop(0.43f, 0.07f, 0.53f, 0.11f)
+                ) else listOf(
+                    SichaCrop(0.48f, 0.05f, 0.95f, 0.95f),
+                    SichaCrop(0.05f, 0.05f, 0.48f, 0.95f),
+                    null
+                )
+                val pageBlocks = SichaTextParser.parsePage(index, glyphs, box.width, box.height, regions, body, inferred)
+                val text = pageBlocks.joinToString("\n") { it.text }
+                allExtracted.append("=== PAGE ").append(index + 1).append(" (body=").append(body).append(") ===\n")
+                allExtracted.append(text).append("\n\n")
+            }
+        }
+        val outDump = File(System.getProperty("java.io.tmpdir"), "vayeitzei_extracted.txt")
+        outDump.writeText(allExtracted.toString(), Charsets.UTF_8)
+        println("Wrote full extraction to: " + outDump.absolutePath)
+        assertTrue(allExtracted.contains("ויצא ב"))
+        assertTrue(allExtracted.contains("מלאכים של ארץ"))
+        assertFalse("Watermark should be filtered", allExtracted.contains("מכון לוי יצחק"))
+        assertFalse("Footnotes should be completely removed", allExtracted.contains("1) לב, ב."))
+        assertFalse("Footnote 2 should be removed", allExtracted.contains("2) ראה תנחומא"))
+        assertFalse("Footnote 7 should be removed", allExtracted.contains("7) ובתנחומא"))
+        val bodyOnly = allExtracted.lines().filterNot { it.startsWith("===") }.joinToString("\n")
+        assertFalse("Undecoded ASCII Hebrew", Regex("[a-z]{4}").containsMatchIn(bodyOnly))
+    }
+
     @Test fun joinsColumnContinuationsButKeepsHeadingsAndReviewedOcr() {
         fun block(text: String, continuation: Boolean = false, heading: Boolean = false, ocr: Boolean = false) =
             SichaTextBlock(0, 0, heading, listOf(SichaTextRun(text, "Unicode", 10f)),

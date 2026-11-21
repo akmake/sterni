@@ -13,6 +13,8 @@
 | Event | Payload | Triggered by |
 |-------|---------|-------------|
 | `visitor:alert` | `{ ip, page, country, city, isp, reason: 'vpn'\|'datacenter'\|'bot', timestamp }` | `loggingMiddleware.js` when a suspicious visitor is logged (throttled ≤1/IP per 10 min). Emitted to the `admins` room. Listened in `AdminLogsPage.jsx` → toast. |
+| `wa-monitor:message` | `{ messageId, chatJid, phone, fromMe, senderName, type, text, quotedText, mediaPath, mediaMime, fileName, durationSeconds, mediaUnavailable, timestamp }` | `whatsappMonitorService.js` on each **live** incoming/outgoing WhatsApp message. Emitted to the `admins` room. Listened in `WhatsAppMonitorPage.jsx`. |
+| `wa-monitor:status` | `{ state: 'connected'\|'connecting'\|'disconnected', user?, hasQr? }` | `whatsappMonitorService.js` on connection changes. Emitted to the `admins` room. Listened in `WhatsAppMonitorPage.jsx`. |
 
 ## Client → Server Events
 

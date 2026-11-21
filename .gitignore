@@ -24,8 +24,14 @@ yarn-error.log*
 # Sensitive / session data
 server/auth_info_baileys/
 auth_info_baileys/
+server/auth_info_monitor/
+auth_info_monitor/
 server/credentials/
 credentials/
+
+# WhatsApp Monitor — private media of monitored conversations
+server/storage/wa-monitor/
+server/storage/
 
 # Uploads (user-generated)
 uploads/

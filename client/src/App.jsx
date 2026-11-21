@@ -53,6 +53,7 @@ import TzitzitManagementPage from './pages/TzitzitManagementPage';
 import ProfilePage from './pages/ProfilePage';
 import SoftwareLibraryPage from './pages/SoftwareLibraryPage';
 import TetherAdminPage from './pages/TetherAdminPage';
+import WhatsAppMonitorPage from './pages/WhatsAppMonitorPage';
 
 /* Hotel Orders */
 import HotelOrdersPage from './pages/HotelOrdersPage';
@@ -177,6 +178,7 @@ export default function App() {
           <Route path="admin/extras" element={<ManageExtrasPage />} />
           <Route path="admin/user-activity" element={<UserActivityPage />} />
           <Route path="admin/tether" element={<TetherAdminPage />} />
+          <Route path="admin/whatsapp-monitor" element={<WhatsAppMonitorPage />} />
           <Route path="admin/commissions" element={<CommissionsPage />} />
         </Route>
 

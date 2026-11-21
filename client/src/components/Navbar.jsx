@@ -86,6 +86,7 @@ const getManagementNav = (isAuthenticated, isAdmin, hasTzitzitAccess) => {
         { to: '/admin/logs', label: 'דוח מבקרים', icon: BarChart3 },
         { to: '/admin/commissions', label: 'דוח עמלות', icon: FileSpreadsheet },
         { to: '/admin/tether', label: 'Tether — ניהול מכשירים', icon: Smartphone },
+        { to: '/admin/whatsapp-monitor', label: 'מעקב וואצפ', icon: MessageCircle },
       ]
     });
   } else if (isAuthenticated) {

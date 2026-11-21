@@ -39,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sterni.dailystudy.ui.theme.Primary
 import com.sterni.dailystudy.ui.theme.SblHebrew
+import com.sterni.dailystudy.ui.theme.LikkuteiRegular
+import com.sterni.dailystudy.ui.theme.LikkuteiBold
 import java.io.File
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -159,16 +161,12 @@ fun SichaReader(book: PdfBook, document: SichaTextDocument, fontSize: Int, vm: P
                         val text = remember(block, fonts, fontSize, query) {
                             buildAnnotatedString {
                                 for (run in block.runs) {
-                                    val family = fonts[run.font] ?: SblHebrew
+                                    val family = if (run.font.contains("Bold", true) || block.heading) LikkuteiBold else LikkuteiRegular
                                     val style = SpanStyle(fontFamily = family,
                                         fontSize = (fontSize * run.size / document.bodySize).coerceIn(fontSize * .8f, fontSize * 1.5f).sp,
                                         background = if (!block.reviewed && (run.confidence ?: 100) < 75) Color(0xFFFFE8CA) else Color.Unspecified,
-                                        fontWeight = if (run.font.contains("Bold", true) && fonts[run.font] == null) FontWeight.Bold else FontWeight.Normal)
-                                    // A subset PDF font may not contain a space glyph. Use the app's
-                                    // Hebrew font for whitespace while keeping original printed glyphs.
-                                    Regex("\\s+|\\S+").findAll(run.text).forEach { token ->
-                                        withStyle(if (token.value.isBlank()) style.copy(fontFamily = SblHebrew) else style) { append(token.value) }
-                                    }
+                                        fontWeight = if (run.font.contains("Bold", true) || block.heading) FontWeight.Bold else FontWeight.Normal)
+                                    withStyle(style) { append(run.text) }
                                 }
                                 if (query.isNotBlank()) {
                                     val full = block.text

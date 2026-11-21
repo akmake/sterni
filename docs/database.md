@@ -55,6 +55,8 @@
 | Contact | `Contact.js` | contacts |
 | Supplier | `Supplier.js` | suppliers |
 | SupplierPayment | `SupplierPayment.js` | supplier payments |
+| WhatsAppMessage | `WhatsAppMessage.js` | WhatsApp Monitor — single message (both directions), index `{chatJid, timestamp}` |
+| WhatsAppChat | `WhatsAppChat.js` | WhatsApp Monitor — per-contact chat summary for the chat list |
 
 ---
 

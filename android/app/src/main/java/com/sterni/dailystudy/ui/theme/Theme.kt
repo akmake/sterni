@@ -26,6 +26,12 @@ import com.sterni.dailystudy.R
 
 val SblHebrew    = FontFamily(Font(R.font.sbl_hbrw))
 val BaHaYetzira  = FontFamily(Font(R.font.ba_hayetzira_regular))
+val LikkuteiRegular = FontFamily(Font(R.font.likkutei_regular))
+val LikkuteiBold    = FontFamily(Font(R.font.likkutei_bold))
+val LikkuteiFont    = FontFamily(
+    Font(R.font.likkutei_regular, androidx.compose.ui.text.font.FontWeight.Normal),
+    Font(R.font.likkutei_bold, androidx.compose.ui.text.font.FontWeight.Bold)
+)
 
 // Kept for backward compatibility with older screens
 val Primary      = Color(0xFF0F766E)

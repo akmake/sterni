@@ -43,8 +43,8 @@ export default function LoginPage() {
       if (data && data.user) {
         // עדכון ה-Store עם האובייקט המלא
         login(data.user);
-        // מעבר לדף הפרויקטים
-        navigate("/projects");
+        // מעבר לדף הפרויקטים (משתמש צופה וואצפ — ישר לעמוד הצפייה)
+        navigate(data.user.role === 'wa-viewer' ? "/wa-view" : "/projects");
       } else {
         throw new Error("תגובת השרת אינה תקינה");
       }

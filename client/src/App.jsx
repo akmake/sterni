@@ -54,6 +54,7 @@ import ProfilePage from './pages/ProfilePage';
 import SoftwareLibraryPage from './pages/SoftwareLibraryPage';
 import TetherAdminPage from './pages/TetherAdminPage';
 import WhatsAppMonitorPage from './pages/WhatsAppMonitorPage';
+import WaViewerPage from './pages/WaViewerPage';
 
 /* Hotel Orders */
 import HotelOrdersPage from './pages/HotelOrdersPage';
@@ -192,6 +193,9 @@ export default function App() {
       {/* ג”€ג”€ג”€ Print pages (outside Layout) ג”€ג”€ג”€ */}
       <Route path="/print/kitchen-a3" element={<KitchenPrintPageA3 />} />
       <Route path="/print/group-schedule" element={<GroupSchedulePrintPage />} />
+
+      {/* WhatsApp viewer — single tracked chat, read-only, outside Layout (wa-viewer / admin) */}
+      <Route path="/wa-view" element={<WaViewerPage />} />
 
     </Routes>
     <ConsentBanner />

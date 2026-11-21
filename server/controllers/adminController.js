@@ -37,7 +37,7 @@ export const updateUser = catchAsync(async (req, res, next) => {
   const userId = req.params.id;
 
   // Prevent self-demotion from admin
-  if (userId === req.user._id.toString() && role === 'user') {
+  if (userId === req.user._id.toString() && role && role !== 'admin') {
     return next(new AppError('לא יכול להוריד את עצמך מנהל', 400));
   }
 
@@ -49,7 +49,7 @@ export const updateUser = catchAsync(async (req, res, next) => {
 
   const updateData = {};
   if (name) updateData.name = name;
-  if (role && ['user', 'admin'].includes(role)) updateData.role = role;
+  if (role && ['user', 'admin', 'wa-viewer'].includes(role)) updateData.role = role;
 
   // Check if email is unique (if changing)
   if (email && email !== currentUser.email) {
@@ -128,12 +128,12 @@ export const changeUserRole = catchAsync(async (req, res, next) => {
   const { role } = req.body;
   const userId = req.params.id;
 
-  if (!['user', 'admin'].includes(role)) {
+  if (!['user', 'admin', 'wa-viewer'].includes(role)) {
     return next(new AppError('תפקיד לא תקין', 400));
   }
 
   // Prevent self-demotion
-  if (userId === req.user._id.toString() && role === 'user') {
+  if (userId === req.user._id.toString() && role && role !== 'admin') {
     return next(new AppError('לא יכול להוריד את עצמך מנהל', 400));
   }
 
@@ -172,7 +172,7 @@ export const createUser = catchAsync(async (req, res, next) => {
   }
 
   const hash = await bcrypt.hash(password, 12);
-  const finalRole = (role && ['user', 'admin'].includes(role)) ? role : 'user';
+  const finalRole = (role && ['user', 'admin', 'wa-viewer'].includes(role)) ? role : 'user';
 
   const user = await User.create({
     name,

@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/userModel.js';
+import { isWaViewerAllowedPath } from './authMiddleware.js';
 
 export default async function requireAuth(req, res, next) {
   try {
@@ -13,6 +14,11 @@ export default async function requireAuth(req, res, next) {
     const user = await User.findById(decoded.id).select('-passwordHash');
     if (!user) {
       return res.status(401).json({ msg: 'Unauthorized: User not found' });
+    }
+
+    // משתמש צופה וואצפ — רשאי רק לעמוד הצפייה ולנתיבי ההתחברות
+    if (user.role === 'wa-viewer' && !isWaViewerAllowedPath(req)) {
+      return res.status(403).json({ msg: 'למשתמש צופה יש גישה רק לעמוד הצפייה' });
     }
 
     req.user = user;

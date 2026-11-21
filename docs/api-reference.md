@@ -47,9 +47,25 @@ Prefix `/api/whatsapp-monitor`. UI: `WhatsAppMonitorPage.jsx`. Separate Baileys 
 | GET | `/qr` | `{ state, qr }` — QR data-URL to link your WhatsApp (null when connected) |
 | POST | `/connect` | Start the monitor connection (if not running) |
 | POST | `/logout` | Unlink + delete session (`auth_info_monitor/`) — new QR next time |
-| GET | `/chats` | Chat list (per-contact summary), sorted by `lastMessageAt`, limit 300 |
-| GET | `/chats/:jid/messages` | Messages for a chat (`?before=ISO&limit=50`), returned old→new, `{ messages, hasMore }` |
-| GET | `/media/:messageId` | Stream a message's media file (private, not via `/uploads`) |
+| GET | `/settings` | Tracking settings `{ mode: 'all'\|'selected', tracked: [{ jid, phone, name }] }` |
+| PUT | `/settings` | Save settings (phones normalized to `972…`). `selected` = store only tracked contacts' messages |
+| GET | `/chats` | Chat list (per-contact summary), sorted by `lastMessageAt`, limit 300. In `selected` mode only tracked chats, unless `?all=1` |
+| POST | `/chats/:jid/read` | Reset `unreadCount` |
+| GET | `/chats/:jid/messages` | Messages for a chat (`?before=ISO&limit=50` older page, or `?after=ISO` only newer), old→new, `{ messages, hasMore }` |
+| POST | `/media/:messageId/fetch` | Download media now from WhatsApp (history / failed download) using stored raw message; 409 if impossible |
+| GET | `/media/:messageId` | Stream a message's media file (private, not via `/uploads`). `?download=1` → attachment with original file name |
+
+## WhatsApp Viewer (read-only — `requireAuth` + role `wa-viewer` or `admin`)
+Prefix `/api/wa-view`. UI: `WaViewerPage.jsx` (`/wa-view`, outside Layout). Shows only the chat(s) matching `WhatsAppMonitorSettings.tracked`. File: `server/routes/waViewRoutes.js`.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/messages` | `{ contact:{name,phone}, count, hasMore, serverTime, messages[] }`, always old→new. Params: `since=ISO` (sent after), `afterId=<id>` (after that message), `changedSince=ISO` (inserted/edited/deleted/reacted/media-downloaded since — pass previous `serverTime` to poll), `before=ISO` (older page), `limit` (default 500, max 2000). No params → latest N. `notice` when no contact configured |
+| GET | `/media/:messageId` | Media of a tracked-chat message. If not on disk yet — downloads from WhatsApp on the fly. `?download=1` → attachment |
+
+Message shape: `{ id, direction:'in'|'out', from, timestamp, type, text, quotedText, media:{available,url,downloadUrl,mime,fileName,fileSize,durationSeconds,isVoiceNote}|null, location?, contact?, poll?, deleted, edited, originalText?, reactions:[{emoji,by:'me'|'them'}], updatedAt }`. `id` = WhatsApp message id (unique, stable).
+
+Script usage: `POST /api/auth/login` (cookies `jwt` + refresh cookie, CSRF token from `GET /api/csrf-token`), then `GET /api/wa-view/messages?since=…` with the cookies; access token lives 15 min → `POST /api/auth/refresh` on 401.
 
 ---
 

@@ -26,7 +26,8 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['user', 'admin'],
+      // 'wa-viewer' = צופה בלבד בעמוד /wa-view (חסום מכל שאר ה-API ב-authMiddleware)
+      enum: ['user', 'admin', 'wa-viewer'],
       default: 'user',
     },
     tzitzitAccess: {

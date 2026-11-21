@@ -55,8 +55,9 @@
 | Contact | `Contact.js` | contacts |
 | Supplier | `Supplier.js` | suppliers |
 | SupplierPayment | `SupplierPayment.js` | supplier payments |
-| WhatsAppMessage | `WhatsAppMessage.js` | WhatsApp Monitor — single message (both directions), index `{chatJid, timestamp}` |
-| WhatsAppChat | `WhatsAppChat.js` | WhatsApp Monitor — per-contact chat summary for the chat list |
+| WhatsAppMessage | `WhatsAppMessage.js` | WhatsApp Monitor — single message (both directions), index `{chatJid, timestamp}`. Types: text/image/video/audio/document/sticker/location/contact/poll/other. Media: `mediaPath`, `mediaMime`, `fileName`, `fileSize`, `durationSeconds`, `isVoiceNote`, `mediaUnavailable`, `raw` (BufferJSON of the Baileys message, `select:false`, for later download). Also `location`, `contactCard`, `poll`, `deleted/deletedAt`, `edited/editedAt/originalText`, `reactions[{emoji,fromMe,at}]` |
+| WhatsAppChat | `WhatsAppChat.js` | WhatsApp Monitor — per-contact chat summary. `jid` canonical (phone jid when known, else `@lid`), `lid`, `phone`, `name` (pushName), `contactName` (phone-book name), `unreadCount` |
+| WhatsAppMonitorSettings | `WhatsAppMonitorSettings.js` | WhatsApp Monitor — singleton (`key:'singleton'`): `mode: 'all'\|'selected'`, `tracked: [{jid, phone, name}]` |
 
 ---
 

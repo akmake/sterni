@@ -155,10 +155,13 @@ pages and their corrections; test both native migration and cached OCR reopening
 
 | File changed | Must also check |
 |---|---|
-| `server/services/whatsappMonitorService.js` | `server/models/WhatsAppMessage.js`, `server/models/WhatsAppChat.js`, `server/routes/whatsappMonitorRoutes.js`, `docs/modules/communication.md`, `docs/socket-events.md` (emits `wa-monitor:message`/`wa-monitor:status`) |
-| `server/routes/whatsappMonitorRoutes.js` | `server/app.js` (registered at `/api/whatsapp-monitor`), `client/src/pages/WhatsAppMonitorPage.jsx`, `docs/api-reference.md` |
-| `server/models/WhatsAppMessage.js` / `WhatsAppChat.js` | `whatsappMonitorService.js` (writer), `whatsappMonitorRoutes.js` (reader), `docs/database.md` |
-| `client/src/pages/WhatsAppMonitorPage.jsx` | `client/src/App.jsx` (route `admin/whatsapp-monitor`), `client/src/components/Navbar.jsx` (admin nav item), `client/src/utils/socket.js` (listens `wa-monitor:*`) |
+| `server/services/whatsappMonitorService.js` | `server/models/WhatsAppMessage.js`, `WhatsAppChat.js`, `WhatsAppMonitorSettings.js`, `server/routes/whatsappMonitorRoutes.js`, `server/routes/waViewRoutes.js`, `docs/modules/communication.md`, `docs/socket-events.md` (emits `wa-monitor:message`/`wa-monitor:update`/`wa-monitor:status`) |
+| `server/routes/whatsappMonitorRoutes.js` | `server/app.js` (registered at `/api/whatsapp-monitor`), `client/src/pages/WhatsAppMonitorPage.jsx`, `waViewRoutes.js` (imports `sendMediaFile`), `docs/api-reference.md` |
+| `server/routes/waViewRoutes.js` | `server/app.js` (registered at `/api/wa-view`), `client/src/pages/WaViewerPage.jsx` (message shape), `client/src/components/whatsapp/WaMessageBubble.jsx` (same shape), `isWaViewerAllowedPath` in `authMiddleware.js`, `docs/api-reference.md` |
+| `server/models/WhatsAppMessage.js` / `WhatsAppChat.js` / `WhatsAppMonitorSettings.js` | `whatsappMonitorService.js` (writer), `whatsappMonitorRoutes.js` + `waViewRoutes.js` (readers), `docs/database.md` |
+| `client/src/pages/WhatsAppMonitorPage.jsx` | `client/src/App.jsx` (route `admin/whatsapp-monitor`), `client/src/components/Navbar.jsx` (`waMonitorNav` sidebar shortcuts), `client/src/utils/socket.js` (listens `wa-monitor:*`), `WaMessageBubble.jsx` (`toBubbleMessage`) |
+| `client/src/pages/WaViewerPage.jsx` | `client/src/App.jsx` (route `/wa-view`, outside Layout), `Layout.jsx` + `LoginPage.jsx` (wa-viewer redirect), `WaMessageBubble.jsx` |
+| Role `wa-viewer` | `server/models/userModel.js` (enum), `server/controllers/adminController.js` (allowed roles), `server/middlewares/authMiddleware.js` + `requireAuth.js` (lockdown), `client/src/pages/AdminUsersPage.jsx` (role option), `Layout.jsx`, `LoginPage.jsx`, `docs/auth-flow.md` |
 
 > ⚠️ Separate Baileys connection from `whatsappService.js` — own auth folder `auth_info_monitor/` and media dir `storage/wa-monitor/` (both gitignored). Do NOT merge with the email-forwarding bot.
 

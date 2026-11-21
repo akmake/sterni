@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, Navigate, useLocation } from 'react-router-dom';
+import { useAuthStore } from '@/stores/authStore';
 import Navbar from './Navbar';
 import Calculator from '../components/Calculator';
 import { Toaster } from "@/components/ui/toaster";
@@ -7,6 +8,13 @@ import { Calculator as CalcIcon } from 'lucide-react'; // אייקון המחש�
 
 export default function Layout() {
   const [isCalcOpen, setIsCalcOpen] = useState(false);
+  const { user } = useAuthStore();
+  const { pathname } = useLocation();
+
+  // משתמש צופה וואצפ רואה רק את עמוד הצפייה — בלי תפריט ובלי שאר המערכת
+  if (user?.role === 'wa-viewer' && pathname !== '/login') {
+    return <Navigate to="/wa-view" replace />;
+  }
 
   return (
     <div dir="rtl" className="flex h-screen bg-slate-50 text-slate-800 overflow-hidden relative">

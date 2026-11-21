@@ -1,6 +1,6 @@
 import { useState, Fragment } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { Menu, X, LogOut, Briefcase, Utensils, FileText, ChevronDown, ChevronUp, Settings, UserCircle, ListTodo, User, Users, CalendarDays, CreditCard, Shield, BarChart3, Scissors, FolderPlus, ClipboardList, Home, ArrowLeftRight, ShoppingCart, ClipboardCheck, Wallet, FolderKanban, Landmark, Hotel, Monitor, DollarSign, Tag, MapPin, MessageCircle, Newspaper, Smartphone, FileSpreadsheet } from "lucide-react";
+import { Menu, X, LogOut, Briefcase, Utensils, FileText, ChevronDown, ChevronUp, Settings, UserCircle, ListTodo, User, Users, CalendarDays, CreditCard, Shield, BarChart3, Scissors, FolderPlus, ClipboardList, Home, ArrowLeftRight, ShoppingCart, ClipboardCheck, Wallet, FolderKanban, Landmark, Hotel, Monitor, DollarSign, Tag, MapPin, MessageCircle, Newspaper, Smartphone, FileSpreadsheet, Eye } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/stores/authStore";
 import useLogout from "@/hooks/useLogout";
@@ -11,7 +11,7 @@ import {
 
 
 // --- פריטי ניווט לפי תצוגה ---
-const getHouseholdNav = (hasTzitzitAccess) => {
+const getHouseholdNav = (hasTzitzitAccess, isAdmin) => {
   const items = [
     { to: '/household/quick-tasks', label: 'משימות מהירות', icon: ListTodo, type: 'link' },
     { to: '/household/projects', label: 'פרויקטים', icon: FolderKanban, type: 'link' },
@@ -24,8 +24,15 @@ const getHouseholdNav = (hasTzitzitAccess) => {
   items.push({ to: '/household/tasks', label: 'משימות בית', icon: ClipboardCheck, type: 'link' });
   items.push({ to: '/software-library', label: 'ספריית תוכנות', icon: Monitor, type: 'link' });
   items.push({ to: '/news', label: 'חדשות', icon: Newspaper, type: 'link' });
+  if (isAdmin) items.push(...waMonitorNav);
   return items;
 };
+
+// קיצורי מעקב וואצפ לאדמין — מופיעים ישירות בתפריט הצד בשתי התצוגות
+const waMonitorNav = [
+  { to: '/admin/whatsapp-monitor', label: 'מעקב וואצפ', icon: MessageCircle, type: 'link' },
+  { to: '/wa-view', label: "צ'אט במעקב", icon: Eye, type: 'link' },
+];
 
 const getManagementNav = (isAuthenticated, isAdmin, hasTzitzitAccess) => {
   const items = [];
@@ -45,6 +52,7 @@ const getManagementNav = (isAuthenticated, isAdmin, hasTzitzitAccess) => {
     { to: '/whatsapp', label: 'WhatsApp', icon: MessageCircle, type: 'link' },
     { to: '/news', label: 'חדשות', icon: Newspaper, type: 'link' }
   );
+  if (isAdmin) items.push(...waMonitorNav);
 
   items.push({
     label: 'יצירת קבצים',
@@ -86,7 +94,6 @@ const getManagementNav = (isAuthenticated, isAdmin, hasTzitzitAccess) => {
         { to: '/admin/logs', label: 'דוח מבקרים', icon: BarChart3 },
         { to: '/admin/commissions', label: 'דוח עמלות', icon: FileSpreadsheet },
         { to: '/admin/tether', label: 'Tether — ניהול מכשירים', icon: Smartphone },
-        { to: '/admin/whatsapp-monitor', label: 'מעקב וואצפ', icon: MessageCircle },
       ]
     });
   } else if (isAuthenticated) {
@@ -106,7 +113,7 @@ export default function Navbar({ mobileOnly = false }) {
     const canSwitch = hasHouseholdAccess; // יכול לעבור בין תצוגות אם יש לו גישת משק בית
 
     const navItems = activeView === 'household' && hasHouseholdAccess
-      ? getHouseholdNav(hasTzitzitAccess)
+      ? getHouseholdNav(hasTzitzitAccess, isAdmin)
       : getManagementNav(isAuthenticated, isAdmin, hasTzitzitAccess);
 
     const handleSwitchView = () => {

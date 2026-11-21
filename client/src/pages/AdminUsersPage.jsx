@@ -212,6 +212,7 @@ export default function AdminUsersPage() {
                         >
                           <option value="user">משתמש</option>
                           <option value="admin">מנהל</option>
+                          <option value="wa-viewer">צופה וואצפ</option>
                         </select>
                       </td>
                       <td className="px-4 py-3">-</td>
@@ -245,6 +246,10 @@ export default function AdminUsersPage() {
                           {user.role === 'admin' ? (
                             <span className="inline-flex items-center gap-1 bg-red-100 text-red-800 px-3 py-1 rounded text-sm font-semibold">
                               <Shield size={14} /> מנהל
+                            </span>
+                          ) : user.role === 'wa-viewer' ? (
+                            <span className="inline-flex items-center gap-1 bg-green-100 text-green-800 px-3 py-1 rounded text-sm">
+                              צופה וואצפ
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-800 px-3 py-1 rounded text-sm">
@@ -412,6 +417,7 @@ export default function AdminUsersPage() {
                 >
                   <option value="user">משתמש</option>
                   <option value="admin">מנהל</option>
+                  <option value="wa-viewer">צופה וואצפ (רק עמוד הצ'אט)</option>
                 </select>
               </div>
             </div>

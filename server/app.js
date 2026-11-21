@@ -61,6 +61,7 @@ import { setupGameSocketIO } from './services/gameSocketService.js';
 import gameRoutes from './routes/gameRoutes.js';
 import whatsappRoutes from './routes/whatsappRoutes.js';
 import whatsappMonitorRoutes from './routes/whatsappMonitorRoutes.js';
+import waViewRoutes from './routes/waViewRoutes.js';
 
 import softwareRoutes from './routes/softwareRoutes.js';
 
@@ -230,6 +231,7 @@ app.use('/api/admin/orders', adminCommissionOrdersStub);
 app.use('/api/admin', adminRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/whatsapp-monitor', whatsappMonitorRoutes);
+app.use('/api/wa-view', waViewRoutes); // צפייה בלבד בשיחה במעקב (wa-viewer / admin)
 app.use('/api/hotel-orders', hotelOrderRoutes);
 app.use('/api/hotel-data', hotelZiporiDataRoutes);
 app.use('/api/v1', companyOsRoutes);

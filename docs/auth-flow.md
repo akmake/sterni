@@ -32,6 +32,14 @@ Both cookies are HTTP-only → cannot be accessed by JavaScript → XSS-safe.
 2. Verifies with `JWT_ACCESS_SECRET`
 3. Sets `req.user = { _id: ObjectId, id: string, role: string }`
 4. **Note:** `_id` is MongoDB ObjectId, `id` is string alias — both exist for compatibility
+5. **`wa-viewer` lockdown:** if `role === 'wa-viewer'` and `isWaViewerAllowedPath(req)` is false → 403. Allowed: `/api/wa-view/*`, `GET /api/auth/profile`, `/api/auth/change-password` (login/logout/refresh don't pass through requireAuth). Same check in `server/middlewares/requireAuth.js`.
+
+### Roles (`User.role`)
+| Role | Access |
+|------|--------|
+| `user` | Regular app |
+| `admin` | Everything + admin pages |
+| `wa-viewer` | **Only** `/wa-view` (read-only WhatsApp chat of the tracked contact). Server blocks every other API; client `Layout.jsx` redirects every in-Layout route to `/wa-view`; `LoginPage` navigates there after login. Set via admin users page. |
 
 ### `requireAdmin`
 - Checks `req.user?.role === 'admin'`
@@ -91,6 +99,8 @@ The axios instance handles fetching and attaching the CSRF token automatically.
 | `ProtectedRoute` | `client/src/components/ProtectedRoute.jsx` | Redirects to /login if not authenticated |
 | `AdminOnlyRoute` | `client/src/components/AdminOnlyRoute.jsx` | Requires `user.role === 'admin'` |
 | `TzitzitRoute` | `client/src/components/TzitzitRoute.jsx` | Special tzitzit access flag |
+| (inline) | `client/src/pages/WaViewerPage.jsx` | `/wa-view` — requires `role` `wa-viewer` or `admin` |
+| (Layout) | `client/src/components/Layout.jsx` | `role === 'wa-viewer'` → `<Navigate to="/wa-view">` (except `/login`) |
 
 **Sidebar (`client/src/components/Navbar.jsx`):** `getManagementNav` returns an empty list when `!isAuthenticated` — logged-out users see only the "התחברות" button, no nav items.
 

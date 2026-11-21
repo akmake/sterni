@@ -1,4 +1,5 @@
 import { useState, Fragment } from "react";
+import { createPortal } from "react-dom";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Menu, X, LogOut, Briefcase, Utensils, FileText, ChevronDown, ChevronUp, Settings, UserCircle, ListTodo, User, Users, CalendarDays, CreditCard, Shield, BarChart3, Scissors, FolderPlus, ClipboardList, Home, ArrowLeftRight, ShoppingCart, ClipboardCheck, Wallet, FolderKanban, Landmark, Hotel, Monitor, DollarSign, Tag, MapPin, MessageCircle, Newspaper, Smartphone, FileSpreadsheet, Eye } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -106,6 +107,7 @@ const getManagementNav = (isAuthenticated, isAdmin, hasTzitzitAccess) => {
 export default function Navbar({ mobileOnly = false }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const navigate = useNavigate();
+    const location = useLocation();
     const { isAuthenticated, user, activeView, toggleView } = useAuthStore();
     const isAdmin = user?.role === 'admin';
     const hasTzitzitAccess = user?.tzitzitAccess || false;
@@ -122,20 +124,26 @@ export default function Navbar({ mobileOnly = false }) {
       navigate(nextView === 'household' ? '/household/quick-tasks' : '/tasks');
     };
 
+    // ── קיצורים בתפריט התחתון (מובייל) — לפי תצוגה פעילה; השאר תחת "עוד" ──
+    const inHousehold = activeView === 'household' && hasHouseholdAccess;
+    const tabs = inHousehold
+      ? [
+          { to: '/household/quick-tasks', label: 'משימות', icon: ListTodo },
+          { to: '/household/projects', label: 'פרויקטים', icon: FolderKanban },
+          { to: '/household/shopping', label: 'קניות', icon: ShoppingCart },
+          { to: '/household/finance', label: 'כספים', icon: Landmark },
+        ]
+      : [
+          { to: '/tasks', label: 'מטלות', icon: ListTodo },
+          { to: '/projects', label: 'פרויקטים', icon: Briefcase },
+          { to: '/groups', label: 'קבוצות', icon: Users },
+          { to: '/hotel-orders', label: 'מלונות', icon: Hotel },
+        ];
+    const isTabActive = (to) => location.pathname === to || location.pathname.startsWith(to + '/');
+    const moreActive = !tabs.some((t) => isTabActive(t.to));
+
     return (
         <>
-            {/* === כפתור תפריט למובייל (בסרגל העליון של Layout) === */}
-            <div className="md:hidden">
-                <button
-                    type="button"
-                    aria-label="תפריט"
-                    onClick={() => setSidebarOpen(true)}
-                    className="h-10 w-10 rounded-xl flex items-center justify-center text-slate-700 hover:bg-slate-100 active:bg-slate-200 transition-colors"
-                >
-                    <Menu className="h-6 w-6" />
-                </button>
-            </div>
-
             {/* === תפריט צד לדסקטופ === */}
             {!mobileOnly && (
                 <div className="hidden md:flex md:flex-col h-full w-full">
@@ -143,44 +151,80 @@ export default function Navbar({ mobileOnly = false }) {
                 </div>
             )}
 
-            {/* === המגירה הנפתחת (Mobile Drawer) === */}
-            <AnimatePresence>
-                {sidebarOpen && (
+            {/* === מובייל: תפריט תחתון + גיליון "עוד" === */}
+            {/* פורטל ל-body כדי לא להיות תלוי באבות עם transform/filter (שגורמים ל-fixed להימדד ביחס אליהם) */}
+            {isAuthenticated && createPortal(
+              <div className="md:hidden" dir="rtl">
+                <nav
+                  aria-label="ניווט ראשי"
+                  className="fixed bottom-0 inset-x-0 z-[60] bg-white/90 backdrop-blur-xl border-t border-slate-200/80 shadow-[0_-4px_20px_rgba(15,23,42,0.06)] pb-[env(safe-area-inset-bottom)]"
+                >
+                  <div className="grid grid-cols-5 h-16">
+                    {tabs.map((t) => {
+                      const active = isTabActive(t.to);
+                      return (
+                        <NavLink key={t.to} to={t.to} onClick={() => setSidebarOpen(false)}
+                          className="relative flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform">
+                          <span className={`flex items-center justify-center w-14 h-8 rounded-full transition-colors ${active ? 'bg-blue-100 text-blue-700' : 'text-slate-500'}`}>
+                            <t.icon className="w-[22px] h-[22px]" strokeWidth={active ? 2.3 : 1.8} />
+                          </span>
+                          <span className={`text-[11px] leading-none ${active ? 'font-bold text-blue-700' : 'font-medium text-slate-500'}`}>{t.label}</span>
+                        </NavLink>
+                      );
+                    })}
+                    <button type="button" onClick={() => setSidebarOpen(true)} aria-label="עוד"
+                      className="relative flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform">
+                      <span className={`flex items-center justify-center w-14 h-8 rounded-full transition-colors ${moreActive || sidebarOpen ? 'bg-blue-100 text-blue-700' : 'text-slate-500'}`}>
+                        <Menu className="w-[22px] h-[22px]" strokeWidth={moreActive ? 2.3 : 1.8} />
+                      </span>
+                      <span className={`text-[11px] leading-none ${moreActive || sidebarOpen ? 'font-bold text-blue-700' : 'font-medium text-slate-500'}`}>עוד</span>
+                    </button>
+                  </div>
+                </nav>
+
+                <AnimatePresence>
+                  {sidebarOpen && (
                     <Fragment>
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="fixed inset-0 z-[60] bg-black/40 md:hidden backdrop-blur-sm"
-                            onClick={() => setSidebarOpen(false)}
-                        />
-                        
-                        <motion.div
-                            initial={{ x: '100%' }}
-                            animate={{ x: 0 }}
-                            exit={{ x: '100%' }}
-                            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className="fixed inset-y-0 right-0 z-[70] w-72 bg-white shadow-2xl md:hidden border-l border-slate-100"
-                        >
-                            <SidebarContent
-                                items={navItems}
-                                user={user}
-                                isAuthenticated={isAuthenticated}
-                                onClose={() => setSidebarOpen(false)}
-                                canSwitch={canSwitch}
-                                activeView={activeView}
-                                onSwitchView={handleSwitchView}
-                            />
-                        </motion.div>
+                      <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[110] bg-slate-900/40 backdrop-blur-[2px]"
+                        onClick={() => setSidebarOpen(false)}
+                      />
+                      <motion.div
+                        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+                        transition={{ type: 'spring', damping: 30, stiffness: 320 }}
+                        drag="y" dragConstraints={{ top: 0, bottom: 0 }} dragElastic={{ top: 0, bottom: 0.6 }}
+                        onDragEnd={(_, info) => { if (info.offset.y > 90 || info.velocity.y > 500) setSidebarOpen(false); }}
+                        className="fixed inset-x-0 bottom-0 z-[120] h-[82dvh] rounded-t-3xl bg-white shadow-2xl overflow-hidden flex flex-col"
+                      >
+                        <div className="shrink-0 pt-2 pb-1 flex justify-center cursor-grab">
+                          <span className="w-10 h-1.5 rounded-full bg-slate-300" />
+                        </div>
+                        <div className="flex-1 min-h-0">
+                          <SidebarContent
+                            items={navItems}
+                            user={user}
+                            isAuthenticated={isAuthenticated}
+                            onClose={() => setSidebarOpen(false)}
+                            canSwitch={canSwitch}
+                            activeView={activeView}
+                            onSwitchView={handleSwitchView}
+                            sheet
+                          />
+                        </div>
+                      </motion.div>
                     </Fragment>
-                )}
-            </AnimatePresence>
+                  )}
+                </AnimatePresence>
+              </div>,
+              document.body
+            )}
         </>
     );
 }
 
 // --- תוכן התפריט (משותף) ---
-function SidebarContent({ items, user, isAuthenticated, onClose, canSwitch, activeView, onSwitchView }) {
+function SidebarContent({ items, user, isAuthenticated, onClose, canSwitch, activeView, onSwitchView, sheet = false }) {
     const { mutate: serverLogout } = useLogout();
     const handleLogout = () => {
         serverLogout();
@@ -340,7 +384,7 @@ function UserNav({ user, logout }) {
                     <ChevronDown size={16} className="text-slate-400" />
                  </div>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-60 mb-2" align="end" side="top">
+            <DropdownMenuContent className="w-60 mb-2 z-[130]" align="end" side="top">
                 <DropdownMenuItem asChild>
                     <Link to="/profile"><UserCircle className="mr-2 h-4 w-4" /><span>פרופיל אישי</span></Link>
                 </DropdownMenuItem>

@@ -1,7 +1,7 @@
 import express from 'express';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import UserPushSubscription from '../models/UserPushSubscription.js';
-import { isPushConfigured, getPushPublicKey, pushToUser } from '../services/assignmentNotifier.js';
+import { isPushConfigured, getPushPublicKey, pushToUser, ensurePushKeys } from '../services/assignmentNotifier.js';
 
 /**
  * /api/push — הרשמה להתראות Web Push באפליקציה הראשית (טלפון/מחשב).
@@ -11,7 +11,8 @@ const router = express.Router();
 router.use(requireAuth);
 
 // ── מפתח ציבורי + האם ההתראות מוגדרות בשרת ──
-router.get('/config', (req, res) => {
+router.get('/config', async (req, res) => {
+    await ensurePushKeys();
     res.json({ enabled: isPushConfigured(), publicKey: getPushPublicKey() });
 });
 

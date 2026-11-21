@@ -3,6 +3,7 @@ import Task from '../models/Task.js';
 import Project from '../models/Project.js';
 import User from '../models/userModel.js';
 import UserPushSubscription from '../models/UserPushSubscription.js';
+import AppSecret from '../models/AppSecret.js';
 
 /**
  * assignmentNotifier — מטלות/פרויקטים שמישהו אחר יצר עבורך (Task.createdBy / Project.createdBy):
@@ -14,7 +15,9 @@ import UserPushSubscription from '../models/UserPushSubscription.js';
  *   3. "חפירה": תזכורות חוזרות עד שהיעד ראה (seenAt) או סיים — ראה REMINDER_SCHEDULE_MIN
  *
  * VAPID: VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT, ואם אין — המפתחות של Company OS
- * (COMPANY_VAPID_*). אותו origin ואותו service worker, אז אותם מפתחות עובדים לשניהם.
+ * (COMPANY_VAPID_*), ואם גם הם לא קיימים — השרת מייצר זוג מפתחות פעם אחת ושומר ב-DB
+ * (AppSecret key 'vapid'), כך שההתראות עובדות בלי הגדרה ידנית.
+ * ⚠️ אם מוסיפים אחר כך מפתחות ל-.env — מנויים קיימים לא יעבדו, וצריך ללחוץ שוב "הפעל התראות".
  *
  * Coupled: server/app.js (attachAssignmentIo + startAssignmentReminderWorker),
  *          server/controllers/taskController.js, projectController.js, server/routes/waViewRoutes.js,
@@ -32,11 +35,41 @@ let ioRef = null;
 export const attachAssignmentIo = (io) => { ioRef = io; };
 
 // ── VAPID ──
-const publicKey = () => process.env.VAPID_PUBLIC_KEY || process.env.COMPANY_VAPID_PUBLIC_KEY || '';
-const privateKey = () => process.env.VAPID_PRIVATE_KEY || process.env.COMPANY_VAPID_PRIVATE_KEY || '';
+let dbKeys = null; // { publicKey, privateKey } מ-AppSecret כשאין ב-.env
+const envPublic = () => process.env.VAPID_PUBLIC_KEY || process.env.COMPANY_VAPID_PUBLIC_KEY || '';
+const envPrivate = () => process.env.VAPID_PRIVATE_KEY || process.env.COMPANY_VAPID_PRIVATE_KEY || '';
+const publicKey = () => envPublic() || dbKeys?.publicKey || '';
+const privateKey = () => (envPublic() ? envPrivate() : dbKeys?.privateKey) || '';
 const subject = () => process.env.VAPID_SUBJECT || process.env.COMPANY_VAPID_SUBJECT || 'mailto:admin@dahanswebsite.com';
 export const isPushConfigured = () => Boolean(publicKey() && privateKey());
 export const getPushPublicKey = () => publicKey() || null;
+
+let keysPromise = null;
+/** טוען (או מייצר ושומר) מפתחות VAPID. בטוח לקרוא הרבה פעמים. */
+export const ensurePushKeys = () => {
+    if (envPublic() && envPrivate()) return Promise.resolve(true);
+    if (dbKeys) return Promise.resolve(true);
+    if (!keysPromise) {
+        keysPromise = (async () => {
+            let doc = await AppSecret.findOne({ key: 'vapid' }).lean();
+            if (!doc) {
+                const k = webpush.generateVAPIDKeys();
+                try {
+                    await AppSecret.create({ key: 'vapid', value: { publicKey: k.publicKey, privateKey: k.privateKey } });
+                    console.log('🔑 [push] נוצרו מפתחות VAPID ונשמרו ב-DB');
+                } catch (_) { /* תהליך אחר יצר במקביל — נקרא אותו */ }
+                doc = await AppSecret.findOne({ key: 'vapid' }).lean();
+            }
+            if (doc?.value?.publicKey && doc?.value?.privateKey) dbKeys = doc.value;
+            return !!dbKeys;
+        })().catch((err) => {
+            console.error('[push] טעינת מפתחות VAPID נכשלה:', err.message);
+            keysPromise = null;
+            return false;
+        });
+    }
+    return keysPromise;
+};
 
 let configuredWith = null;
 const ensureVapid = () => {
@@ -54,7 +87,9 @@ export const emitToUser = (userId, event, payload = {}) => {
 // ── Push ──
 /** שולח push לכל המכשירים של המשתמש. best-effort, לא זורק. מחזיר כמה נשלחו. */
 export const pushToUser = async (userId, payload) => {
-    if (!isPushConfigured() || !userId) return 0;
+    if (!userId) return 0;
+    await ensurePushKeys();
+    if (!isPushConfigured()) return 0;
     try {
         ensureVapid();
         const subs = await UserPushSubscription.find({ userId }).lean();
@@ -101,16 +136,19 @@ const nextReminderDate = (fromDate, count) => {
 
 /** נקרא מיד אחרי יצירת מטלה עבור משתמש אחר */
 export const notifyTaskAssigned = async (task, creator) => {
-    emitToUser(task.userId, 'tasks:changed', { taskId: String(task._id), action: 'created' });
+    const payload = taskPayload(task, creator.name || 'משתמש');
+    // title/body/url — להתראה בתוך האפליקציה (AssignmentAlerts.jsx)
+    emitToUser(task.userId, 'tasks:changed', { taskId: String(task._id), action: 'created', ...payload });
     emitToUser(creator._id, 'assignments:changed', { kind: 'task' });
-    await pushToUser(task.userId, taskPayload(task, creator.name || 'משתמש'));
+    await pushToUser(task.userId, payload);
 };
 
 /** נקרא מיד אחרי יצירת פרויקט עבור משתמש אחר */
 export const notifyProjectAssigned = async (project, creator) => {
-    emitToUser(project.owner, 'projects:changed', { projectId: String(project._id), action: 'created' });
+    const payload = projectPayload(project, creator.name || 'משתמש');
+    emitToUser(project.owner, 'projects:changed', { projectId: String(project._id), action: 'created', ...payload });
     emitToUser(creator._id, 'assignments:changed', { kind: 'project' });
-    await pushToUser(project.owner, projectPayload(project, creator.name || 'משתמש'));
+    await pushToUser(project.owner, payload);
 };
 
 /** שדות לשמירה ביצירה — מתזמן את התזכורת הראשונה */
@@ -169,5 +207,6 @@ const tick = async () => {
 export const startAssignmentReminderWorker = () => {
     if (workerStarted) return;
     workerStarted = true;
+    ensurePushKeys();
     setInterval(tick, 60 * 1000).unref?.();
 };

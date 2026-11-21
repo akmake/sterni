@@ -27,6 +27,7 @@
 - תפריט צד (admin): "מעקב וואצפ" + "צ'אט במעקב" כקישורים ישירים בשתי התצוגות (`waMonitorNav` ב-`Navbar.jsx`)
 - מטלות ופרויקטים מהצופה: אדמין בוחר בעמודה "יוצר מטלות עבור" (ניהול משתמשים) משתמש יעד → `User.taskTargetUser`. בעמוד הצופה: פאנל צד (דסקטופ) / לשוניות תחתונות (מובייל) — "מטלות" ו"פרויקטים". נוצרים אצל היעד (`createdBy` = הצופה, מוצג כ"מאת …" + "חדש"), עם עדכון מיידי (socket) + התראת Push לטלפון + תזכורות חוזרות עד שהיעד ראה (`server/services/assignmentNotifier.js`). הצופה רואה סטטוס: נשלח / נראה / בוצע.
 - עמוד הצופה מתעדכן בזמן אמת: `wa-view:changed` (room `wa-viewers`) → משיכת `changedSince`; polling 15ש כגיבוי.
+- התראות Push לצופה (`PushOptIn compact` בכותרת `/wa-view`): כל הודעה חדשה בשיחה שבמעקב (`notifyViewersOfMessage` ב-`whatsappMonitorService.js`, tag `wa-view-chat` — מחליפות זו את זו), וכשהיעד מסמן מטלה שהצופה יצר כבוצעה (`taskController.updateTaskStatus`).
 - Auth session: `server/auth_info_monitor/` (נפרד מ-`auth_info_baileys/`) — gitignored
 - Media: `server/storage/wa-monitor/` — מחוץ ל-`/uploads` הפומבי, מוגש רק דרך `GET /api/whatsapp-monitor/media/:messageId` (admin) — gitignored
 - מה עושה: ממשכפל את ההתכתבויות של **חשבון הוואצפ שלך** (שני הכיוונים: `emitOwnEvents: true`) + מושך היסטוריה (`syncFullHistory: true`), שומר ב-DB, ומציג פאנל בסגנון וואצפ ווב עם תמונות/וידאו/הקלטות ועדכון חי.

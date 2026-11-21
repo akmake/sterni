@@ -27,6 +27,8 @@ import NodeCache from 'node-cache';
 import WhatsAppMessage from '../models/WhatsAppMessage.js';
 import WhatsAppChat from '../models/WhatsAppChat.js';
 import WhatsAppMonitorSettings from '../models/WhatsAppMonitorSettings.js';
+import User from '../models/userModel.js';
+import { pushToUser } from './assignmentNotifier.js';
 
 // ============================================================
 // ===  CONFIG / PATHS  ===
@@ -606,6 +608,7 @@ const storeMessage = async (m, { live, notify = false }) => {
         // ── דחיפה חיה לפאנל ── (לפני הורדת מדיה, כדי שהודעה תופיע מיד)
         const { raw: _raw, ...publicDoc } = doc;
         if (live) emitToAdmins('wa-monitor:message', { ...publicDoc, timestamp: timestamp.toISOString() });
+        if (live) notifyViewersOfMessage(ident, { fromMe, senderName, preview: previewOf(parsed) }).catch(() => {});
 
         // ── מדיה ── מורידים אוטומטית רק בהודעות חיות; היסטוריה — לפי דרישה
         if (parsed.media && live && (!doc.fileSize || doc.fileSize <= AUTO_DOWNLOAD_MAX_BYTES)) {
@@ -622,6 +625,26 @@ const storeMessage = async (m, { live, notify = false }) => {
     } catch (err) {
         console.error('❌ [WA-Monitor] שגיאה בשמירת הודעה:', err.message);
     }
+};
+
+/**
+ * Push לכל משתמשי 'wa-viewer' על הודעה חדשה בשיחה שבמעקב (שני הכיוונים).
+ * tag קבוע → הודעות רצופות מחליפות זו את זו במגירת ההתראות במקום להציף.
+ */
+const notifyViewersOfMessage = async (ident, { fromMe, senderName, preview }) => {
+    const s = await getMonitorSettings();
+    if (!chatMatchesTracked(s.tracked, { jid: ident.chatJid, lid: ident.lid, phone: ident.phone })) return;
+    const viewers = await User.find({ role: 'wa-viewer' }).select('_id').lean();
+    if (!viewers.length) return;
+    const chat = await WhatsAppChat.findOne({ jid: ident.chatJid }).select('contactName name').lean();
+    const contact = chat?.contactName || chat?.name || senderName || s.tracked[0]?.name || 'איש הקשר';
+    const payload = {
+        title: fromMe ? `💬 נשלחה הודעה ל${contact}` : `💬 ${contact}`,
+        body: preview || 'הודעה חדשה',
+        url: '/wa-view',
+        tag: 'wa-view-chat',
+    };
+    await Promise.all(viewers.map((v) => pushToUser(v._id, payload)));
 };
 
 /** שמות אנשי קשר מהטלפון (contacts.upsert / היסטוריה) */

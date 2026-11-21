@@ -5,6 +5,7 @@ import { connectSocket } from '@/utils/socket';
 import { useAuthStore } from '@/stores/authStore';
 import useLogout from '@/hooks/useLogout';
 import WaMessageBubble, { fmtDay } from '@/components/whatsapp/WaMessageBubble';
+import PushOptIn from '@/components/PushOptIn';
 import {
     Loader2, LogOut, MessageCircle, ListTodo, FolderKanban, Send, Plus, X,
     CheckCircle2, Eye, Clock, CalendarDays, ChevronDown,
@@ -525,6 +526,7 @@ function WaViewerContent() {
                     </div>
                 </div>
                 {newCount > 0 && <span className="bg-amber-400 text-white text-xs font-semibold rounded-full px-2.5 py-1">{newCount} חדשות</span>}
+                <PushOptIn compact />
                 <button onClick={() => logout()} title="יציאה" className="p-2 rounded-lg hover:bg-white/15">
                     <LogOut className="w-4 h-4" />
                 </button>

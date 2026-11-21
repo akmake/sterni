@@ -1,5 +1,6 @@
 import Task from '../models/Task.js';
-import { emitToUser } from '../services/assignmentNotifier.js';
+import User from '../models/userModel.js';
+import { emitToUser, pushToUser } from '../services/assignmentNotifier.js';
 
 // מודיע ליוצר (אם מישהו אחר יצר את המטלה) שהסטטוס השתנה — מתעדכן אצלו בעמוד הצופה
 const notifyCreator = (task) => {
@@ -61,6 +62,16 @@ export const updateTaskStatus = async (req, res) => {
       .populate('createdBy', 'name');
     if (!task) return res.status(404).json({ error: 'Task not found' });
     notifyCreator({ ...task.toObject(), createdBy: task.createdBy?._id });
+    // מי שיצר עבורי את המטלה מקבל התראה כשסיימתי אותה
+    if (isCompleted === true && task.createdBy?._id && String(task.createdBy._id) !== String(req.user._id)) {
+      const owner = await User.findById(req.user._id).select('name').lean();
+      pushToUser(task.createdBy._id, {
+        title: `✅ ${owner?.name || 'המשימה'} סימן/ה כבוצע`,
+        body: task.text,
+        url: '/wa-view',
+        tag: `task-done-${task._id}`,
+      }).catch(() => {});
+    }
     res.json(task);
   } catch (error) {
     res.status(400).json({ error: error.message });

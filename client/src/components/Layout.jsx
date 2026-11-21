@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import Navbar from './Navbar';
+import AssignmentAlerts from './AssignmentAlerts';
 import Calculator from '../components/Calculator';
 import { Toaster } from "@/components/ui/toaster";
 import { Calculator as CalcIcon } from 'lucide-react'; // אייקון המחשבון
@@ -35,6 +36,7 @@ export default function Layout() {
       </main>
 
       <Toaster />
+      <AssignmentAlerts />
 
       {/* --- הכפתור הצף (כמו וואטסאפ) --- */}
       <button

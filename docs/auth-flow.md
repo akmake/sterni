@@ -32,7 +32,7 @@ Both cookies are HTTP-only → cannot be accessed by JavaScript → XSS-safe.
 2. Verifies with `JWT_ACCESS_SECRET`
 3. Sets `req.user = { _id: ObjectId, id: string, role: string }`
 4. **Note:** `_id` is MongoDB ObjectId, `id` is string alias — both exist for compatibility
-5. **`wa-viewer` lockdown:** if `role === 'wa-viewer'` and `isWaViewerAllowedPath(req)` is false → 403. Allowed: `/api/wa-view/*`, `GET /api/auth/profile`, `/api/auth/change-password` (login/logout/refresh don't pass through requireAuth). Same check in `server/middlewares/requireAuth.js`.
+5. **`wa-viewer` lockdown:** if `role === 'wa-viewer'` and `isWaViewerAllowedPath(req)` is false → 403. Allowed: `/api/wa-view/*`, `/api/push/*` (phone notifications), `GET /api/auth/profile`, `/api/auth/change-password` (login/logout/refresh don't pass through requireAuth). Same check in `server/middlewares/requireAuth.js`.
 
 ### Roles (`User.role`)
 | Role | Access |

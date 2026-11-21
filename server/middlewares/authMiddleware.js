@@ -8,6 +8,7 @@ import mongoose from 'mongoose';
 export const isWaViewerAllowedPath = (req) => {
   const url = req.originalUrl || '';
   if (url.startsWith('/api/wa-view')) return true;
+  if (url.startsWith('/api/push')) return true; // הרשמה להתראות לטלפון
   if (req.method === 'GET' && url.startsWith('/api/auth/profile')) return true;
   if (url.startsWith('/api/auth/change-password')) return true;
   return false;

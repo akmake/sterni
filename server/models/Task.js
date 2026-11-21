@@ -7,6 +7,8 @@ const taskSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   // מי יצר את המטלה, כשזה לא בעל המטלה (למשל צופה וואצפ שיוצר עבור userId). null = הבעלים עצמו
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  // שם המקור להצגה ("מאת …") — למשל שם איש הקשר שבמעקב, כשהמטלה נוצרה דרך עמוד הצופה. ריק → createdBy.name
+  sourceLabel: { type: String, default: '' },
   // ── הקצאה ע"י אחר (createdBy) — "חפירה" עד שהבעלים ראה (assignmentNotifier.js) ──
   seenAt: { type: Date, default: null },          // הבעלים ראה את המטלה בעמוד המטלות
   reminderCount: { type: Number, default: 0 },

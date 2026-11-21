@@ -124,16 +124,16 @@ export default function Navbar({ mobileOnly = false }) {
 
     return (
         <>
-            {/* === כפתור צף למובייל === */}
+            {/* === כפתור תפריט למובייל (בסרגל העליון של Layout) === */}
             <div className="md:hidden">
-                <Button 
-                    variant="outline" 
-                    size="icon" 
+                <button
+                    type="button"
+                    aria-label="תפריט"
                     onClick={() => setSidebarOpen(true)}
-                    className="bg-white/90 backdrop-blur shadow-lg border-slate-200 rounded-full h-12 w-12"
+                    className="h-10 w-10 rounded-xl flex items-center justify-center text-slate-700 hover:bg-slate-100 active:bg-slate-200 transition-colors"
                 >
-                    <Menu className="h-6 w-6 text-slate-700" />
-                </Button>
+                    <Menu className="h-6 w-6" />
+                </button>
             </div>
 
             {/* === תפריט צד לדסקטופ === */}

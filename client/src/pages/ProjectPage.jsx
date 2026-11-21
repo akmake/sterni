@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import useProjectsStore from '@/stores/projectsStore';
 import api from '@/utils/api';
+import ActionMenu from '@/components/ui/ActionMenu';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -152,7 +153,7 @@ export default function ProjectPage() {
     const DeleteButton = () => (
         <button 
             onClick={(e) => handleDeleteFile(e, file._id)}
-            className="absolute top-2 right-2 bg-white/90 text-red-500 hover:text-red-600 p-1.5 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-all z-20 hover:bg-red-50"
+            className="absolute top-2 right-2 bg-white/90 text-red-500 hover:text-red-600 p-1.5 rounded-full shadow-sm opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-all z-20 hover:bg-red-50"
             title="מחק קובץ"
         >
             <X size={14} strokeWidth={3} />
@@ -170,7 +171,7 @@ export default function ProjectPage() {
                 />
                 <DeleteButton />
                 {/* Overlay להורדה */}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity hidden [@media(hover:hover)]:flex items-center justify-center">
                     <a href={fileUrl} target="_blank" rel="noreferrer" className="text-white hover:scale-110 transition-transform bg-white/20 p-2 rounded-full backdrop-blur-sm">
                         <Download size={20} />
                     </a>
@@ -218,12 +219,12 @@ export default function ProjectPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F5F7] p-4 md:p-8 font-sans text-slate-800 dir-rtl">
-      <div className="max-w-6xl mx-auto space-y-6 md:space-y-8">
+    <div className="min-h-full bg-[#F5F5F7] px-4 pt-4 pb-28 md:p-8 font-sans text-slate-800 dir-rtl">
+      <div className="max-w-6xl mx-auto space-y-4 md:space-y-8">
 
         {/* --- Header Section --- */}
-        <div className="bg-white/80 backdrop-blur-xl p-6 md:p-8 rounded-[2rem] shadow-sm border border-white/50 relative overflow-hidden">
-           <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div className="bg-white/80 backdrop-blur-xl p-5 md:p-8 rounded-3xl md:rounded-[2rem] shadow-sm border border-white/50 relative overflow-hidden">
+           <div className="relative z-10 flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 md:gap-6">
                 <div className="flex-1 min-w-0">
                     {editingName ? (
                       <input
@@ -236,7 +237,7 @@ export default function ProjectPage() {
                       />
                     ) : (
                       <h1 
-                        className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 leading-tight group/name cursor-pointer"
+                        className="text-[26px] md:text-4xl font-bold tracking-tight text-slate-900 leading-tight break-words group/name cursor-pointer"
                         onClick={startEditName}
                         title="לחץ לעריכה"
                       >
@@ -256,7 +257,7 @@ export default function ProjectPage() {
                       />
                     ) : (
                       <p 
-                        className="text-slate-500 mt-2 text-lg font-light group/desc cursor-pointer"
+                        className="text-slate-500 mt-2 text-[15px] md:text-lg font-light whitespace-pre-wrap break-words group/desc cursor-pointer"
                         onClick={startEditDesc}
                         title="לחץ לעריכה"
                       >
@@ -266,17 +267,17 @@ export default function ProjectPage() {
                     )}
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-row-reverse md:flex-row items-center gap-3">
                     <Button
                         onClick={() => setSharingModalOpen(true)}
-                        className="flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-lg transition"
+                        className="shrink-0 flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700 px-4 h-12 md:h-auto md:py-2 rounded-xl md:rounded-lg transition"
                     >
                         <Share2 size={18} />
                         שתף
                     </Button>
 
                     {/* Progress Widget */}
-                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 min-w-[200px]">
+                    <div className="flex-1 md:flex-none bg-white p-3 md:p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 md:min-w-[200px]">
                         <div className="relative w-14 h-14 flex items-center justify-center">
                             <svg className="w-full h-full transform -rotate-90">
                                 <circle cx="28" cy="28" r="24" stroke="#f1f5f9" strokeWidth="6" fill="transparent" />
@@ -315,9 +316,9 @@ export default function ProjectPage() {
                         value={newTaskName}
                         onChange={e => setNewTaskName(e.target.value)}
                         placeholder="מה המשימה הבאה שלך?"
-                        className="border-none shadow-none focus-visible:ring-0 bg-transparent text-lg h-12 placeholder:text-slate-400 w-full"
+                        className="border-none shadow-none focus-visible:ring-0 bg-transparent text-[16px] md:text-lg h-12 placeholder:text-slate-400 w-full min-w-0"
                     />
-                    <Button type="submit" size="sm" className="rounded-xl px-6 bg-slate-100 text-slate-900 hover:bg-slate-200 font-bold">
+                    <Button type="submit" size="sm" className="shrink-0 rounded-xl px-4 md:px-6 bg-slate-100 text-slate-900 hover:bg-slate-200 font-bold">
                         הוסף
                     </Button>
                 </form>
@@ -335,12 +336,12 @@ export default function ProjectPage() {
                 )}
 
                 {activeProject.tasks.map(task => (
-                    <div key={task._id} className="group relative bg-white hover:bg-slate-50 p-4 rounded-2xl transition-all duration-200 border border-transparent hover:border-slate-200 shadow-sm hover:shadow-md flex items-center justify-between">
-                        <div className="flex items-center gap-4 overflow-hidden flex-1">
+                    <div key={task._id} className="group relative bg-white md:hover:bg-slate-50 pr-4 pl-1.5 py-3 rounded-2xl transition-all duration-200 border border-slate-100/80 md:border-transparent md:hover:border-slate-200 shadow-sm flex items-start gap-2">
+                        <div className="flex items-start gap-3 min-w-0 flex-1">
                             <Checkbox
                                 checked={task.done}
                                 onCheckedChange={() => toggleTask(id, task._id)}
-                                className={`w-6 h-6 rounded-lg border-2 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500 transition-all ${task.done ? 'border-slate-300' : 'border-slate-300'}`}
+                                className="shrink-0 mt-0.5 w-6 h-6 rounded-lg border-2 border-slate-300 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500 transition-all"
                             />
                             {editingTaskId === task._id ? (
                               <input
@@ -349,11 +350,11 @@ export default function ProjectPage() {
                                 onChange={e => setEditTaskValue(e.target.value)}
                                 onBlur={saveTaskName}
                                 onKeyDown={e => { if (e.key === 'Enter') saveTaskName(); if (e.key === 'Escape') { setEditingTaskId(null); } }}
-                                className="text-lg flex-1 bg-transparent border-b-2 border-blue-500 outline-none"
+                                className="text-[16px] md:text-lg flex-1 min-w-0 bg-transparent border-b-2 border-blue-500 outline-none"
                               />
                             ) : (
                               <span 
-                                className={`text-lg truncate transition-all select-none cursor-pointer ${task.done ? 'text-slate-400 line-through decoration-slate-300' : 'text-slate-700'}`}
+                                className={`flex-1 min-w-0 text-[16px] md:text-lg leading-relaxed whitespace-pre-wrap break-words transition-all select-none cursor-pointer ${task.done ? 'text-slate-400 line-through decoration-slate-300' : 'text-slate-700'}`}
                                 onDoubleClick={() => startEditTask(task)}
                                 title="לחיצה כפולה לעריכה"
                               >
@@ -362,38 +363,12 @@ export default function ProjectPage() {
                             )}
                         </div>
 
-                        {/* Task Actions */}
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-4 group-hover:translate-x-0 pl-2">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => startEditTask(task)}
-                                title="ערוך שם"
-                                className="w-9 h-9 rounded-full text-slate-400 hover:text-amber-600 hover:bg-amber-50"
-                            >
-                                <Pencil size={16} />
-                            </Button>
-
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleConvert(task._id)}
-                                title="הפוך לפרויקט חדש"
-                                className="w-9 h-9 rounded-full text-slate-400 hover:text-blue-600 hover:bg-blue-50"
-                            >
-                                <ArrowUpRight size={18} />
-                            </Button>
-
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => deleteTask(id, task._id)}
-                                title="מחק משימה"
-                                className="w-9 h-9 rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50"
-                            >
-                                <Trash2 size={18} />
-                            </Button>
-                        </div>
+                        {/* Task Actions — תפריט ⋮ אחד (גם במובייל, במקום כפתורים שמופיעים רק ב-hover) */}
+                        <ActionMenu items={[
+                            { label: 'עריכה', icon: Pencil, onClick: () => startEditTask(task) },
+                            { label: 'הפוך לפרויקט חדש', icon: ArrowUpRight, onClick: () => handleConvert(task._id) },
+                            { label: 'מחיקה', icon: Trash2, onClick: () => deleteTask(id, task._id), danger: true, separatorBefore: true },
+                        ]} />
                     </div>
                 ))}
             </div>
@@ -401,7 +376,7 @@ export default function ProjectPage() {
 
           {/* --- Right Column: Files & Gallery (4/12) --- */}
           <div className="lg:col-span-4 space-y-6">
-            <div className="bg-white/80 backdrop-blur-md p-6 rounded-[2rem] border border-white/60 h-full flex flex-col shadow-sm">
+            <div className="bg-white/80 backdrop-blur-md p-5 md:p-6 rounded-3xl md:rounded-[2rem] border border-white/60 h-full flex flex-col shadow-sm">
                 
                 <div className="flex items-center justify-between mb-6">
                     <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -416,7 +391,7 @@ export default function ProjectPage() {
                 {/* Upload Area */}
                 <div 
                     onClick={() => fileInputRef.current.click()}
-                    className="border-2 border-dashed border-slate-300 hover:border-blue-500 hover:bg-blue-50/30 bg-slate-50 rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 group mb-6 flex flex-col items-center justify-center gap-3"
+                    className="border-2 border-dashed border-slate-300 hover:border-blue-500 hover:bg-blue-50/30 bg-slate-50 rounded-2xl p-5 md:p-8 text-center cursor-pointer transition-all duration-300 group mb-6 flex flex-col items-center justify-center gap-3"
                 >
                     <input 
                         type="file" 

@@ -23,8 +23,8 @@
 |-------|------|---------|
 | User | `userModel.js` | auth, admin. `role`: user/admin/wa-viewer. `taskTargetUser` (ObjectId→User, null) — the user this user may create tasks for (set by admin). `apiKeyHash` (sha256, `select:false`) + `apiKeyCreatedAt` — `/api/wa-view` API key |
 | Group | `Group.js` | groups module |
-| Project | `Project.js` | projects module. `createdBy` (ObjectId→User, null) — created for `owner` by someone else (`/api/wa-view/projects`), populated in `getProjects`; reminders `seenAt`, `reminderCount`, `nextReminderAt` |
-| Task | `Task.js` | tasks page. `userId` = owner (whose `/tasks` shows it), `createdBy` (ObjectId→User, null) — set when someone else created it (e.g. wa-viewer via `/api/wa-view/tasks`); populated with `name` in `getTasks`. Reminders: `seenAt`, `reminderCount`, `nextReminderAt` (indexed) |
+| Project | `Project.js` | projects module. `createdBy` (ObjectId→User, null) — created for `owner` by someone else (`/api/wa-view/projects`), populated in `getProjects`; `sourceLabel` as in Task; reminders `seenAt`, `reminderCount`, `nextReminderAt` |
+| Task | `Task.js` | tasks page. `userId` = owner (whose `/tasks` shows it), `createdBy` (ObjectId→User, null) — set when someone else created it (e.g. wa-viewer via `/api/wa-view/tasks`); populated with `name` in `getTasks`. `sourceLabel` — display name for "מאת …" (the tracked WhatsApp contact when created via `/wa-view`; falls back to `createdBy.name`). Reminders: `seenAt`, `reminderCount`, `nextReminderAt` (indexed) |
 | AppSecret | `AppSecret.js` | Server-generated secrets `{ key (unique), value }` — currently `vapid` `{publicKey, privateKey}` when no VAPID env keys |
 | UserPushSubscription | `UserPushSubscription.js` | Web Push subscription per device for the main app: `userId`, `endpoint` (unique), `keys{p256dh,auth}`, `userAgent`. Separate from `CompanyPushSubscription` |
 | Hall | `Hall.js` | halls page |

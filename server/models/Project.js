@@ -42,6 +42,7 @@ const projectSchema = new mongoose.Schema({
 
   // ── נוצר ע"י משתמש אחר עבור owner (למשל צופה וואצפ דרך /api/wa-view/projects) ──
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  sourceLabel: { type: String, default: '' }, // "מאת …" — שם איש הקשר שבמעקב (ריק → createdBy.name)
   seenAt: { type: Date, default: null },          // הבעלים פתח/ראה את הפרויקט
   reminderCount: { type: Number, default: 0 },
   nextReminderAt: { type: Date, default: null, index: true },

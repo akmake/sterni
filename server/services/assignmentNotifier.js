@@ -136,7 +136,7 @@ const nextReminderDate = (fromDate, count) => {
 
 /** נקרא מיד אחרי יצירת מטלה עבור משתמש אחר */
 export const notifyTaskAssigned = async (task, creator) => {
-    const payload = taskPayload(task, creator.name || 'משתמש');
+    const payload = taskPayload(task, task.sourceLabel || creator.name || 'משתמש');
     // title/body/url — להתראה בתוך האפליקציה (AssignmentAlerts.jsx)
     emitToUser(task.userId, 'tasks:changed', { taskId: String(task._id), action: 'created', ...payload });
     emitToUser(creator._id, 'assignments:changed', { kind: 'task' });
@@ -145,7 +145,7 @@ export const notifyTaskAssigned = async (task, creator) => {
 
 /** נקרא מיד אחרי יצירת פרויקט עבור משתמש אחר */
 export const notifyProjectAssigned = async (project, creator) => {
-    const payload = projectPayload(project, creator.name || 'משתמש');
+    const payload = projectPayload(project, project.sourceLabel || creator.name || 'משתמש');
     emitToUser(project.owner, 'projects:changed', { projectId: String(project._id), action: 'created', ...payload });
     emitToUser(creator._id, 'assignments:changed', { kind: 'project' });
     await pushToUser(project.owner, payload);
@@ -187,7 +187,7 @@ const remindBatch = async (Model, buildPayload, ownerField, extraFilter) => {
         );
         if (!locked.modifiedCount) continue;
         const creator = await User.findById(doc.createdBy).select('name').lean();
-        await pushToUser(doc[ownerField], buildPayload(doc, creator?.name || 'משתמש', count));
+        await pushToUser(doc[ownerField], buildPayload(doc, doc.sourceLabel || creator?.name || 'משתמש', count));
     }
 };
 

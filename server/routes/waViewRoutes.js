@@ -186,6 +186,14 @@ const getMeAndTarget = async (userId) => {
     return { me, target };
 };
 
+/** שם איש הקשר שבמעקב — מוצג אצל היעד כ"מאת …" במקום שם המשתמש של הצופה */
+const getTrackedLabel = async () => {
+    const { settings, chats } = await getTrackedChats();
+    const c = chats[0] || {};
+    const t = settings.tracked[0] || {};
+    return c.contactName || c.name || t.name || (c.phone || t.phone ? `+${c.phone || t.phone}` : '');
+};
+
 /** GET /api/wa-view/assignments — { enabled, targetName, tasks, projects } — מה שאני יצרתי עבור היעד */
 router.get('/assignments', async (req, res) => {
     try {
@@ -227,7 +235,8 @@ router.post('/tasks', async (req, res) => {
         if (!text) return res.status(400).json({ message: 'נדרש טקסט למטלה' });
         if (text.length > 2000) return res.status(400).json({ message: 'המטלה ארוכה מדי (עד 2000 תווים)' });
 
-        const task = await Task.create({ text, userId: target._id, createdBy: req.user._id, ...initialReminderFields() });
+        const sourceLabel = await getTrackedLabel();
+        const task = await Task.create({ text, userId: target._id, createdBy: req.user._id, sourceLabel, ...initialReminderFields() });
         notifyTaskAssigned(task, me).catch(() => {});
         res.status(201).json({ _id: task._id, text: task.text, isCompleted: false, seenAt: null, createdAt: task.createdAt });
     } catch (err) {
@@ -259,7 +268,9 @@ router.post('/projects', async (req, res) => {
             .slice(0, 100)
             .map((name) => ({ name: name.slice(0, 500), done: false }));
 
+        const sourceLabel = await getTrackedLabel();
         const project = await Project.create({
+            sourceLabel,
             owner: target._id,
             projectName,
             description,

@@ -63,6 +63,7 @@ import whatsappRoutes from './routes/whatsappRoutes.js';
 import whatsappMonitorRoutes from './routes/whatsappMonitorRoutes.js';
 import waViewRoutes from './routes/waViewRoutes.js';
 import pushRoutes from './routes/pushRoutes.js';
+import apiKeyAuth from './middlewares/apiKeyAuth.js';
 import { attachAssignmentIo, startAssignmentReminderWorker } from './services/assignmentNotifier.js';
 
 import softwareRoutes from './routes/softwareRoutes.js';
@@ -203,7 +204,10 @@ app.get('/api/csrf-token', rateLimiter, csrfProtection, (req, res) => {
 
 // --- Protected Routes (׳׳›׳׳ ׳•׳”׳׳׳” ׳”׳›׳ ׳—׳¡׳•׳ ׳׳׳ ׳˜׳•׳§׳) ---
 app.use('/api/company-webhooks', companyWebhookRoutes);
-app.use(csrfProtection);
+// מפתח API (Bearer / X-Api-Key / ?key=) ל-/api/wa-view — לפני CSRF: בקשה עם מפתח לא נשענת על cookie,
+// ולכן אין בה סיכון CSRF ואין לה טוקן CSRF. בלי מפתח — ממשיכים כרגיל (cookie + CSRF).
+app.use('/api/wa-view', apiKeyAuth);
+app.use((req, res, next) => (req.apiKeyAuth ? next() : csrfProtection(req, res, next)));
 
 app.use('/api/emails', requireAuth, emailRoutes);
 app.use('/api/projects', requireAuth, projectRoutes);

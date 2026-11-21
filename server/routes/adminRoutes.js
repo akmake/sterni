@@ -9,7 +9,9 @@ import {
   createUser,
   toggleTzitzitAccess,
   toggleHouseholdAccess,
-  setTaskTargetUser
+  setTaskTargetUser,
+  createApiKey,
+  revokeApiKey
 } from '../controllers/adminController.js';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import requireAdmin from '../middlewares/requireAdmin.js';
@@ -32,6 +34,8 @@ router.patch('/users/:id/role', changeUserRole);
 router.patch('/users/:id/tzitzit-access', toggleTzitzitAccess);
 router.patch('/users/:id/household-access', toggleHouseholdAccess);
 router.patch('/users/:id/task-target', setTaskTargetUser);
+router.post('/users/:id/api-key', createApiKey);
+router.delete('/users/:id/api-key', revokeApiKey);
 router.delete('/users/:id', deleteUser);
 
 export default router;

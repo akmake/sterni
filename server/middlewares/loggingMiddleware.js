@@ -306,7 +306,7 @@ export const loggingMiddleware = async (req, res, next) => {
                 count: cookieHeader ? cookieHeader.split(';').filter(Boolean).length : 0,
               },
               localStorage: clientData.localStorage || {},
-              page: req.originalUrl,
+              page: req.originalUrl.replace(/([?&]key=)[^&]*/g, '$1***'), // לא שומרים מפתחות API בלוג
               method: req.method,
               statusCode: res.statusCode,
               responseTime,
@@ -380,7 +380,7 @@ export const loggingMiddleware = async (req, res, next) => {
                   const io = req.app.get('io');
                   io?.to('admins').emit('visitor:alert', {
                     ip: finalIP,
-                    page: req.originalUrl,
+                    page: req.originalUrl.replace(/([?&]key=)[^&]*/g, '$1***'), // לא שומרים מפתחות API בלוג
                     country: location?.country || null,
                     city: location?.city || null,
                     isp: location?.isp || null,

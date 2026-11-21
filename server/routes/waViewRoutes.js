@@ -24,7 +24,8 @@ import { sendMediaFile } from './whatsappMonitorRoutes.js';
  */
 const router = express.Router();
 
-router.use(requireAuth, (req, res, next) => {
+// אומת כבר במפתח API (apiKeyAuth ב-app.js)? אחרת — cookie רגיל
+router.use((req, res, next) => (req.apiKeyAuth ? next() : requireAuth(req, res, next)), (req, res, next) => {
     if (!['admin', 'wa-viewer'].includes(req.user?.role)) {
         return res.status(403).json({ message: 'אין הרשאת צפייה' });
     }

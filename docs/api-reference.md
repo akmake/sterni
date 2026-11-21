@@ -68,7 +68,7 @@ Prefix `/api/wa-view`. UI: `WaViewerPage.jsx` (`/wa-view`, outside Layout). Show
 
 Message shape: `{ id, direction:'in'|'out', from, timestamp, type, text, quotedText, media:{available,url,downloadUrl,mime,fileName,fileSize,durationSeconds,isVoiceNote}|null, location?, contact?, poll?, deleted, edited, originalText?, reactions:[{emoji,by:'me'|'them'}], updatedAt }`. `id` = WhatsApp message id (unique, stable).
 
-Script usage: `POST /api/auth/login` (cookies `jwt` + refresh cookie, CSRF token from `GET /api/csrf-token`), then `GET /api/wa-view/messages?since=…` with the cookies; access token lives 15 min → `POST /api/auth/refresh` on 401.
+**Script / agent usage — use an API key** (admin → ניהול משתמשים → 🔑 on the wa-viewer row). Send it as `Authorization: Bearer wav_…`, `X-Api-Key: wav_…`, or `?key=wav_…` (also works on `/media/:id`). Doesn't expire; revocable; scoped to `/api/wa-view` only (`middlewares/apiKeyAuth.js`, mounted before CSRF in `app.js`, so key-authenticated POSTs need no CSRF token). `?key=` is redacted from request logs. Cookie login also works but the `jwt` cookie lives 15 min — a script that doesn't call `POST /api/auth/refresh` gets 401 every ~15 min (this was the "random 401" bug).
 
 ---
 
@@ -195,6 +195,8 @@ Script usage: `POST /api/auth/login` (cookies `jwt` + refresh cookie, CSRF token
 ### Admin users (`/api/admin/users`, admin)
 | Method | Path | Description |
 |--------|------|-------------|
+| POST | `/admin/users/:id/api-key` | Create (replace) the user's `/api/wa-view` API key → `{ data: { apiKey } }` — shown once, only `sha256` stored (`User.apiKeyHash`). wa-viewer/admin only |
+| DELETE | `/admin/users/:id/api-key` | Revoke the API key |
 | PATCH | `/admin/users/:id/task-target` | `{ taskTargetUser: <userId>\|null }` — allow this user to create tasks that land in the target user's `/tasks` (null = revoke). UI: "יוצר מטלות עבור" column in `AdminUsersPage.jsx` |
 
 ### Meals / Kitchen

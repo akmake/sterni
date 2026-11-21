@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Edit2, Trash2, Lock, Shield, User, Mail, Calendar, Save, X, Check, Plus, Scissors, Home } from 'lucide-react';
+import { Edit2, Trash2, Lock, Shield, User, Mail, Calendar, Save, X, Check, Plus, Scissors, Home, KeyRound, Copy } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '@/utils/api';
 
@@ -125,6 +125,29 @@ export default function AdminUsersPage() {
     } catch (error) {
       toast.error('שגיאה בעדכון הגישה');
       console.error(error);
+    }
+  };
+
+  // ── מפתח API לגישה אוטומטית ל-/api/wa-view (מוצג פעם אחת) ──
+  const [apiKeyModal, setApiKeyModal] = useState(null); // { userId, name, key? }
+  const handleCreateApiKey = async (userId) => {
+    try {
+      const { data } = await api.post(`/admin/users/${userId}/api-key`);
+      setApiKeyModal((m) => ({ ...m, key: data.data.apiKey }));
+      setUsers(users.map(u => u._id === userId ? { ...u, apiKeyCreatedAt: new Date().toISOString() } : u));
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'שגיאה ביצירת מפתח');
+    }
+  };
+  const handleRevokeApiKey = async (userId) => {
+    if (!window.confirm('לבטל את מפתח ה-API? כל סקריפט שמשתמש בו יפסיק לעבוד מיד.')) return;
+    try {
+      await api.delete(`/admin/users/${userId}/api-key`);
+      setUsers(users.map(u => u._id === userId ? { ...u, apiKeyCreatedAt: null } : u));
+      setApiKeyModal(null);
+      toast.success('המפתח בוטל');
+    } catch (error) {
+      toast.error('שגיאה בביטול המפתח');
     }
   };
 
@@ -341,6 +364,15 @@ export default function AdminUsersPage() {
                           >
                             <Lock size={16} />
                           </button>
+                          {user.role === 'wa-viewer' && (
+                            <button
+                              onClick={() => setApiKeyModal({ userId: user._id, name: user.name, hasKey: !!user.apiKeyCreatedAt })}
+                              className={`flex items-center gap-1 px-3 py-1 rounded text-sm ${user.apiKeyCreatedAt ? 'text-green-700 hover:bg-green-50' : 'text-gray-500 hover:bg-gray-100'}`}
+                              title={user.apiKeyCreatedAt ? 'יש מפתח API פעיל' : 'מפתח API לגישה אוטומטית'}
+                            >
+                              <KeyRound size={16} />
+                            </button>
+                          )}
                           <button
                             onClick={() => handleDeleteUser(user._id, user.name)}
                             className="flex items-center gap-1 text-red-600 hover:bg-red-50 px-3 py-1 rounded text-sm"
@@ -360,6 +392,52 @@ export default function AdminUsersPage() {
       )}
 
       {/* Password Change Modal */}
+      {apiKeyModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setApiKeyModal(null)}>
+          <div dir="rtl" className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold flex items-center gap-2"><KeyRound size={20} /> מפתח API — {apiKeyModal.name}</h3>
+              <button onClick={() => setApiKeyModal(null)} className="p-1 rounded hover:bg-gray-100"><X size={18} /></button>
+            </div>
+            <p className="text-sm text-gray-600">
+              מפתח קבוע לגישה אוטומטית ל-<code>/api/wa-view</code> (הודעות, מדיה, מטלות). לא פג תוקף כמו ההתחברות הרגילה (15 דקות). אפשר לבטל בכל רגע.
+            </p>
+            {apiKeyModal.key ? (
+              <div className="space-y-2">
+                <div className="text-sm font-semibold text-amber-700">⚠️ העתק עכשיו — המפתח לא יוצג שוב</div>
+                <div className="flex gap-2">
+                  <input readOnly value={apiKeyModal.key} dir="ltr" className="flex-1 font-mono text-xs border rounded px-2 py-2 bg-gray-50" onFocus={(e) => e.target.select()} />
+                  <button onClick={() => { navigator.clipboard?.writeText(apiKeyModal.key); toast.success('הועתק'); }}
+                    className="px-3 rounded bg-blue-600 text-white flex items-center gap-1 text-sm"><Copy size={14} /> העתק</button>
+                </div>
+                <div dir="ltr" className="text-xs bg-gray-900 text-gray-100 rounded p-3 font-mono whitespace-pre-wrap break-all">
+{`GET https://dahanswebsite.com/api/wa-view/messages?since=2026-11-21T21:23:00Z
+Authorization: Bearer ${apiKeyModal.key}
+
+# or (tools without headers):
+https://dahanswebsite.com/api/wa-view/messages?key=${apiKeyModal.key}`}
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-gray-700">
+                {apiKeyModal.hasKey ? 'למשתמש יש מפתח פעיל. יצירת מפתח חדש תבטל את הקודם.' : 'אין למשתמש מפתח.'}
+              </div>
+            )}
+            <div className="flex gap-2 justify-end pt-2">
+              {apiKeyModal.hasKey && !apiKeyModal.key && (
+                <button onClick={() => handleRevokeApiKey(apiKeyModal.userId)} className="px-4 py-2 rounded border border-red-300 text-red-600 text-sm hover:bg-red-50">ביטול מפתח</button>
+              )}
+              {!apiKeyModal.key && (
+                <button onClick={() => handleCreateApiKey(apiKeyModal.userId)} className="px-4 py-2 rounded bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">
+                  {apiKeyModal.hasKey ? 'צור מפתח חדש' : 'צור מפתח'}
+                </button>
+              )}
+              {apiKeyModal.key && <button onClick={() => setApiKeyModal(null)} className="px-4 py-2 rounded bg-gray-900 text-white text-sm">סיום</button>}
+            </div>
+          </div>
+        </div>
+      )}
+
       {showPasswordModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-sm w-full space-y-4 p-6">

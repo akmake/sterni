@@ -2,11 +2,12 @@ import User from '../models/userModel.js';
 import AppError from '../utils/AppError.js';
 import catchAsync from '../utils/catchAsync.js';
 import bcrypt from 'bcrypt';
+import { generateApiKey, hashApiKey } from '../middlewares/apiKeyAuth.js';
 
 // --- Get all users ---
 export const getAllUsers = catchAsync(async (req, res, next) => {
   const users = await User.find({})
-    .select('name email role tzitzitAccess householdAccess preferredView taskTargetUser createdAt')
+    .select('name email role tzitzitAccess householdAccess preferredView taskTargetUser apiKeyCreatedAt createdAt')
     .sort('-createdAt');
 
   res.status(200).json({
@@ -249,6 +250,24 @@ export const setTaskTargetUser = catchAsync(async (req, res, next) => {
     status: 'success',
     data: { user }
   });
+});
+
+// --- API key (גישה אוטומטית ל-/api/wa-view) — יצירה מחליפה מפתח קודם; המפתח מוחזר פעם אחת בלבד ---
+export const createApiKey = catchAsync(async (req, res, next) => {
+  const user = await User.findById(req.params.id).select('role');
+  if (!user) return next(new AppError('משתמש לא נמצא', 404));
+  if (!['wa-viewer', 'admin'].includes(user.role)) {
+    return next(new AppError('מפתח API זמין רק למשתמש צופה וואצפ', 400));
+  }
+  const apiKey = generateApiKey();
+  await User.updateOne({ _id: user._id }, { apiKeyHash: hashApiKey(apiKey), apiKeyCreatedAt: new Date() });
+  res.status(201).json({ status: 'success', data: { apiKey } });
+});
+
+export const revokeApiKey = catchAsync(async (req, res, next) => {
+  const r = await User.updateOne({ _id: req.params.id }, { apiKeyHash: null, apiKeyCreatedAt: null });
+  if (!r.matchedCount) return next(new AppError('משתמש לא נמצא', 404));
+  res.status(200).json({ status: 'success' });
 });
 
 // --- Toggle household access for user ---

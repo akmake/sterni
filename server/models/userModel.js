@@ -45,6 +45,9 @@ const userSchema = new mongoose.Schema(
       ref: 'User',
       default: null,
     },
+    // מפתח API קבוע לגישה אוטומטית ל-/api/wa-view (middlewares/apiKeyAuth.js). רק hash נשמר.
+    apiKeyHash: { type: String, default: null, select: false, index: { sparse: true } },
+    apiKeyCreatedAt: { type: Date, default: null },
     preferredView: {
       type: String,
       enum: ['management', 'household'],

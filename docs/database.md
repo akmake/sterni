@@ -21,7 +21,7 @@
 
 | Model | File | Used by |
 |-------|------|---------|
-| User | `userModel.js` | auth, admin. `role`: user/admin/wa-viewer. `taskTargetUser` (ObjectId→User, null) — the user this user may create tasks for (set by admin) |
+| User | `userModel.js` | auth, admin. `role`: user/admin/wa-viewer. `taskTargetUser` (ObjectId→User, null) — the user this user may create tasks for (set by admin). `apiKeyHash` (sha256, `select:false`) + `apiKeyCreatedAt` — `/api/wa-view` API key |
 | Group | `Group.js` | groups module |
 | Project | `Project.js` | projects module. `createdBy` (ObjectId→User, null) — created for `owner` by someone else (`/api/wa-view/projects`), populated in `getProjects`; reminders `seenAt`, `reminderCount`, `nextReminderAt` |
 | Task | `Task.js` | tasks page. `userId` = owner (whose `/tasks` shows it), `createdBy` (ObjectId→User, null) — set when someone else created it (e.g. wa-viewer via `/api/wa-view/tasks`); populated with `name` in `getTasks`. Reminders: `seenAt`, `reminderCount`, `nextReminderAt` (indexed) |

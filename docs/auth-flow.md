@@ -34,6 +34,9 @@ Both cookies are HTTP-only → cannot be accessed by JavaScript → XSS-safe.
 4. **Note:** `_id` is MongoDB ObjectId, `id` is string alias — both exist for compatibility
 5. **`wa-viewer` lockdown:** if `role === 'wa-viewer'` and `isWaViewerAllowedPath(req)` is false → 403. Allowed: `/api/wa-view/*`, `/api/push/*` (phone notifications), `GET /api/auth/profile`, `/api/auth/change-password` (login/logout/refresh don't pass through requireAuth). Same check in `server/middlewares/requireAuth.js`.
 
+### API key (`server/middlewares/apiKeyAuth.js`) — `/api/wa-view` only
+For automated consumers: `Authorization: Bearer wav_…` / `X-Api-Key` / `?key=`. Looked up by `sha256` in `User.apiKeyHash` (`select:false`); role must be `wa-viewer` or `admin`. Sets `req.user` + `req.apiKeyAuth = true`; `app.js` skips CSRF for such requests; `waViewRoutes` skips cookie `requireAuth`. Created/revoked by admin (`/api/admin/users/:id/api-key`). Invalid key → 401.
+
 ### Roles (`User.role`)
 | Role | Access |
 |------|--------|

@@ -168,7 +168,7 @@ pages and their corrections; test both native migration and cached OCR reopening
 | `client/src/utils/push.js` / `components/PushOptIn.jsx` | `server/routes/pushRoutes.js`, `TasksPage.jsx`, `ProjectsPage.jsx`, `WaViewerPage.jsx` (compact) |
 | `server/utils/listenWithFallback.js` / `server/.dev-port` | `server/app.js` (listen), `client/vite.config.js` (`followDevPort` reads `.dev-port`), `docs/architecture.md` (Ports) |
 | `client/src/components/ui/ActionMenu.jsx` (⋮ menu) | `TasksPage.jsx`, `ProjectsPage.jsx`, `ProjectPage.jsx` — row actions live in this menu (no hover-only buttons; they're invisible on touch) |
-| `client/src/components/Layout.jsx` mobile top bar | `Navbar.jsx` (`mobileOnly` renders only the ☰ button), `MOBILE_TITLES` map in `Layout.jsx` — add a title when adding a main route |
+| `client/src/components/Navbar.jsx` mobile bottom tab bar + "עוד" sheet | `Layout.jsx` (renders `<Navbar mobileOnly />`, `<main>` bottom padding `4rem+safe-area`, calculator FAB `bottom-24`), `TasksPage.jsx` (undo snackbar `bottom-24`); tabs per active view are defined inside `Navbar` (`tabs`) — the full list lives in the sheet (`SidebarContent`). Rendered via portal to `body`. No top bar on mobile |
 | `client/src/components/AssignmentAlerts.jsx` | `Layout.jsx` (mounted), `assignmentNotifier.js` (socket payload title/body/url) |
 | `User.taskTargetUser` / `Task.createdBy` / `Project.createdBy` (create tasks & projects for another user) | `adminController.js` (`setTaskTargetUser`, `getAllUsers` select), `adminRoutes.js` (`/users/:id/task-target`), `waViewRoutes.js` (`/tasks`), `taskController.js` (`getTasks` populate), `AdminUsersPage.jsx` (column), `WaViewerPage.jsx` (`TasksPanel`), `TasksPage.jsx` ("מאת" badge), `docs/database.md` |
 

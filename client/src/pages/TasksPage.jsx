@@ -334,7 +334,7 @@ const TasksPage = () => {
 
       {/* ── Undo snackbar ── */}
       {undo && (
-        <div className="fixed bottom-6 inset-x-0 z-50 flex justify-center px-4 pointer-events-none">
+        <div className="fixed bottom-24 md:bottom-6 inset-x-0 z-50 flex justify-center px-4 pointer-events-none">
           <div className="pointer-events-auto flex items-center gap-4 bg-slate-900 text-white rounded-2xl shadow-2xl pr-4 pl-2 py-2 max-w-md w-full">
             <span className="flex-1 text-sm truncate">המטלה נמחקה</span>
             <button onClick={undoDelete} className="text-sm font-bold text-sky-300 hover:text-sky-200 px-3 py-1.5 rounded-lg hover:bg-white/10">

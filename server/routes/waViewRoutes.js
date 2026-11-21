@@ -4,6 +4,8 @@ import WhatsAppMessage from '../models/WhatsAppMessage.js';
 import WhatsAppChat from '../models/WhatsAppChat.js';
 import Task from '../models/Task.js';
 import User from '../models/userModel.js';
+import Project from '../models/Project.js';
+import { notifyTaskAssigned, notifyProjectAssigned, initialReminderFields } from '../services/assignmentNotifier.js';
 import {
     getMonitorSettings,
     trackedChatFilter,
@@ -172,26 +174,44 @@ router.get('/media/:messageId', async (req, res) => {
 });
 
 // ============================================================
-// ===  מטלות — יצירה עבור משתמש אחר (User.taskTargetUser)  ===
+// ===  מטלות ופרויקטים — יצירה עבור משתמש אחר (User.taskTargetUser)  ===
 // ============================================================
+// היעד מקבל מיד: socket ('tasks:changed' / 'projects:changed') + Web Push, ותזכורות עד שראה.
 
-const getTaskTarget = async (userId) => {
-    const me = await User.findById(userId).select('taskTargetUser').lean();
-    if (!me?.taskTargetUser) return null;
-    return User.findById(me.taskTargetUser).select('name').lean();
+const getMeAndTarget = async (userId) => {
+    const me = await User.findById(userId).select('name taskTargetUser').lean();
+    if (!me?.taskTargetUser) return { me, target: null };
+    const target = await User.findById(me.taskTargetUser).select('name').lean();
+    return { me, target };
 };
 
-/** GET /api/wa-view/tasks — { enabled, targetName, tasks } — המטלות שאני יצרתי עבור היעד */
-router.get('/tasks', async (req, res) => {
+/** GET /api/wa-view/assignments — { enabled, targetName, tasks, projects } — מה שאני יצרתי עבור היעד */
+router.get('/assignments', async (req, res) => {
     try {
-        const target = await getTaskTarget(req.user._id);
-        if (!target) return res.json({ enabled: false, targetName: null, tasks: [] });
-        const tasks = await Task.find({ userId: target._id, createdBy: req.user._id })
-            .select('text isCompleted completedAt createdAt')
-            .sort({ createdAt: -1 })
-            .limit(100)
-            .lean();
-        res.json({ enabled: true, targetName: target.name, tasks });
+        const { target } = await getMeAndTarget(req.user._id);
+        if (!target) return res.json({ enabled: false, targetName: null, tasks: [], projects: [] });
+        const [tasks, projects] = await Promise.all([
+            Task.find({ userId: target._id, createdBy: req.user._id })
+                .select('text isCompleted completedAt seenAt createdAt')
+                .sort({ createdAt: -1 }).limit(100).lean(),
+            Project.find({ owner: target._id, createdBy: req.user._id })
+                .select('projectName description dueDate tasks seenAt createdAt')
+                .sort({ createdAt: -1 }).limit(50).lean(),
+        ]);
+        res.json({
+            enabled: true,
+            targetName: target.name,
+            tasks,
+            projects: projects.map((p) => {
+                const total = p.tasks?.length || 0;
+                const done = (p.tasks || []).filter((t) => t.done).length;
+                return {
+                    _id: p._id, projectName: p.projectName, description: p.description || '',
+                    dueDate: p.dueDate || null, seenAt: p.seenAt, createdAt: p.createdAt,
+                    taskCount: total, doneCount: done, progress: total ? Math.round((done / total) * 100) : 0,
+                };
+            }),
+        });
     } catch (err) {
         res.status(500).json({ message: 'שגיאה בשליפת מטלות', error: err.message });
     }
@@ -200,16 +220,57 @@ router.get('/tasks', async (req, res) => {
 /** POST /api/wa-view/tasks { text } — יוצר מטלה שתופיע ב-/tasks של משתמש היעד */
 router.post('/tasks', async (req, res) => {
     try {
-        const target = await getTaskTarget(req.user._id);
+        const { me, target } = await getMeAndTarget(req.user._id);
         if (!target) return res.status(403).json({ message: 'אין לך הרשאה ליצור מטלות' });
         const text = String(req.body?.text || '').trim();
         if (!text) return res.status(400).json({ message: 'נדרש טקסט למטלה' });
         if (text.length > 2000) return res.status(400).json({ message: 'המטלה ארוכה מדי (עד 2000 תווים)' });
 
-        const task = await Task.create({ text, userId: target._id, createdBy: req.user._id });
-        res.status(201).json({ _id: task._id, text: task.text, isCompleted: false, createdAt: task.createdAt });
+        const task = await Task.create({ text, userId: target._id, createdBy: req.user._id, ...initialReminderFields() });
+        notifyTaskAssigned(task, me).catch(() => {});
+        res.status(201).json({ _id: task._id, text: task.text, isCompleted: false, seenAt: null, createdAt: task.createdAt });
     } catch (err) {
         res.status(500).json({ message: 'שגיאה ביצירת מטלה', error: err.message });
+    }
+});
+
+/**
+ * POST /api/wa-view/projects { projectName, description?, dueDate?, tasks?: string[] }
+ * יוצר פרויקט שהבעלים שלו הוא משתמש היעד (מופיע ב-/projects שלו)
+ */
+router.post('/projects', async (req, res) => {
+    try {
+        const { me, target } = await getMeAndTarget(req.user._id);
+        if (!target) return res.status(403).json({ message: 'אין לך הרשאה ליצור פרויקטים' });
+
+        const projectName = String(req.body?.projectName || '').trim();
+        if (!projectName) return res.status(400).json({ message: 'נדרש שם לפרויקט' });
+        if (projectName.length > 200) return res.status(400).json({ message: 'שם הפרויקט ארוך מדי' });
+        const description = String(req.body?.description || '').trim().slice(0, 5000);
+        let dueDate;
+        if (req.body?.dueDate) {
+            dueDate = new Date(req.body.dueDate);
+            if (isNaN(dueDate.getTime())) return res.status(400).json({ message: 'תאריך יעד לא תקין' });
+        }
+        const tasks = (Array.isArray(req.body?.tasks) ? req.body.tasks : [])
+            .map((t) => String(t || '').trim())
+            .filter(Boolean)
+            .slice(0, 100)
+            .map((name) => ({ name: name.slice(0, 500), done: false }));
+
+        const project = await Project.create({
+            owner: target._id,
+            projectName,
+            description,
+            dueDate,
+            tasks,
+            createdBy: req.user._id,
+            ...initialReminderFields(),
+        });
+        notifyProjectAssigned(project, me).catch(() => {});
+        res.status(201).json({ _id: project._id, projectName: project.projectName, createdAt: project.createdAt });
+    } catch (err) {
+        res.status(500).json({ message: 'שגיאה ביצירת פרויקט', error: err.message });
     }
 });
 

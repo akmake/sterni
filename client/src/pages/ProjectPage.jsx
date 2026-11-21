@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import useProjectsStore from '@/stores/projectsStore';
+import api from '@/utils/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -55,6 +56,11 @@ export default function ProjectPage() {
   const taskInputRef = useRef(null);
 
   useEffect(() => { fetchProject(id); }, [id]);
+
+  // נפתח מהתראה / מהרשימה — פרויקט שהוקצו לי מסומן כנראה (עוצר תזכורות; השרת מסנן לבעלים בלבד)
+  useEffect(() => {
+    if (id) api.post('/projects/seen', { ids: [id] }).catch(() => {});
+  }, [id]);
 
   if (!activeProject) return (
       <div className="min-h-screen bg-[#F5F5F7] flex items-center justify-center text-slate-400">

@@ -3,6 +3,8 @@ import { useState, useEffect, useRef } from 'react';
 import api from '../utils/api'; 
 import { Plus, Trash2, Check, Circle, Loader2, ArrowUpRight, Pencil } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { connectSocket } from '../utils/socket';
+import PushOptIn from '../components/PushOptIn';
 
 const TasksPage = () => {
   const navigate = useNavigate();
@@ -14,8 +16,9 @@ const TasksPage = () => {
   const [editValue, setEditValue] = useState('');
   const editRef = useRef(null);
 
-  const fetchTasks = async () => {
-    setLoading(true);
+  // silent = רענון ברקע (סוקט / חזרה לאפליקציה) בלי ספינר
+  const fetchTasks = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       // ✅ api.get מוסיף לבד את /api בהתחלה ושולח קוקיז
       const res = await api.get('/tasks');
@@ -23,13 +26,41 @@ const TasksPage = () => {
     } catch (err) {
       console.error("Error fetching tasks:", err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchTasks();
   }, []);
+
+  // ── זמן אמת: מטלה שמישהו יצר עבורי מופיעה מיד (assignmentNotifier → 'tasks:changed') ──
+  useEffect(() => {
+    const socket = connectSocket();
+    const onChanged = () => fetchTasks(true);
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchTasks(true); };
+    socket?.on('tasks:changed', onChanged);
+    socket?.on('connect', onChanged); // אחרי ניתוק — לא לפספס מה שנוצר בינתיים
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      socket?.off('tasks:changed', onChanged);
+      socket?.off('connect', onChanged);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
+
+  // מטלות שהוקצו לי ועוד לא נראו — מסמנים כנראו כשהעמוד גלוי (עוצר את התזכורות)
+  const unseenIds = tasks.filter(t => t.createdBy && !t.seenAt && !t.isCompleted).map(t => t._id).join(',');
+  useEffect(() => {
+    if (!unseenIds) return;
+    const mark = () => {
+      if (document.visibilityState !== 'visible') return;
+      api.post('/tasks/seen', { ids: unseenIds.split(',') }).catch(() => {});
+    };
+    const t = setTimeout(mark, 1500); // שנייה וחצי על המסך = ראה
+    document.addEventListener('visibilitychange', mark);
+    return () => { clearTimeout(t); document.removeEventListener('visibilitychange', mark); };
+  }, [unseenIds]);
 
   const handleAddTask = async (e) => {
     e.preventDefault();
@@ -122,6 +153,7 @@ const TasksPage = () => {
               {activeTasks.length} נותרו
             </span>
           </div>
+          <PushOptIn className="mt-4" />
         </div>
 
         {/* Add Task Input */}
@@ -176,6 +208,11 @@ const TasksPage = () => {
                       {task.createdBy?.name && (
                         <span className="mr-2 align-middle text-xs font-normal bg-green-100 text-green-800 rounded px-2 py-0.5">
                           מאת {task.createdBy.name}
+                        </span>
+                      )}
+                      {task.createdBy && !task.seenAt && (
+                        <span className="mr-1 align-middle text-xs font-semibold bg-amber-400 text-white rounded px-2 py-0.5 animate-pulse">
+                          חדש
                         </span>
                       )}
                     </span>

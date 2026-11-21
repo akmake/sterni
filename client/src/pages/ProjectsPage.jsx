@@ -4,6 +4,9 @@ import useProjectsStore from '@/stores/projectsStore';
 import { Button } from '@/components/ui/Button';
 import { Plus, ArrowRight, Trash2 } from 'lucide-react'; // הוספתי את Trash2
 import { Progress } from '@/components/ui/progress';
+import api from '@/utils/api';
+import { connectSocket } from '@/utils/socket';
+import PushOptIn from '@/components/PushOptIn';
 
 export default function ProjectsPage() {
   // הוספנו את deleteProject מהחנות
@@ -11,6 +14,34 @@ export default function ProjectsPage() {
   const navigate = useNavigate();
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
+
+  // ── זמן אמת: פרויקט שמישהו יצר עבורי מופיע מיד (assignmentNotifier → 'projects:changed') ──
+  useEffect(() => {
+    const socket = connectSocket();
+    const refresh = () => fetchProjects();
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchProjects(); };
+    socket?.on('projects:changed', refresh);
+    socket?.on('connect', refresh);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      socket?.off('projects:changed', refresh);
+      socket?.off('connect', refresh);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [fetchProjects]);
+
+  // פרויקטים שהוקצו לי ועוד לא נראו — מסמנים כנראו כשהעמוד גלוי (עוצר תזכורות)
+  const unseenIds = projects.filter(p => p.createdBy && !p.seenAt).map(p => p._id).join(',');
+  useEffect(() => {
+    if (!unseenIds) return;
+    const mark = () => {
+      if (document.visibilityState !== 'visible') return;
+      api.post('/projects/seen', { ids: unseenIds.split(',') }).catch(() => {});
+    };
+    const t = setTimeout(mark, 1500);
+    document.addEventListener('visibilitychange', mark);
+    return () => { clearTimeout(t); document.removeEventListener('visibilitychange', mark); };
+  }, [unseenIds]);
 
   // פונקציית המחיקה
   const handleDelete = async (e, id) => {
@@ -31,6 +62,7 @@ export default function ProjectsPage() {
           <div>
             <h1 className="text-4xl font-semibold tracking-tight text-slate-900">הפרויקטים שלי</h1>
             <p className="text-slate-500 mt-1 text-lg">כל המשימות שלך במקום אחד מסודר.</p>
+            <PushOptIn className="mt-3" />
           </div>
           <Button 
             onClick={() => navigate('/projects/new')}
@@ -78,6 +110,12 @@ export default function ProjectsPage() {
                   <div className="flex flex-col h-full justify-between">
                     <div>
                       {/* תוקן: שימוש ב-name במקום projectName */}
+                      {project.createdBy?.name && (
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xs bg-green-100 text-green-800 rounded-full px-2.5 py-0.5">מאת {project.createdBy.name}</span>
+                          {!project.seenAt && <span className="text-xs font-semibold bg-amber-400 text-white rounded-full px-2.5 py-0.5 animate-pulse">חדש</span>}
+                        </div>
+                      )}
                       <h3 className="text-xl font-semibold text-slate-900 mb-2 truncate">
                         {project.name || project.projectName || 'פרויקט ללא שם'}
                       </h3>

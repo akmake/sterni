@@ -74,7 +74,13 @@ const contactNames = new Map();
 export const attachMonitorIo = (io) => { ioRef = io; };
 
 const emitToAdmins = (event, payload) => {
-    try { ioRef?.to('admins').emit(event, payload); } catch (_) { /* best-effort */ }
+    try {
+        ioRef?.to('admins').emit(event, payload);
+        // עמוד הצופה (/wa-view) — רק "משהו השתנה", הוא מושך בעצמו (changedSince) ורואה רק את השיחה במעקב
+        if (event !== 'wa-monitor:status') {
+            ioRef?.to('wa-viewers').to('admins').emit('wa-view:changed', { at: Date.now() });
+        }
+    } catch (_) { /* best-effort */ }
 };
 
 // ============================================================

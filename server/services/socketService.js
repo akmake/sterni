@@ -24,6 +24,9 @@ export function setupSocketIO(io) {
   io.on('connection', async (socket) => {
     console.log(`🔌 Socket connected: ${socket.userId}`);
 
+    // חדר אישי — עדכוני זמן אמת למשתמש הזה (מטלות/פרויקטים שהוקצו לו, assignmentNotifier.js)
+    socket.join(`user:${socket.userId}`);
+
     // ★ Admins join the 'admins' room — receive visitor-intelligence alerts
     try {
       const u = await User.findById(socket.userId).select('role').lean();
@@ -31,6 +34,8 @@ export function setupSocketIO(io) {
         socket.join('admins');
         socket.isAdmin = true;
       }
+      // צופה וואצפ — מקבל 'wa-view:changed' כשיש הודעה חדשה (WaViewerPage מרענן מיד)
+      if (u?.role === 'wa-viewer') socket.join('wa-viewers');
     } catch (err) {
       console.error('Error joining admins room:', err.message);
     }

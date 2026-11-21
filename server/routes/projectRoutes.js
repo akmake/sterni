@@ -23,7 +23,8 @@ import {
     getAllUsers,
     addCollaborator,
     removeCollaborator,
-    updateCollaboratorRole
+    updateCollaboratorRole,
+  markProjectsSeen
 } from '../controllers/projectController.js';
 
 const router = express.Router();
@@ -61,6 +62,7 @@ const upload = multer({
 // Routes
 // ⚠️ Important: PUT SPECIFIC ROUTES BEFORE GENERIC /:id ROUTES
 router.get('/users/all', getAllUsers);
+router.post('/seen', markProjectsSeen); // לפני /:id
 
 router.route('/')
   .get(getProjects)

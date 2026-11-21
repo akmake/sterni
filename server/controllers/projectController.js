@@ -1,4 +1,5 @@
 import Project from '../models/Project.js';
+import { emitToUser } from '../services/assignmentNotifier.js';
 import User from '../models/userModel.js';
 import AppError from '../utils/AppError.js';
 
@@ -18,7 +19,7 @@ const assertProjectOwner = (project, userId) => {
 export const getProjects = async (req, res, next) => {
   try {
     // פרויקטים שאני הבעלים שלהם
-    const ownProjects = await Project.find({ owner: req.user._id }).sort({ createdAt: -1 });
+    const ownProjects = await Project.find({ owner: req.user._id }).populate('createdBy', 'name').sort({ createdAt: -1 });
     
     // פרויקטים משותפים (כשאני collaborator)
     const sharedProjects = await Project.find({
@@ -471,6 +472,21 @@ export const updateCollaboratorRole = async (req, res, next) => {
     await project.save();
     
     res.json(project);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// סימון פרויקטים שהוקצו לי כ"נראו" — עוצר את התזכורות (assignmentNotifier)
+export const markProjectsSeen = async (req, res, next) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.slice(0, 200) : [];
+    const filter = { owner: req.user._id, createdBy: { $ne: null }, seenAt: null };
+    if (ids.length) filter._id = { $in: ids };
+    const touched = await Project.find(filter).select('createdBy').lean();
+    await Project.updateMany(filter, { $set: { seenAt: new Date(), nextReminderAt: null } });
+    [...new Set(touched.map((p) => String(p.createdBy)))].forEach((c) => emitToUser(c, 'assignments:changed', { kind: 'project' }));
+    res.json({ ok: true, count: touched.length });
   } catch (err) {
     next(err);
   }

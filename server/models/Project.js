@@ -39,6 +39,12 @@ const projectSchema = new mongoose.Schema({
   collaborators: [collaboratorSchema],
 
   dueDate: { type: Date },
+
+  // ── נוצר ע"י משתמש אחר עבור owner (למשל צופה וואצפ דרך /api/wa-view/projects) ──
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  seenAt: { type: Date, default: null },          // הבעלים פתח/ראה את הפרויקט
+  reminderCount: { type: Number, default: 0 },
+  nextReminderAt: { type: Date, default: null, index: true },
 }, { 
   timestamps: true,
   toJSON: { virtuals: true },

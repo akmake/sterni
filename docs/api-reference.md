@@ -62,8 +62,9 @@ Prefix `/api/wa-view`. UI: `WaViewerPage.jsx` (`/wa-view`, outside Layout). Show
 |--------|------|-------------|
 | GET | `/messages` | `{ contact:{name,phone}, count, hasMore, serverTime, messages[] }`, always old→new. Params: `since=ISO` (sent after), `afterId=<id>` (after that message), `changedSince=ISO` (inserted/edited/deleted/reacted/media-downloaded since — pass previous `serverTime` to poll), `before=ISO` (older page), `limit` (default 500, max 2000). No params → latest N. `notice` when no contact configured |
 | GET | `/media/:messageId` | Media of a tracked-chat message. If not on disk yet — downloads from WhatsApp on the fly. `?download=1` → attachment |
-| GET | `/tasks` | `{ enabled, targetName, tasks[] }` — whether the caller has `User.taskTargetUser`, and the tasks the caller created for that user (last 100) |
-| POST | `/tasks` | `{ text }` (≤2000) → creates `Task { userId: taskTargetUser, createdBy: caller }`. 403 without `taskTargetUser` |
+| GET | `/assignments` | `{ enabled, targetName, tasks[], projects[] }` — whether the caller has `User.taskTargetUser`, and what the caller created for that user (tasks: `text,isCompleted,seenAt,createdAt`; projects: `projectName,description,dueDate,seenAt,taskCount,doneCount,progress`) |
+| POST | `/tasks` | `{ text }` (≤2000) → `Task { userId: taskTargetUser, createdBy: caller }` + instant socket/push to the target + reminders. 403 without `taskTargetUser` |
+| POST | `/projects` | `{ projectName, description?, dueDate?, tasks?: string[] }` → `Project { owner: taskTargetUser, createdBy: caller }` + instant socket/push + reminders |
 
 Message shape: `{ id, direction:'in'|'out', from, timestamp, type, text, quotedText, media:{available,url,downloadUrl,mime,fileName,fileSize,durationSeconds,isVoiceNote}|null, location?, contact?, poll?, deleted, edited, originalText?, reactions:[{emoji,by:'me'|'them'}], updatedAt }`. `id` = WhatsApp message id (unique, stable).
 
@@ -178,7 +179,18 @@ Script usage: `POST /api/auth/login` (cookies `jwt` + refresh cookie, CSRF token
 ### Tasks
 | Method | Path | Description |
 |--------|------|-------------|
-| GET/POST/PUT/DELETE | `/tasks` | Tasks CRUD. GET populates `createdBy: { _id, name }` (shown as "מאת …" badge in `TasksPage.jsx`) |
+| GET/POST/PUT/DELETE | `/tasks` | Tasks CRUD. GET populates `createdBy: { _id, name }` (shown as "מאת …" badge in `TasksPage.jsx`). PATCH/DELETE `/:id` now only for the owner (404 otherwise) |
+| POST | `/tasks/seen` | `{ ids? }` — mark tasks someone created for me as seen (stops reminders). Called by `TasksPage` after 1.5s visible |
+| POST | `/projects/seen` | `{ ids? }` — same for projects (`ProjectsPage`, `ProjectPage`) |
+
+### Push (`/api/push`, requireAuth)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/push/config` | `{ enabled, publicKey }` |
+| POST | `/push/status` | `{ endpoint }` → `{ subscribed }` for this device |
+| POST | `/push/subscribe` | PushSubscription JSON → `UserPushSubscription` |
+| POST | `/push/unsubscribe` | `{ endpoint }` |
+| POST | `/push/test` | Test notification to all my devices → `{ sent }` |
 
 ### Admin users (`/api/admin/users`, admin)
 | Method | Path | Description |

@@ -62,6 +62,8 @@ import gameRoutes from './routes/gameRoutes.js';
 import whatsappRoutes from './routes/whatsappRoutes.js';
 import whatsappMonitorRoutes from './routes/whatsappMonitorRoutes.js';
 import waViewRoutes from './routes/waViewRoutes.js';
+import pushRoutes from './routes/pushRoutes.js';
+import { attachAssignmentIo, startAssignmentReminderWorker } from './services/assignmentNotifier.js';
 
 import softwareRoutes from './routes/softwareRoutes.js';
 
@@ -135,6 +137,8 @@ const io = new Server(httpServer, {
 app.set('io', io);
 setupSocketIO(io);
 attachMonitorIo(io);
+attachAssignmentIo(io);
+startAssignmentReminderWorker();
 await setupGameSocketIO(io);
 setupCompanySocket(io);
 startReminderWorker();
@@ -231,6 +235,7 @@ app.use('/api/admin/orders', adminCommissionOrdersStub);
 app.use('/api/admin', adminRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/whatsapp-monitor', whatsappMonitorRoutes);
+app.use('/api/push', pushRoutes); // Web Push של האפליקציה הראשית (מטלות/פרויקטים שהוקצו לך)
 app.use('/api/wa-view', waViewRoutes); // צפייה בלבד בשיחה במעקב (wa-viewer / admin)
 app.use('/api/hotel-orders', hotelOrderRoutes);
 app.use('/api/hotel-data', hotelZiporiDataRoutes);

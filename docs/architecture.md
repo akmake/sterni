@@ -127,6 +127,13 @@ All routes funnel errors to the central handler `server/middlewares/errorHandler
 - Rooms: `user:<userId>` (every socket — personal realtime: `tasks:changed`, `projects:changed`, `assignments:changed`), `admins`, `wa-viewers` (role `wa-viewer`), `family:<id>`
 - Client (`client/src/utils/socket.js`): one shared socket; on `connect_error` "token" → `POST /auth/refresh` and reconnect (15-min access token in a long-lived PWA); reconnects on `visibilitychange`
 
+## PWA / Service Worker (`client/vite.config.js` → `VitePWA`, `client/src/components/UpdateBanner.jsx`)
+- `generateSW`, `importScripts: company-push.js` (push handler). Hashed JS/CSS/icons are precached; **`index.html` is not** (`globIgnores`) and there is **no NavigationRoute** (`navigateFallback: null`).
+- Navigations (not `/api/`, `/uploads/`) → `NetworkFirst` (`html-pages` cache, 5s timeout) — after a deploy a normal load gets the new `index.html`; the cache is only an offline fallback.
+- `skipWaiting` + `clientsClaim`: a new SW replaces an installed old one immediately. Before 2026-11-24 the SW precached `index.html` and served every navigation from it, so devices kept the old build (e.g. `/wa-view?view=tasks` showed the old chat) until the SW updated in the background and the page was loaded again.
+- No automatic reload: `UpdateBanner` (mounted in `App.jsx`, all pages) shows "גרסה חדשה זמינה · עדכון" on `controllerchange` (ignored on first install), checks for an update hourly + on tab return.
+- Server side: `index.html` and `sw.js` should be served `Cache-Control: no-cache` by nginx (not in this repo — unverified).
+
 ## Background Services (start on boot)
 - `startEmailListener()` — polls email inbox
 - `connectToWhatsApp()` — initializes Baileys WhatsApp connection

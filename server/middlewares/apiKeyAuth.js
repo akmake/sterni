@@ -31,12 +31,17 @@ const extractKey = (req) => {
 export default async function apiKeyAuth(req, res, next) {
     const key = extractKey(req);
     if (!key) return next();
-    if (!key.startsWith(API_KEY_PREFIX)) return res.status(401).json({ message: 'מפתח API לא תקין' });
+    // אבחון בלי ערך המפתח ובלי query (?key=)
+    const fail = (message) => {
+        console.warn(`[wa-view 401] API_KEY_INVALID ${req.method} ${(req.originalUrl || '').split('?')[0]} pid=${process.pid}`);
+        return res.status(401).json({ message, code: 'API_KEY_INVALID' });
+    };
+    if (!key.startsWith(API_KEY_PREFIX)) return fail('מפתח API לא תקין');
 
     try {
         const user = await User.findOne({ apiKeyHash: hashApiKey(key) }).select('_id role').lean();
         if (!user || !['wa-viewer', 'admin'].includes(user.role)) {
-            return res.status(401).json({ message: 'מפתח API לא תקין או בוטל' });
+            return fail('מפתח API לא תקין או בוטל');
         }
         req.user = { _id: user._id, id: String(user._id), role: user.role };
         req.apiKeyAuth = true;

@@ -34,6 +34,8 @@ Both cookies are HTTP-only → cannot be accessed by JavaScript → XSS-safe.
 4. **Note:** `_id` is MongoDB ObjectId, `id` is string alias — both exist for compatibility
 5. **`wa-viewer` lockdown:** if `role === 'wa-viewer'` and `isWaViewerAllowedPath(req)` is false → 403. Allowed: `/api/wa-view/*`, `/api/push/*` (phone notifications), `GET /api/auth/profile`, `/api/auth/change-password` (login/logout/refresh don't pass through requireAuth). Same check in `server/middlewares/requireAuth.js`.
 
+6. **401 carries `code`** (no secrets): `NO_TOKEN` (no `jwt` cookie arrived), `TOKEN_EXPIRED`, `TOKEN_BAD_SIGNATURE` (signed with a different `JWT_ACCESS_SECRET` — another process/server), `TOKEN_INVALID`. On `/api/wa-view` it also logs one line to stdout (pm2 logs): `[wa-view 401] <code> <method> <path, no query> cookies=<cookie names only> expiredAgo=<s> pid=<pid> ua="…"`. API key failures: `code: 'API_KEY_INVALID'`, same log prefix.
+
 ### API key (`server/middlewares/apiKeyAuth.js`) — `/api/wa-view` only
 For automated consumers: `Authorization: Bearer wav_…` / `X-Api-Key` / `?key=`. Looked up by `sha256` in `User.apiKeyHash` (`select:false`); role must be `wa-viewer` or `admin`. Sets `req.user` + `req.apiKeyAuth = true`; `app.js` skips CSRF for such requests; `waViewRoutes` skips cookie `requireAuth`. Created/revoked by admin (`/api/admin/users/:id/api-key`). Invalid key → 401.
 
@@ -114,6 +116,7 @@ The axios instance handles fetching and attaching the CSRF token automatically.
 | Symptom | Likely cause |
 |---------|-------------|
 | All API calls return 401 | CSRF token not being sent, or access token expired |
+| Automated `/api/wa-view` reader: messages OK, media 401 right after | Unproven (2026-11-24). Compare the two requests: `pm2 logs sterni-backend | grep "wa-view 401"` (`code`, cookie names, pid) and the admin request log (`Log`: status, userAgent, `cookies.count`). `NO_TOKEN` → the media request didn't carry the refreshed cookie (different client/tool) — use the API key / `?key=` on media URLs; `TOKEN_BAD_SIGNATURE` → parallel process with another secret. Don't lengthen TTLs or weaken auth to hide it |
 | 403 "Form has been tampered" | Missing `X-CSRF-Token` header on mutating request |
 | User gets `_id` as string instead of ObjectId | Use `req.user._id` (ObjectId) not `req.user.id` (string) for MongoDB queries |
 | "לא מחובר" on valid session | Cookie not sent — check `credentials: 'include'` in fetch/axios |

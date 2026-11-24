@@ -4,6 +4,7 @@ import { useAuthStore } from "@/stores/authStore";
 
 import Layout from "@/components/Layout";
 import ConsentBanner from "@/components/ConsentBanner";
+import UpdateBanner from "@/components/UpdateBanner";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AdminOnlyRoute from "@/components/AdminOnlyRoute";
 import TzitzitRoute from "@/components/TzitzitRoute";
@@ -199,6 +200,7 @@ export default function App() {
 
     </Routes>
     <ConsentBanner />
+    <UpdateBanner />
     </>
   );
 }

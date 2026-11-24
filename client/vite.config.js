@@ -55,9 +55,30 @@ export default defineConfig({
         ]
       },
       // --- התיקון לשגיאה: הגדלת המגבלה ל-4MB ---
+      // index.html לא נשמר ב-precache ואין NavigationRoute אליו: ניווט = NetworkFirst (מהרשת, מטמון רק כשאין רשת),
+      // כך שאחרי פריסה טעינה רגילה מביאה את הגרסה החדשה. ה-SW החדש מחליף מיד את הישן (skipWaiting/clientsClaim)
+      // — אחרת SW ישן שכבר מותקן היה ממשיך להגיש index.html ישן. העמוד עצמו לא נטען מחדש אוטומטית:
+      // UpdateBanner (App.jsx) מציג כפתור "עדכון", כדי לא למחוק טקסט שלא נשמר.
       workbox: {
         maximumFileSizeToCacheInBytes: 4000000,
-        importScripts: ['company-push.js']
+        importScripts: ['company-push.js'],
+        globIgnores: ['**/index.html'],
+        navigateFallback: null,
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
+        runtimeCaching: [
+          {
+            urlPattern: ({ request, url }) => request.mode === 'navigate'
+              && !url.pathname.startsWith('/api/') && !url.pathname.startsWith('/uploads/'),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'html-pages',
+              networkTimeoutSeconds: 5,
+              expiration: { maxEntries: 20 },
+            },
+          },
+        ],
       }
     })
   ],

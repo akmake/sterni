@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import api from '@/utils/api';
 import { connectSocket } from '@/utils/socket';
 import { useAuthStore } from '@/stores/authStore';
@@ -8,7 +8,7 @@ import WaMessageBubble, { fmtDay } from '@/components/whatsapp/WaMessageBubble';
 import PushOptIn from '@/components/PushOptIn';
 import {
     Loader2, LogOut, MessageCircle, ListTodo, FolderKanban, Send, Plus, X,
-    CheckCircle2, Eye, Clock, CalendarDays, ChevronDown,
+    CheckCircle2, Eye, Clock, CalendarDays, ChevronDown, Pencil, Check, RefreshCw,
 } from 'lucide-react';
 
 /**
@@ -20,7 +20,11 @@ import {
  * זמן אמת (Socket.IO): 'wa-view:changed' → מושך הודעות (changedSince); 'assignments:changed' → מרענן מטלות/פרויקטים.
  * גיבוי: polling כל 15ש + רענון בחזרה לאפליקציה.
  *
- * API: GET /api/wa-view/messages, GET /api/wa-view/assignments, POST /api/wa-view/tasks, POST /api/wa-view/projects
+ * /wa-view?view=tasks — מסך מטלות בלבד (TasksOnlyContent): GET /assignments פעם אחת + אחרי שליחה/עריכה/רענון ידני.
+ *   בלי בקשות הודעות, בלי socket, בלי polling ובלי רענון בחזרה ללשונית. חידוש ה-jwt הרגיל (api.js) נשאר.
+ *
+ * API: GET /api/wa-view/messages, GET /api/wa-view/assignments, POST /api/wa-view/tasks,
+ *      PATCH /api/wa-view/tasks/:id (טקסט בלבד), POST /api/wa-view/projects
  */
 
 const POLL_MS = 15_000;
@@ -107,18 +111,42 @@ function TasksView({ targetName, tasks, onCreated, notify }) {
             </div>
 
             <Section title="פתוחות" count={open.length}>
-                {open.length === 0 ? <Empty text="אין מטלות פתוחות" /> : open.map((t) => <TaskRow key={t._id} t={t} />)}
+                {open.length === 0 ? <Empty text="אין מטלות פתוחות" /> : open.map((t) => <TaskRow key={t._id} t={t} onSaved={onCreated} notify={notify} />)}
             </Section>
             {done.length > 0 && (
                 <Section title="בוצעו" count={done.length} collapsible>
-                    {done.map((t) => <TaskRow key={t._id} t={t} />)}
+                    {done.map((t) => <TaskRow key={t._id} t={t} onSaved={onCreated} notify={notify} />)}
                 </Section>
             )}
         </div>
     );
 }
 
-function TaskRow({ t }) {
+/** שורת מטלה + עריכת טקסט בלבד (PATCH /api/wa-view/tasks/:id). אין מחיקה ואין שינוי סטטוס. */
+function TaskRow({ t, onSaved, notify }) {
+    const [editing, setEditing] = useState(false);
+    const [draft, setDraft] = useState(t.text);
+    const [saving, setSaving] = useState(false);
+
+    const startEdit = () => { setDraft(t.text); setEditing(true); };
+    const cancel = () => { setDraft(t.text); setEditing(false); };
+    const save = async () => {
+        const v = draft.trim();
+        if (!v || saving) return;
+        if (v === t.text) { setEditing(false); return; }
+        setSaving(true);
+        try {
+            await api.patch(`/wa-view/tasks/${t._id}`, { text: v });
+            setEditing(false);
+            notify('המטלה עודכנה');
+            onSaved();
+        } catch (err) {
+            notify(err.response?.data?.message || 'שגיאה בשמירת המטלה', true);
+        } finally {
+            setSaving(false);
+        }
+    };
+
     return (
         <div className="bg-white rounded-xl border border-slate-200 px-3.5 py-3 flex items-start gap-3">
             <div className={`mt-0.5 w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center
@@ -126,12 +154,36 @@ function TaskRow({ t }) {
                 {t.isCompleted && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
             </div>
             <div className="flex-1 min-w-0">
-                <div className={`text-[14px] leading-snug whitespace-pre-wrap break-words ${t.isCompleted ? 'line-through text-slate-400' : 'text-slate-800'}`}>{t.text}</div>
+                {editing ? (
+                    <>
+                        <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={3} maxLength={2000} autoFocus
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save(); }
+                                if (e.key === 'Escape') cancel();
+                            }}
+                            aria-label="טקסט המטלה" className="input-base resize-none" />
+                        <div className="flex items-center justify-end gap-2 mt-2">
+                            <button onClick={cancel} disabled={saving} className="px-3 py-1.5 rounded-lg text-xs text-slate-600 hover:bg-slate-100">ביטול</button>
+                            <button onClick={save} disabled={!draft.trim() || saving}
+                                className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg px-3 py-1.5 disabled:opacity-40">
+                                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} שמירה
+                            </button>
+                        </div>
+                    </>
+                ) : (
+                    <div className={`text-[14px] leading-snug whitespace-pre-wrap break-words ${t.isCompleted ? 'line-through text-slate-400' : 'text-slate-800'}`}>{t.text}</div>
+                )}
                 <div className="flex items-center gap-2 mt-1.5">
                     <StatusPill done={t.isCompleted} seen={!!t.seenAt} />
                     <span className="text-[11px] text-slate-400">{relTime(t.createdAt)}</span>
                 </div>
             </div>
+            {!editing && (
+                <button onClick={startEdit} title="עריכת המטלה" aria-label="עריכת המטלה"
+                    className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-50">
+                    <Pencil className="w-4 h-4" />
+                </button>
+            )}
         </div>
     );
 }
@@ -526,6 +578,11 @@ function WaViewerContent() {
                     </div>
                 </div>
                 {newCount > 0 && <span className="bg-amber-400 text-white text-xs font-semibold rounded-full px-2.5 py-1">{newCount} חדשות</span>}
+                {assign.enabled && (
+                    <a href="/wa-view?view=tasks" title="מסך מטלות בלבד" aria-label="מסך מטלות בלבד" className="p-2 rounded-lg hover:bg-white/15">
+                        <ListTodo className="w-4 h-4" />
+                    </a>
+                )}
                 <PushOptIn compact />
                 <button onClick={() => logout()} title="יציאה" className="p-2 rounded-lg hover:bg-white/15">
                     <LogOut className="w-4 h-4" />
@@ -574,15 +631,91 @@ function WaViewerContent() {
             )}
 
             <Toast toast={toast} />
-            <style>{`.input-base{width:100%;border:1px solid rgb(226 232 240);border-radius:0.75rem;padding:0.55rem 0.75rem;font-size:14px;outline:none;background:white;color:rgb(30 41 59)}.input-base:focus{border-color:rgb(16 185 129);box-shadow:0 0 0 3px rgb(16 185 129 / 0.15)}`}</style>
+            <style>{INPUT_CSS}</style>
         </div>
     );
 }
 
-/** שומר: מחובר + (wa-viewer או admin) */
+const INPUT_CSS = `.input-base{width:100%;border:1px solid rgb(226 232 240);border-radius:0.75rem;padding:0.55rem 0.75rem;font-size:14px;outline:none;background:white;color:rgb(30 41 59)}.input-base:focus{border-color:rgb(16 185 129);box-shadow:0 0 0 3px rgb(16 185 129 / 0.15)}`;
+
+// ============================================================
+// ===  TASKS ONLY (/wa-view?view=tasks)  ===
+// ============================================================
+// טוען רק /assignments: בטעינה, אחרי שליחה/עריכה, ובלחיצה על "רענון". אין כאן קריאות הודעות, socket,
+// polling או visibilitychange — בכוונה. זה לא פתרון לרציפות הקורא האוטומטי (בשביל זה — מפתח API).
+function TasksOnlyContent() {
+    const [assign, setAssign] = useState(null);
+    const [error, setError] = useState('');
+    const [refreshing, setRefreshing] = useState(false);
+    const [toast, setToast] = useState(null);
+    const toastTimer = useRef(null);
+    const { mutate: logout } = useLogout();
+
+    const notify = useCallback((text, err = false) => {
+        setToast({ text, error: err });
+        clearTimeout(toastTimer.current);
+        toastTimer.current = setTimeout(() => setToast(null), 3000);
+    }, []);
+
+    const load = useCallback(async () => {
+        setRefreshing(true);
+        try {
+            const { data } = await api.get('/wa-view/assignments');
+            setAssign(data);
+            setError('');
+        } catch (err) {
+            setError(err.response?.data?.message || 'שגיאה בטעינת המטלות');
+        } finally {
+            setRefreshing(false);
+        }
+    }, []);
+
+    useEffect(() => { load(); }, [load]);
+
+    return (
+        <div dir="rtl" className="h-[100dvh] flex flex-col bg-slate-50">
+            <header className="shrink-0 px-4 py-3 bg-gradient-to-l from-[#008069] to-[#00a884] text-white flex items-center gap-3 shadow-md z-20">
+                <ListTodo className="w-5 h-5" />
+                <div className="flex-1 min-w-0">
+                    <div className="font-semibold truncate leading-tight">מטלות</div>
+                    {assign?.targetName && <div className="text-[11px] text-white/85 truncate">שליחה אל {assign.targetName}</div>}
+                </div>
+                <button onClick={load} disabled={refreshing} title="רענון" aria-label="רענון" className="p-2 rounded-lg hover:bg-white/15 disabled:opacity-50">
+                    <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                </button>
+                <a href="/wa-view" title="לצ'אט" aria-label="לצ'אט" className="p-2 rounded-lg hover:bg-white/15">
+                    <MessageCircle className="w-4 h-4" />
+                </a>
+                <button onClick={() => logout()} title="יציאה" aria-label="יציאה" className="p-2 rounded-lg hover:bg-white/15">
+                    <LogOut className="w-4 h-4" />
+                </button>
+            </header>
+
+            <main className="flex-1 overflow-y-auto">
+                <div className="max-w-2xl mx-auto p-4">
+                    {!assign && !error ? (
+                        <div className="flex justify-center py-16 text-slate-500"><Loader2 className="w-7 h-7 animate-spin" /></div>
+                    ) : error && !assign ? (
+                        <div className="text-center text-red-600 py-16">{error}</div>
+                    ) : !assign.enabled ? (
+                        <div className="text-center text-slate-500 py-16">לא הוגדר משתמש יעד למטלות</div>
+                    ) : (
+                        <TasksView targetName={assign.targetName} tasks={assign.tasks} onCreated={load} notify={notify} />
+                    )}
+                </div>
+            </main>
+
+            <Toast toast={toast} />
+            <style>{INPUT_CSS}</style>
+        </div>
+    );
+}
+
+/** שומר: מחובר + (wa-viewer או admin). ?view=tasks → מסך מטלות בלבד */
 export default function WaViewerPage() {
     const { isAuthenticated, user } = useAuthStore();
+    const [params] = useSearchParams();
     if (!isAuthenticated) return <Navigate to="/login" replace />;
     if (!['wa-viewer', 'admin'].includes(user?.role)) return <Navigate to="/" replace />;
-    return <WaViewerContent />;
+    return params.get('view') === 'tasks' ? <TasksOnlyContent /> : <WaViewerContent />;
 }

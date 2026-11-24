@@ -55,7 +55,7 @@ Prefix `/api/whatsapp-monitor`. UI: `WhatsAppMonitorPage.jsx`. Separate Baileys 
 | POST | `/media/:messageId/fetch` | Download media now from WhatsApp (history / failed download) using stored raw message; 409 if impossible |
 | GET | `/media/:messageId` | Stream a message's media file (private, not via `/uploads`). `?download=1` → attachment with original file name |
 
-## WhatsApp Viewer (read-only — `requireAuth` + role `wa-viewer` or `admin`)
+## WhatsApp Viewer (messages read-only — `requireAuth` + role `wa-viewer` or `admin`)
 Prefix `/api/wa-view`. UI: `WaViewerPage.jsx` (`/wa-view`, outside Layout). Shows only the chat(s) matching `WhatsAppMonitorSettings.tracked`. File: `server/routes/waViewRoutes.js`.
 
 | Method | Path | Description |
@@ -64,7 +64,10 @@ Prefix `/api/wa-view`. UI: `WaViewerPage.jsx` (`/wa-view`, outside Layout). Show
 | GET | `/media/:messageId` | Media of a tracked-chat message. If not on disk yet — downloads from WhatsApp on the fly. `?download=1` → attachment |
 | GET | `/assignments` | `{ enabled, targetName, tasks[], projects[] }` — whether the caller has `User.taskTargetUser`, and what the caller created for that user (tasks: `text,isCompleted,seenAt,createdAt`; projects: `projectName,description,dueDate,seenAt,taskCount,doneCount,progress`) |
 | POST | `/tasks` | `{ text }` (≤2000) → `Task { userId: taskTargetUser, createdBy: caller }` + instant socket/push to the target + reminders. 403 without `taskTargetUser` |
+| PATCH | `/tasks/:id` | `{ text }` (trimmed, 1–2000) → edits **text only** of a task filtered by `_id` + `createdBy: caller` + `userId: caller's taskTargetUser` (else 404). Owner/target/status can't change; no DELETE exists. Cookie auth + CSRF only — **API key → 403** (key scope not widened). Emits `tasks:changed` `{action:'updated'}` to the target + `assignments:changed` to the caller |
 | POST | `/projects` | `{ projectName, description?, dueDate?, tasks?: string[] }` → `Project { owner: taskTargetUser, createdBy: caller }` + instant socket/push + reminders |
+
+**Tasks-only screen:** `/wa-view?view=tasks` (`TasksOnlyContent` in `WaViewerPage.jsx`) calls only `GET /assignments` (on load, after create/edit, manual refresh) — no `/messages`, no socket, no polling, no refresh-on-tab-return. The normal `jwt` refresh in `api.js` still applies. It is not a fix for an automated reader — that needs the API key.
 
 Message shape: `{ id, direction:'in'|'out', from, timestamp, type, text, quotedText, media:{available,url,downloadUrl,mime,fileName,fileSize,durationSeconds,isVoiceNote}|null, location?, contact?, poll?, deleted, edited, originalText?, reactions:[{emoji,by:'me'|'them'}], updatedAt }`. `id` = WhatsApp message id (unique, stable).
 

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon app.js",
     "start": "node app.js",
-    "test:companyos": "node tests/companyos/run.mjs"
+    "test:companyos": "node tests/companyos/run.mjs",
+    "test:wa-view": "node --test --experimental-test-module-mocks tests/wa-view-task-edit.test.mjs"
   },
   "dependencies": {
     "@hebcal/core": "^6.9.3",

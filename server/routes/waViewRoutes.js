@@ -1,11 +1,12 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import { requireAuth } from '../middlewares/authMiddleware.js';
 import WhatsAppMessage from '../models/WhatsAppMessage.js';
 import WhatsAppChat from '../models/WhatsAppChat.js';
 import Task from '../models/Task.js';
 import User from '../models/userModel.js';
 import Project from '../models/Project.js';
-import { notifyTaskAssigned, notifyProjectAssigned, initialReminderFields } from '../services/assignmentNotifier.js';
+import { notifyTaskAssigned, notifyProjectAssigned, initialReminderFields, emitToUser } from '../services/assignmentNotifier.js';
 import {
     getMonitorSettings,
     trackedChatFilter,
@@ -17,7 +18,7 @@ import { sendMediaFile } from './whatsappMonitorRoutes.js';
 /**
  * /api/wa-view — צפייה בלבד בשיחה עם איש הקשר שנבחר בהגדרות המעקב.
  * גישה: role 'wa-viewer' (משתמש צופה — חסום מכל API אחר ב-authMiddleware) או 'admin'.
- * אין כאן שום פעולת כתיבה מבחינת המשתמש.
+ * ההודעות לקריאה בלבד. כתיבה: יצירת מטלות/פרויקטים ליעד + עריכת טקסט של מטלה שהצופה יצר (בלי מחיקה).
  *
  * Coupled: server/services/whatsappMonitorService.js (settings + מדיה),
  *          client/src/pages/WaViewerPage.jsx
@@ -241,6 +242,40 @@ router.post('/tasks', async (req, res) => {
         res.status(201).json({ _id: task._id, text: task.text, isCompleted: false, seenAt: null, createdAt: task.createdAt });
     } catch (err) {
         res.status(500).json({ message: 'שגיאה ביצירת מטלה', error: err.message });
+    }
+});
+
+/**
+ * PATCH /api/wa-view/tasks/:id { text } — עריכת הטקסט של מטלה שאני יצרתי עבור היעד שלי. טקסט בלבד:
+ * אין שינוי בעלות / יעד / סטטוס, ואין מחיקה. הסינון בשרת: _id + createdBy=אני + userId=היעד שהוגדר לי
+ * (אם היעד הוחלף — מטלות ליעד הקודם כבר לא ניתנות לעריכה).
+ * רק בהתחברות רגילה (cookie + CSRF דרך app.js). מפתח API חסום כאן בכוונה — לא מרחיבים את היקף המפתח.
+ */
+router.patch('/tasks/:id', async (req, res) => {
+    try {
+        if (req.apiKeyAuth) return res.status(403).json({ message: 'עריכת מטלות זמינה רק מהממשק (לא במפתח API)' });
+        if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'מזהה מטלה לא תקין' });
+        if (typeof req.body?.text !== 'string') return res.status(400).json({ message: 'נדרש טקסט למטלה' });
+        const text = req.body.text.trim();
+        if (!text) return res.status(400).json({ message: 'נדרש טקסט למטלה' });
+        if (text.length > 2000) return res.status(400).json({ message: 'המטלה ארוכה מדי (עד 2000 תווים)' });
+
+        const { target } = await getMeAndTarget(req.user._id);
+        if (!target) return res.status(403).json({ message: 'אין לך הרשאה לערוך מטלות' });
+
+        const task = await Task.findOneAndUpdate(
+            { _id: req.params.id, createdBy: req.user._id, userId: target._id },
+            { $set: { text } },
+            { new: true, runValidators: true },
+        ).select('text isCompleted completedAt seenAt createdAt userId').lean();
+        if (!task) return res.status(404).json({ message: 'המטלה לא נמצאה' });
+
+        emitToUser(task.userId, 'tasks:changed', { taskId: String(task._id), action: 'updated' });
+        emitToUser(req.user._id, 'assignments:changed', { kind: 'task' });
+        const { userId, ...pub } = task;
+        res.json(pub);
+    } catch (err) {
+        res.status(500).json({ message: 'שגיאה בעדכון מטלה', error: err.message });
     }
 });
 

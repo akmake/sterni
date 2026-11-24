@@ -26,6 +26,8 @@
 - Viewer: `client/src/pages/WaViewerPage.jsx` — `/wa-view` (מחוץ ל-Layout), צפייה בלבד בשיחה עם איש הקשר שבמעקב; API `server/routes/waViewRoutes.js` (`/api/wa-view`). גישה: role `wa-viewer` (חסום מכל שאר המערכת) או admin. רכיב בועה משותף: `client/src/components/whatsapp/WaMessageBubble.jsx`
 - תפריט צד (admin): "מעקב וואצפ" + "צ'אט במעקב" כקישורים ישירים בשתי התצוגות (`waMonitorNav` ב-`Navbar.jsx`)
 - מטלות ופרויקטים מהצופה: אדמין בוחר בעמודה "יוצר מטלות עבור" (ניהול משתמשים) משתמש יעד → `User.taskTargetUser`. בעמוד הצופה: פאנל צד (דסקטופ) / לשוניות תחתונות (מובייל) — "מטלות" ו"פרויקטים". נוצרים אצל היעד (`createdBy` = הצופה; מוצג כ"מאת <שם איש הקשר שבמעקב>" — `sourceLabel` — + "חדש"), עם עדכון מיידי (socket) + התראת Push לטלפון + תזכורות חוזרות עד שהיעד ראה (`server/services/assignmentNotifier.js`). הצופה רואה סטטוס: נשלח / נראה / בוצע.
+- עריכת מטלה (טקסט בלבד, בלי מחיקה/סטטוס): כפתור עיפרון ב-`TaskRow` → `PATCH /api/wa-view/tasks/:id` (cookie + CSRF; מפתח API חסום). בדיקות: `npm run test:wa-view` ב-`server/`.
+- `/wa-view?view=tasks` — מסך מטלות בלבד: רק `GET /assignments`, בלי הודעות/socket/polling/רענון בחזרה ללשונית. מעבר בין המסכים בטעינת עמוד מלאה (כדי שלא יישאר socket פתוח).
 - עמוד הצופה מתעדכן בזמן אמת: `wa-view:changed` (room `wa-viewers`) → משיכת `changedSince`; polling 15ש כגיבוי.
 - התראות Push לצופה (`PushOptIn compact` בכותרת `/wa-view`): כל הודעה חדשה בשיחה שבמעקב (`notifyViewersOfMessage` ב-`whatsappMonitorService.js`, tag `wa-view-chat` — מחליפות זו את זו), וכשהיעד מסמן מטלה שהצופה יצר כבוצעה (`taskController.updateTaskStatus`).
 - Auth session: `server/auth_info_monitor/` (נפרד מ-`auth_info_baileys/`) — gitignored
